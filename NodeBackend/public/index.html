@@ -185,14 +185,15 @@
         <input
           type="text"
           id="original-url"
-          placeholder="Paste Amazon or Flipkart product URL"
+          placeholder="Paste Amazon, Flipkart, or Myntra URL"
         />
         <button id="create-btn">Create affiliate link</button>
       </div>
       <div class="small">
         Examples:
-        <code class="mono">https://amzn.to/48eIkdx</code> or
-        <code class="mono">https://www.flipkart.com/...</code>
+        <code class="mono">https://amzn.to/48eIkdx</code> •
+        <code class="mono">https://www.flipkart.com/...</code> •
+        <code class="mono">https://www.myntra.com/...</code>
       </div>
 
       <h2>Saved links</h2>
@@ -208,9 +209,7 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody id="links-tbody">
-          <!-- rows go here -->
-        </tbody>
+        <tbody id="links-tbody"></tbody>
       </table>
     </div>
 
@@ -226,14 +225,11 @@
         if (type) statusEl.classList.add(type);
       }
 
-      // Auto-detect Amazon vs Flipkart and call right backend route
+      // Auto-detect Amazon, Flipkart, Myntra
       async function createLink() {
         const url = inputEl.value.trim();
         if (!url) {
-          setStatus(
-            "Please paste an Amazon or Flipkart product URL first.",
-            "error"
-          );
+          setStatus("Please paste a product URL first.", "error");
           return;
         }
 
@@ -241,7 +237,10 @@
         let endpoint = null;
         let sourceLabel = "";
 
-        if (lower.includes("amazon.") || lower.includes("amzn.to")) {
+        if (lower.includes("myntra.")) {
+          endpoint = "/api/links/admitad";
+          sourceLabel = "Myntra";
+        } else if (lower.includes("amazon.") || lower.includes("amzn.to")) {
           endpoint = "/api/links/amazon";
           sourceLabel = "Amazon";
         } else if (lower.includes("flipkart.")) {
@@ -249,19 +248,17 @@
           sourceLabel = "Flipkart";
         } else {
           setStatus(
-            "Right now this tool only supports Amazon and Flipkart product links.",
+            "Supported: Amazon, Flipkart, Myntra (Admitad program)",
             "error"
           );
           return;
         }
 
         createBtn.disabled = true;
-        setStatus(`Creating ${sourceLabel} link...`, "");
+        setStatus(`Creating ${sourceLabel} link...`);
 
         try {
-          const res = await fetch(
-            `${endpoint}?url=${encodeURIComponent(url)}`
-          );
+          const res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}`);
           const data = await res.json();
 
           if (!res.ok || !data.ok) {
@@ -272,7 +269,6 @@
           inputEl.value = "";
           await loadLinks();
         } catch (err) {
-          console.error(err);
           setStatus(err.message, "error");
         } finally {
           createBtn.disabled = false;
@@ -280,17 +276,15 @@
       }
 
       async function loadLinks() {
-        setStatus("Loading links...", "");
+        setStatus("Loading links...");
         try {
           const res = await fetch("/api/links/all");
           const data = await res.json();
-          if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Failed to load links");
-          }
-          renderLinks(data.links || []);
+
+          if (!data.ok) throw new Error(data.error);
+          renderLinks(data.links);
           setStatus(`Loaded ${data.count} link(s).`, "ok");
         } catch (err) {
-          console.error(err);
           setStatus(err.message, "error");
         }
       }
@@ -299,76 +293,30 @@
         tbodyEl.innerHTML = "";
 
         if (!links.length) {
-          const tr = document.createElement("tr");
-          const td = document.createElement("td");
-          td.colSpan = 7;
-          td.textContent = "No links yet. Create one above.";
-          tr.appendChild(td);
-          tbodyEl.appendChild(tr);
+          tbodyEl.innerHTML =
+            '<tr><td colspan="7">No links yet. Create one above.</td></tr>';
           return;
         }
 
         for (const link of links) {
           const tr = document.createElement("tr");
 
-          // ID
-          const tdId = document.createElement("td");
-          tdId.textContent = link.id;
-          tr.appendChild(tdId);
-
-          // Source
-          const tdSource = document.createElement("td");
-          tdSource.textContent = link.source || "-";
-          tr.appendChild(tdSource);
-
-          // Original URL
-          const tdOriginal = document.createElement("td");
-          tdOriginal.innerHTML = `<div class="mono">${link.originalUrl}</div>`;
-          tr.appendChild(tdOriginal);
-
-          // Affiliate URL
-          const tdAff = document.createElement("td");
-          tdAff.innerHTML = `<div class="mono">${link.affiliateUrl}</div>`;
-          tr.appendChild(tdAff);
-
-          // Clicks
-          const tdClicks = document.createElement("td");
-          const clicks = link.clicks || 0;
-          tdClicks.innerHTML = `<span class="badge"><span>${clicks}</span> clicks</span>`;
-          tr.appendChild(tdClicks);
-
-          // Created
-          const tdCreated = document.createElement("td");
-          tdCreated.textContent = link.createdAt
-            ? new Date(link.createdAt).toLocaleString()
-            : "-";
-          tr.appendChild(tdCreated);
-
-          // Actions
-          const tdActions = document.createElement("td");
-          tdActions.className = "actions";
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "secondary";
-          copyBtn.textContent = "Copy affiliate URL";
-          copyBtn.onclick = () => copyToClipboard(link.affiliateUrl);
-
-          const goBtn = document.createElement("button");
-          goBtn.textContent = "Open tracked link";
-          goBtn.onclick = () => {
-            window.open(`/api/links/go/${link.id}`, "_blank");
-          };
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "danger";
-          deleteBtn.textContent = "Delete";
-          deleteBtn.onclick = () => deleteLink(link.id);
-
-          tdActions.appendChild(copyBtn);
-          tdActions.appendChild(goBtn);
-          tdActions.appendChild(deleteBtn);
-
-          tr.appendChild(tdActions);
+          tr.innerHTML = `
+            <td>${link.id}</td>
+            <td>${link.source || "-"}</td>
+            <td><div class="mono">${link.originalUrl}</div></td>
+            <td><div class="mono">${link.affiliateUrl}</div></td>
+            <td><span class="badge"><span>${link.clicks ||
+              0}</span> clicks</span></td>
+            <td>${link.createdAt
+              ? new Date(link.createdAt).toLocaleString()
+              : "-"}</td>
+            <td class="actions">
+              <button class="secondary" onclick="copyToClipboard('${link.affiliateUrl}')">Copy</button>
+              <button onclick="window.open('/api/links/go/${link.id}', '_blank')">Open</button>
+              <button class="danger" onclick="deleteLink('${link.id}')">Delete</button>
+            </td>
+          `;
 
           tbodyEl.appendChild(tr);
         }
@@ -380,13 +328,11 @@
         try {
           const res = await fetch(`/api/links/${id}`, { method: "DELETE" });
           const data = await res.json();
-          if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Failed to delete");
-          }
-          setStatus(data.message || `Link ${id} deleted.`, "ok");
+
+          if (!data.ok) throw new Error(data.error);
+          setStatus(`Link ${id} deleted.`, "ok");
           await loadLinks();
         } catch (err) {
-          console.error(err);
           setStatus(err.message, "error");
         }
       }
@@ -394,10 +340,9 @@
       async function copyToClipboard(text) {
         try {
           await navigator.clipboard.writeText(text);
-          setStatus("Copied affiliate URL to clipboard.", "ok");
-        } catch (err) {
-          console.error(err);
-          setStatus("Could not copy to clipboard.", "error");
+          setStatus("Copied affiliate URL.", "ok");
+        } catch {
+          setStatus("Could not copy.", "error");
         }
       }
 
@@ -406,7 +351,6 @@
         if (e.key === "Enter") createLink();
       });
 
-      // Load list on page open
       window.addEventListener("DOMContentLoaded", loadLinks);
     </script>
   </body>
