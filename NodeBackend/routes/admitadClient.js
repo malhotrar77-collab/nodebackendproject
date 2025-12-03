@@ -1,96 +1,72 @@
-// routes/admitadClient.js
+// NodeBackend/routes/admitadClient.js
+
 const axios = require("axios");
 
-let cachedToken = null;
-let tokenExpiresAt = 0;
+// Read env vars once
+const CLIENT_ID = process.env.ADMITAD_CLIENT_ID;
+const CLIENT_SECRET = process.env.ADMITAD_CLIENT_SECRET;
+const WEBSITE_ID = process.env.ADMITAD_WEBSITE_ID;
 
-// Get an OAuth token from Admitad using client credentials
-async function getAdmitadToken() {
-  const now = Date.now();
+// On boot, log whether env vars are present (but not the full secrets)
+console.log("Admitad env check →", {
+  hasClientId: !!CLIENT_ID,
+  hasClientSecret: !!CLIENT_SECRET,
+  hasWebsiteId: !!WEBSITE_ID,
+});
 
-  // Reuse token if still valid for > 60 seconds
-  if (cachedToken && now < tokenExpiresAt - 60_000) {
-    return cachedToken;
-  }
-
-  const clientId = process.env.ADMITAD_CLIENT_ID;
-  const clientSecret = process.env.ADMITAD_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "Admitad credentials are not configured. Please set ADMITAD_CLIENT_ID and ADMITAD_CLIENT_SECRET."
-    );
-  }
-
-  const authString = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-
-  const resp = await axios.post(
-    "https://api.admitad.com/token/",
-    new URLSearchParams({
-      grant_type: "client_credentials",
-    }).toString(),
-    {
-      headers: {
-        Authorization: `Basic ${authString}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    }
+if (!CLIENT_ID || !CLIENT_SECRET || !WEBSITE_ID) {
+  console.warn(
+    "WARNING: Some Admitad env vars are missing. " +
+      "Set ADMITAD_CLIENT_ID, ADMITAD_CLIENT_SECRET, ADMITAD_WEBSITE_ID in Render."
   );
-
-  const { access_token, expires_in } = resp.data;
-  cachedToken = access_token;
-  tokenExpiresAt = now + expires_in * 1000;
-
-  return cachedToken;
 }
 
-/**
- * Create a deeplink using Admitad API.
- *
- * @param {Object} opts
- * @param {string} opts.campaignId  Admitad campaign (offer) id, e.g. 123456
- * @param {string} opts.url         Original product URL
- */
+// Get OAuth token from Admitad
+async function getAdmitadToken() {
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+  }).toString();
+
+  const url = "https://api.admitad.com/token/";
+
+  const res = await axios.post(url, body, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+
+  if (!res.data || !res.data.access_token) {
+    throw new Error("No access_token in Admitad token response");
+  }
+
+  return res.data.access_token;
+}
+
+// Create deeplink for a given campaign + URL
 async function createAdmitadDeeplink({ campaignId, url }) {
   const token = await getAdmitadToken();
 
-  // Some implementations use `/deeplink/{campaignId}/?subid=&ulp=` etc.
-  // We'll use the universal deeplink endpoint:
-  const websiteId = process.env.ADMITAD_WEBSITE_ID;
-
-  if (!websiteId) {
-    throw new Error("Missing ADMITAD_WEBSITE_ID env variable.");
-  }
-
-  const params = new URLSearchParams({
-    website_id: websiteId,
-    campaign_id: String(campaignId),
-    ulp: url, // encoded automatically
-  });
-
-  const resp = await axios.get("https://api.admitad.com/deeplink/", {
+  const res = await axios.get("https://api.admitad.com/deeplink/", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    params,
+    params: {
+      website_id: WEBSITE_ID,
+      campaign_id: campaignId,
+      ulp: url,
+    },
   });
 
-  // Response usually contains "deeplink" or "result" field; adjust when you see real shape
-  const data = resp.data;
+  const data = res.data;
 
-  const deeplink =
-    data.deeplink ||
-    data.result?.deeplink ||
-    data.results?.[0]?.deeplink ||
-    null;
-
-  if (!deeplink) {
-    throw new Error("Could not find deeplink in Admitad response.");
+  // Shape may differ; adjust when we see real response
+  if (!data || !data.deeplink) {
+    throw new Error("No deeplink field in Admitad response");
   }
 
-  return deeplink;
+  return data.deeplink;
 }
 
-module.exports = {
-  createAdmitadDeeplink,
-};
+module.exports = { createAdmitadDeeplink };
