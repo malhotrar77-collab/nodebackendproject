@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="verify-admitad" content="6d956ec42a" />
     <title>Affiliate Links Dashboard</title>
+
     <style>
       body {
         font-family:
@@ -116,8 +118,14 @@
       }
       .mono {
         font-family:
-          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          "Liberation Mono",
+          "Courier New",
+          monospace;
         font-size: 12px;
         word-break: break-all;
       }
@@ -140,6 +148,7 @@
       }
     </style>
   </head>
+
   <body>
     <div class="container">
       <h1>Affiliate Links Dashboard</h1>
@@ -147,7 +156,6 @@
         Backend: <code class="mono">/api/links/*</code> (same server)
       </div>
 
-      <!-- CHANGED: more general heading + placeholder -->
       <h2>Create affiliate link</h2>
       <div id="status"></div>
       <div class="row">
@@ -195,7 +203,7 @@
         if (type) statusEl.classList.add(type);
       }
 
-      // UPDATED: auto-detect Amazon vs Flipkart and call right backend route
+      // Auto-detect Amazon vs Flipkart and call right backend route
       async function createLink() {
         const url = inputEl.value.trim();
         if (!url) {
