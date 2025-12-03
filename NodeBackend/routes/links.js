@@ -1,23 +1,26 @@
+// NodeBackend/routes/links.js
+
 const { createAdmitadDeeplink } = require("./admitadClient");
-
-// Map Admitad programs (add more later)
-const ADMITAD_PROGRAMS = [
-  {
-    key: "myntra",
-    pattern: "myntra.com",
-    campaignId: 123456, // <-- REPLACE with your real Myntra campaign ID
-  },
-];
-
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
 const path = require("path");
 
-// Path to JSON database
+// -------------------- Admitad programs --------------------
+// TODO: Replace campaignId with your REAL Myntra program ID
+// (and add more objects for Ajio, etc. later)
+const ADMITAD_PROGRAMS = [
+  {
+    key: "myntra",
+    pattern: "myntra.com",
+    campaignId: 123456, // <-- put your real Myntra campaign ID here
+  },
+];
+
+// -------------------- Simple JSON "database" --------------------
+
 const dbPath = path.join(__dirname, "..", "data", "links.json");
 
-// Load database or start empty
 let links = [];
 try {
   if (fs.existsSync(dbPath)) {
@@ -30,35 +33,47 @@ try {
 let nextId =
   links.length > 0 ? Math.max(...links.map((l) => Number(l.id))) + 1 : 1;
 
-// Save database
 function saveDB() {
-  fs.writeFileSync(dbPath, JSON.stringify(links, null, 2));
+  try {
+    fs.writeFileSync(dbPath, JSON.stringify(links, null, 2));
+  } catch (err) {
+    console.error("Error saving database:", err);
+  }
 }
 
-// ---- BASIC ROUTES ----
+// -------------------- Helpers --------------------
 
-// TEST
+function requireUrlParam(req, res) {
+  const originalUrl = req.query.url;
+  if (!originalUrl) {
+    res.status(400).json({
+      ok: false,
+      error: "Please provide url query param: ?url=...",
+    });
+    return null;
+  }
+  return originalUrl;
+}
+
+// -------------------- ROUTES --------------------
+
+// Quick test route
 router.get("/test", (req, res) => {
   res.json({ status: "links router working" });
 });
 
-// GET ALL
+// Get all saved links
 router.get("/all", (req, res) => {
   res.json({ ok: true, count: links.length, links });
 });
 
-// CREATE AMAZON LINK
+// ---------- AMAZON ----------
+
 router.get("/amazon", (req, res) => {
-  const originalUrl = req.query.url;
+  const originalUrl = requireUrlParam(req, res);
+  if (!originalUrl) return;
 
-  if (!originalUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: "Please provide url query param: ?url=...",
-    });
-  }
-
-  const tag = "alwaysonsal08-21";
+  const tag = "alwaysonsal08-21"; // your Amazon tag
   const joinChar = originalUrl.includes("?") ? "&" : "?";
   const affiliateUrl = `${originalUrl}${joinChar}tag=${tag}`;
 
@@ -78,20 +93,13 @@ router.get("/amazon", (req, res) => {
   res.json({ ok: true, id: link.id, originalUrl, affiliateUrl });
 });
 
-// CREATE FLIPKART LINK
-router.get("/flipkart", (req, res) => {
-  const originalUrl = req.query.url;
+// ---------- FLIPKART ----------
 
-  if (!originalUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: "Please provide url query param: ?url=...",
-    });
-  }
+router.get("/flipkart", (req, res) => {
+  const originalUrl = requireUrlParam(req, res);
+  if (!originalUrl) return;
 
   const flipkartTag = "alwaysonsale"; // your Flipkart affiliate ID
-
-  // Flipkart affiliate format
   const joinChar = originalUrl.includes("?") ? "&" : "?";
   const affiliateUrl = `${originalUrl}${joinChar}affid=${flipkartTag}`;
 
@@ -116,22 +124,15 @@ router.get("/flipkart", (req, res) => {
   });
 });
 
-// ---- ADMITAD DEEPLINK ROUTE (IMPORTANT: BEFORE '/:id') ----
+// ---------- ADMITAD (Myntra, Ajio, …) ----------
 
-// CREATE ADMITAD LINK (Myntra, Ajio, etc.)
 router.get("/admitad", async (req, res) => {
-  const originalUrl = req.query.url;
-
-  if (!originalUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: "Missing ?url parameter",
-    });
-  }
+  const originalUrl = requireUrlParam(req, res);
+  if (!originalUrl) return;
 
   const lower = originalUrl.toLowerCase();
 
-  // Find matching Admitad program
+  // Find a matching program by domain pattern
   const program = ADMITAD_PROGRAMS.find((p) => lower.includes(p.pattern));
 
   if (!program) {
@@ -166,17 +167,19 @@ router.get("/admitad", async (req, res) => {
       affiliateUrl,
     });
   } catch (err) {
-    console.error("Admitad API ERROR →", err.response?.data || err.message);
+    const details = err.response?.data || err.message;
+    console.error("Admitad API ERROR →", details);
+
+    // TEMP: expose details so we understand what's wrong
     res.status(500).json({
       ok: false,
-      error: "Failed to generate Admitad deeplink.",
+      error: details,
     });
   }
 });
 
-// ---- ID-BASED ROUTES (KEEP AFTER /admitad) ----
+// ---------- GET SINGLE LINK ----------
 
-// GET A SINGLE LINK BY ID
 router.get("/:id", (req, res) => {
   const { id } = req.params;
   const link = links.find((l) => l.id === id);
@@ -190,7 +193,8 @@ router.get("/:id", (req, res) => {
   res.json({ ok: true, link });
 });
 
-// REDIRECT + COUNT CLICK
+// ---------- REDIRECT & COUNT CLICK ----------
+
 router.get("/go/:id", (req, res) => {
   const { id } = req.params;
   const link = links.find((l) => l.id === id);
@@ -207,7 +211,8 @@ router.get("/go/:id", (req, res) => {
   res.redirect(link.affiliateUrl);
 });
 
-// DELETE LINK
+// ---------- DELETE LINK ----------
+
 router.delete("/:id", (req, res) => {
   const { id } = req.params;
   const index = links.findIndex((l) => l.id === id);
@@ -225,4 +230,3 @@ router.delete("/:id", (req, res) => {
 });
 
 module.exports = router;
-
