@@ -1,3 +1,14 @@
+const { createAdmitadDeeplink } = require("./admitadClient");
+
+// Map Admitad programs (add more later)
+const ADMITAD_PROGRAMS = [
+  {
+    key: "myntra",
+    pattern: "myntra.com",
+    campaignId: 123456   // <-- REPLACE with your real Myntra campaign ID
+  },
+];
+
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
@@ -152,3 +163,61 @@ router.delete("/:id", (req, res) => {
 });
 
 module.exports = router;
+
+// CREATE ADMITAD LINK (Myntra, Ajio, etc.)
+router.get("/admitad", async (req, res) => {
+  const originalUrl = req.query.url;
+
+  if (!originalUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Missing ?url parameter",
+    });
+  }
+
+  const lower = originalUrl.toLowerCase();
+
+  // Find matching Admitad program
+  const program = ADMITAD_PROGRAMS.find((p) =>
+    lower.includes(p.pattern)
+  );
+
+  if (!program) {
+    return res.status(400).json({
+      ok: false,
+      error: "No matching Admitad program for this URL.",
+    });
+  }
+
+  try {
+    const affiliateUrl = await createAdmitadDeeplink({
+      campaignId: program.campaignId,
+      url: originalUrl,
+    });
+
+    const link = {
+      id: String(nextId++),
+      source: `admitad-${program.key}`,
+      originalUrl,
+      affiliateUrl,
+      clicks: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    links.push(link);
+    saveDB();
+
+    res.json({
+      ok: true,
+      id: link.id,
+      originalUrl,
+      affiliateUrl,
+    });
+  } catch (err) {
+    console.error("Admitad API ERROR →", err.response?.data || err.message);
+    res.status(500).json({
+      ok: false,
+      error: "Failed to generate Admitad deeplink.",
+    });
+  }
+});
