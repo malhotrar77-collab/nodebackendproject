@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1",
+    "source": "amazon",
+    "originalUrl": "https://amzn.to/48eIkdx",
+    "affiliateUrl": "https://amzn.to/48eIkdx?tag=alwaysonsal08-21",
+    "tag": "alwaysonsal08-21",
+    "clicks": 0,
+    "createdAt": "2025-12-02T15:45:24.443Z"
+  },
+  {
+    "id": "2",
+    "source": "amazon",
+    "originalUrl": "https://amzn.to/48eIkdx",
+    "affiliateUrl": "https://amzn.to/48eIkdx?tag=alwaysonsal08-21",
+    "tag": "alwaysonsal08-21",
+    "clicks": 1,
+    "createdAt": "2025-12-02T15:45:51.106Z"
+  },
+  {
+    "id": "3",
+    "source": "amazon",
+    "originalUrl": "https://amzn.to/3MBgD5W",
+    "affiliateUrl": "https://amzn.to/3MBgD5W?tag=alwaysonsal08-21",
+    "tag": "alwaysonsal08-21",
+    "clicks": 1,
+    "createdAt": "2025-12-02T16:04:33.973Z"
+  },
+  {
+    "id": "5",
+    "source": "amazon",
+    "originalUrl": "https://amzn.to/48hzBHy",
+    "affiliateUrl": "https://amzn.to/48hzBHy?tag=alwaysonsal08-21",
+    "tag": "alwaysonsal08-21",
+    "clicks": 1,
+    "createdAt": "2025-12-02T16:34:24.904Z"
+  }
+]
