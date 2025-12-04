@@ -1,23 +1,30 @@
-const { createAdmitadDeeplink } = require("./admitadClient");
+// NodeBackend/routes/links.js
+
+const { createAdmitadDeeplink } = require("./admitadClient"); // still here for future
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
 
-// Map Admitad programs (we will use later once approved)
+// -------------------- CONFIG --------------------
+
+// Map Admitad programs (for later, when approvals come)
 const ADMITAD_PROGRAMS = [
   {
     key: "myntra",
     pattern: "myntra.com",
-    campaignId: 123456, // TODO: replace with real campaign ID when approved
+    campaignId: 123456, // TODO: replace with real Myntra campaign ID when approved
   },
 ];
+
+// Amazon tag
+const AMAZON_TAG = "alwaysonsal08-21";
 
 // Path to JSON database
 const dbPath = path.join(__dirname, "..", "data", "links.json");
 
-// Load database or start empty
+// -------------------- DB LOADING --------------------
+
 let links = [];
 try {
   if (fs.existsSync(dbPath)) {
@@ -30,87 +37,157 @@ try {
 let nextId =
   links.length > 0 ? Math.max(...links.map((l) => Number(l.id))) + 1 : 1;
 
-// Save database
 function saveDB() {
   fs.writeFileSync(dbPath, JSON.stringify(links, null, 2));
 }
 
-// -------- Basic test --------
+// -------------------- HELPERS --------------------
+
+// Clean Amazon URL -> https://www.amazon.in/dp/ASIN
+function normalizeAmazonUrl(originalUrl) {
+  try {
+    const u = new URL(originalUrl);
+    const host = u.hostname.toLowerCase();
+
+    // keep short links as they are
+    if (host === "amzn.to") return originalUrl;
+
+    if (!host.includes("amazon.")) return originalUrl;
+
+    const segments = u.pathname.split("/").filter(Boolean);
+    let asin = null;
+
+    for (let i = 0; i < segments.length; i++) {
+      const part = segments[i].toLowerCase();
+
+      if (part === "dp" && segments[i + 1]) {
+        asin = segments[i + 1];
+        break;
+      }
+
+      if (
+        part === "gp" &&
+        segments[i + 1] &&
+        segments[i + 1].toLowerCase() === "product" &&
+        segments[i + 2]
+      ) {
+        asin = segments[i + 2];
+        break;
+      }
+    }
+
+    if (!asin) {
+      return originalUrl;
+    }
+
+    return `${u.protocol}//${host}/dp/${asin}`;
+  } catch (e) {
+    return originalUrl;
+  }
+}
+
+// Fetch product title from Amazon page (very simple scraping)
+async function fetchAmazonTitle(productUrl) {
+  try {
+    const res = await fetch(productUrl, {
+      headers: {
+        // Pretend to be a browser
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      },
+    });
+
+    if (!res.ok) {
+      console.warn("Amazon title fetch failed status:", res.status);
+      return null;
+    }
+
+    const html = await res.text();
+
+    // Try productTitle first
+    let m = html.match(/id="productTitle"[^>]*>([^<]+)</i);
+    if (m && m[1]) {
+      return m[1].trim().replace(/\s+/g, " ");
+    }
+
+    // Fallback: <title>...</title>
+    m = html.match(/<title>([^<]+)<\/title>/i);
+    if (m && m[1]) {
+      return m[1].trim().replace(/\s+/g, " ");
+    }
+
+    return null;
+  } catch (err) {
+    console.error("Error fetching Amazon title:", err.message);
+    return null;
+  }
+}
+
+function boolFromQuery(v) {
+  if (!v) return false;
+  const s = String(v).toLowerCase();
+  return s === "1" || s === "true" || s === "yes" || s === "on";
+}
+
+// -------------------- ROUTES --------------------
+
+// Quick test
 router.get("/test", (req, res) => {
   res.json({ status: "links router working" });
 });
 
-// -------- Get all links --------
+// Get all links
 router.get("/all", (req, res) => {
   res.json({ ok: true, count: links.length, links });
 });
 
-// -------- AMAZON LINK (with optional auto-title) --------
+// ---------- AMAZON CREATOR (with URL cleaning + auto title) ----------
 router.get("/amazon", async (req, res) => {
-  const originalUrl = (req.query.url || "").trim();
-  const manualTitle = (req.query.title || "").trim();
-  const category = (req.query.category || "").trim();
-  const note = (req.query.note || "").trim();
-  const autoTitle =
-    req.query.autoTitle === "1" || req.query.autoTitle === "true";
+  const originalUrlRaw = (req.query.url || "").trim();
 
-  if (!originalUrl) {
+  if (!originalUrlRaw) {
     return res.status(400).json({
       ok: false,
       error: "Please provide url query param: ?url=...",
     });
   }
 
-  // Your Amazon tag
-  const tag = "alwaysonsal08-21";
-  const joinChar = originalUrl.includes("?") ? "&" : "?";
-  const affiliateUrl = `${originalUrl}${joinChar}tag=${tag}`;
+  // optional fields from UI
+  const titleInput = (req.query.title || "").trim();
+  const category = (req.query.category || "").trim();
+  const note = (req.query.note || "").trim();
+  const autoTitle = boolFromQuery(req.query.autoTitle);
 
-  let finalTitle = manualTitle;
+  // 1) Clean the Amazon URL
+  const canonicalUrl = normalizeAmazonUrl(originalUrlRaw);
 
-  // Try to auto-fetch title from Amazon HTML
-  if (autoTitle && !finalTitle) {
-    try {
-      const resp = await axios.get(originalUrl, {
-        timeout: 8000,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-        },
-      });
+  // 2) Build affiliate URL on top of CLEAN URL
+  const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+  const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
 
-      const html = resp.data;
+  // 3) Decide final title
+  let finalTitle = titleInput;
 
-      // Try og:title first
-      const ogMatch = html.match(
-        /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["'][^>]*>/i,
-      );
-      if (ogMatch && ogMatch[1]) {
-        finalTitle = ogMatch[1].trim();
-      } else {
-        // Fallback: <title>…</title>
-        const titleMatch = html.match(
-          /<title[^>]*>([^<]+)<\/title>/i,
-        );
-        if (titleMatch && titleMatch[1]) {
-          finalTitle = titleMatch[1].trim();
-        }
-      }
-    } catch (err) {
-      console.error("Amazon auto-title fetch failed:", err.message);
-      // If it fails, we just continue with empty title
+  if (!finalTitle && autoTitle) {
+    // try to fetch from Amazon
+    const fetched = await fetchAmazonTitle(canonicalUrl);
+    if (fetched) {
+      finalTitle = fetched;
     }
   }
 
   const link = {
     id: String(nextId++),
     source: "amazon",
-    originalUrl,
+    // we store both raw and clean
+    originalUrl: canonicalUrl,
+    rawOriginalUrl: originalUrlRaw,
     affiliateUrl,
-    tag,
-    title: finalTitle || "",      // stored for UI
-    category: category || "",
-    note: note || "",
+    tag: AMAZON_TAG,
+    title: finalTitle || null,
+    category: category || null,
+    note: note || null,
     clicks: 0,
     createdAt: new Date().toISOString(),
   };
@@ -121,18 +198,13 @@ router.get("/amazon", async (req, res) => {
   res.json({
     ok: true,
     id: link.id,
-    originalUrl,
-    affiliateUrl,
-    title: link.title,
+    link,
   });
 });
 
-// -------- FLIPKART LINK (simple, manual for now) --------
+// ---------- FLIPKART CREATOR (unchanged, simple) ----------
 router.get("/flipkart", (req, res) => {
   const originalUrl = (req.query.url || "").trim();
-  const title = (req.query.title || "").trim();
-  const category = (req.query.category || "").trim();
-  const note = (req.query.note || "").trim();
 
   if (!originalUrl) {
     return res.status(400).json({
@@ -151,9 +223,9 @@ router.get("/flipkart", (req, res) => {
     originalUrl,
     affiliateUrl,
     tag: flipkartTag,
-    title: title || "",
-    category: category || "",
-    note: note || "",
+    title: (req.query.title || "").trim() || null,
+    category: (req.query.category || "").trim() || null,
+    note: (req.query.note || "").trim() || null,
     clicks: 0,
     createdAt: new Date().toISOString(),
   };
@@ -164,12 +236,11 @@ router.get("/flipkart", (req, res) => {
   res.json({
     ok: true,
     id: link.id,
-    originalUrl,
-    affiliateUrl,
+    link,
   });
 });
 
-// -------- Get single link --------
+// ---------- GET SINGLE ----------
 router.get("/:id", (req, res) => {
   const { id } = req.params;
   const link = links.find((l) => l.id === id);
@@ -183,7 +254,7 @@ router.get("/:id", (req, res) => {
   res.json({ ok: true, link });
 });
 
-// -------- Redirect + count click --------
+// ---------- REDIRECT + COUNT CLICK ----------
 router.get("/go/:id", (req, res) => {
   const { id } = req.params;
   const link = links.find((l) => l.id === id);
@@ -194,13 +265,13 @@ router.get("/go/:id", (req, res) => {
       .json({ ok: false, error: `No link found with id ${id}` });
   }
 
-  link.clicks++;
+  link.clicks = (link.clicks || 0) + 1;
   saveDB();
 
   res.redirect(link.affiliateUrl);
 });
 
-// -------- Delete link --------
+// ---------- DELETE ----------
 router.delete("/:id", (req, res) => {
   const { id } = req.params;
   const index = links.findIndex((l) => l.id === id);
@@ -217,7 +288,7 @@ router.delete("/:id", (req, res) => {
   res.json({ ok: true, message: `Link ${id} deleted successfully` });
 });
 
-// -------- ADMITAD LINK (for later; currently invalid_scope) --------
+// ---------- ADMITAD (still here, but will give invalid_scope until approvals) ----------
 router.get("/admitad", async (req, res) => {
   const originalUrl = (req.query.url || "").trim();
 
@@ -259,8 +330,7 @@ router.get("/admitad", async (req, res) => {
     res.json({
       ok: true,
       id: link.id,
-      originalUrl,
-      affiliateUrl,
+      link,
     });
   } catch (err) {
     console.error("Admitad API ERROR →", err.response?.data || err.message);
