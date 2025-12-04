@@ -1,6 +1,6 @@
 // NodeBackend/routes/links.js
 
-const { createAdmitadDeeplink } = require("./admitadClient"); // still here for future
+const { createAdmitadDeeplink } = require("./admitadClient"); // kept for future
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
@@ -124,12 +124,6 @@ async function fetchAmazonTitle(productUrl) {
   }
 }
 
-function boolFromQuery(v) {
-  if (!v) return false;
-  const s = String(v).toLowerCase();
-  return s === "1" || s === "true" || s === "yes" || s === "on";
-}
-
 // -------------------- ROUTES --------------------
 
 // Quick test
@@ -142,7 +136,7 @@ router.get("/all", (req, res) => {
   res.json({ ok: true, count: links.length, links });
 });
 
-// ---------- AMAZON CREATOR (with URL cleaning + auto title) ----------
+// ---------- AMAZON CREATOR (URL cleaning + ALWAYS try auto-title) ----------
 router.get("/amazon", async (req, res) => {
   const originalUrlRaw = (req.query.url || "").trim();
 
@@ -157,7 +151,6 @@ router.get("/amazon", async (req, res) => {
   const titleInput = (req.query.title || "").trim();
   const category = (req.query.category || "").trim();
   const note = (req.query.note || "").trim();
-  const autoTitle = boolFromQuery(req.query.autoTitle);
 
   // 1) Clean the Amazon URL
   const canonicalUrl = normalizeAmazonUrl(originalUrlRaw);
@@ -169,8 +162,8 @@ router.get("/amazon", async (req, res) => {
   // 3) Decide final title
   let finalTitle = titleInput;
 
-  if (!finalTitle && autoTitle) {
-    // try to fetch from Amazon
+  // If no custom title → ALWAYS try to fetch from Amazon
+  if (!finalTitle) {
     const fetched = await fetchAmazonTitle(canonicalUrl);
     if (fetched) {
       finalTitle = fetched;
@@ -180,7 +173,7 @@ router.get("/amazon", async (req, res) => {
   const link = {
     id: String(nextId++),
     source: "amazon",
-    // we store both raw and clean
+    // store both raw and clean
     originalUrl: canonicalUrl,
     rawOriginalUrl: originalUrlRaw,
     affiliateUrl,
@@ -202,7 +195,7 @@ router.get("/amazon", async (req, res) => {
   });
 });
 
-// ---------- FLIPKART CREATOR (unchanged, simple) ----------
+// ---------- FLIPKART CREATOR (simple) ----------
 router.get("/flipkart", (req, res) => {
   const originalUrl = (req.query.url || "").trim();
 
@@ -240,55 +233,7 @@ router.get("/flipkart", (req, res) => {
   });
 });
 
-// ---------- GET SINGLE ----------
-router.get("/:id", (req, res) => {
-  const { id } = req.params;
-  const link = links.find((l) => l.id === id);
-
-  if (!link) {
-    return res
-      .status(404)
-      .json({ ok: false, error: `No link found with id ${id}` });
-  }
-
-  res.json({ ok: true, link });
-});
-
-// ---------- REDIRECT + COUNT CLICK ----------
-router.get("/go/:id", (req, res) => {
-  const { id } = req.params;
-  const link = links.find((l) => l.id === id);
-
-  if (!link) {
-    return res
-      .status(404)
-      .json({ ok: false, error: `No link found with id ${id}` });
-  }
-
-  link.clicks = (link.clicks || 0) + 1;
-  saveDB();
-
-  res.redirect(link.affiliateUrl);
-});
-
-// ---------- DELETE ----------
-router.delete("/:id", (req, res) => {
-  const { id } = req.params;
-  const index = links.findIndex((l) => l.id === id);
-
-  if (index === -1) {
-    return res
-      .status(404)
-      .json({ ok: false, error: "No link found with that ID" });
-  }
-
-  links.splice(index, 1);
-  saveDB();
-
-  res.json({ ok: true, message: `Link ${id} deleted successfully` });
-});
-
-// ---------- ADMITAD (still here, but will give invalid_scope until approvals) ----------
+// ---------- ADMITAD (will show invalid_scope until programs are approved) ----------
 router.get("/admitad", async (req, res) => {
   const originalUrl = (req.query.url || "").trim();
 
@@ -339,6 +284,54 @@ router.get("/admitad", async (req, res) => {
       error: err.response?.data || "Failed to generate Admitad deeplink.",
     });
   }
+});
+
+// ---------- GET SINGLE ----------
+router.get("/:id", (req, res) => {
+  const { id } = req.params;
+  const link = links.find((l) => l.id === id);
+
+  if (!link) {
+    return res
+      .status(404)
+      .json({ ok: false, error: `No link found with id ${id}` });
+  }
+
+  res.json({ ok: true, link });
+});
+
+// ---------- REDIRECT + COUNT CLICK ----------
+router.get("/go/:id", (req, res) => {
+  const { id } = req.params;
+  const link = links.find((l) => l.id === id);
+
+  if (!link) {
+    return res
+      .status(404)
+      .json({ ok: false, error: `No link found with id ${id}` });
+  }
+
+  link.clicks = (link.clicks || 0) + 1;
+  saveDB();
+
+  res.redirect(link.affiliateUrl);
+});
+
+// ---------- DELETE ----------
+router.delete("/:id", (req, res) => {
+  const { id } = req.params;
+  const index = links.findIndex((l) => l.id === id);
+
+  if (index === -1) {
+    return res
+      .status(404)
+      .json({ ok: false, error: "No link found with that ID" });
+  }
+
+  links.splice(index, 1);
+  saveDB();
+
+  res.json({ ok: true, message: `Link ${id} deleted successfully` });
 });
 
 module.exports = router;
