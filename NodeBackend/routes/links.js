@@ -1,26 +1,23 @@
-// NodeBackend/routes/links.js
-
-const { createAdmitadDeeplink } = require("./admitadClient");
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
 const path = require("path");
 
-// -------------------- Admitad programs --------------------
-// TODO: Replace campaignId with your REAL Myntra program ID
-// (and add more objects for Ajio, etc. later)
+const { createAdmitadDeeplink } = require("./admitadClient");
+
+// Map Admitad programs here
 const ADMITAD_PROGRAMS = [
   {
     key: "myntra",
     pattern: "myntra.com",
-    campaignId: 123456, // <-- put your real Myntra campaign ID here
+    campaignId: 123456 // replace when approved
   },
 ];
 
-// -------------------- Simple JSON "database" --------------------
-
+// Path to JSON database
 const dbPath = path.join(__dirname, "..", "data", "links.json");
 
+// Load database or start empty
 let links = [];
 try {
   if (fs.existsSync(dbPath)) {
@@ -33,47 +30,39 @@ try {
 let nextId =
   links.length > 0 ? Math.max(...links.map((l) => Number(l.id))) + 1 : 1;
 
+// Save database
 function saveDB() {
-  try {
-    fs.writeFileSync(dbPath, JSON.stringify(links, null, 2));
-  } catch (err) {
-    console.error("Error saving database:", err);
-  }
+  fs.writeFileSync(dbPath, JSON.stringify(links, null, 2));
 }
 
-// -------------------- Helpers --------------------
-
-function requireUrlParam(req, res) {
-  const originalUrl = req.query.url;
-  if (!originalUrl) {
-    res.status(400).json({
-      ok: false,
-      error: "Please provide url query param: ?url=...",
-    });
-    return null;
-  }
-  return originalUrl;
-}
-
-// -------------------- ROUTES --------------------
-
-// Quick test route
+// TEST
 router.get("/test", (req, res) => {
   res.json({ status: "links router working" });
 });
 
-// Get all saved links
+// GET ALL
 router.get("/all", (req, res) => {
   res.json({ ok: true, count: links.length, links });
 });
 
-// ---------- AMAZON ----------
 
+// ---------------------------
+// AMAZON LINK CREATOR
+// ---------------------------
 router.get("/amazon", (req, res) => {
-  const originalUrl = requireUrlParam(req, res);
-  if (!originalUrl) return;
+  const originalUrl = req.query.url;
+  const title = req.query.title || "";
+  const category = req.query.category || "";
+  const note = req.query.note || "";
 
-  const tag = "alwaysonsal08-21"; // your Amazon tag
+  if (!originalUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Missing ?url parameter",
+    });
+  }
+
+  const tag = "alwaysonsal08-21";
   const joinChar = originalUrl.includes("?") ? "&" : "?";
   const affiliateUrl = `${originalUrl}${joinChar}tag=${tag}`;
 
@@ -85,21 +74,35 @@ router.get("/amazon", (req, res) => {
     tag,
     clicks: 0,
     createdAt: new Date().toISOString(),
+    title,
+    category,
+    note,
   };
 
   links.push(link);
   saveDB();
 
-  res.json({ ok: true, id: link.id, originalUrl, affiliateUrl });
+  return res.json({ ok: true, link });
 });
 
-// ---------- FLIPKART ----------
 
+// ---------------------------
+// FLIPKART (manual for now)
+// ---------------------------
 router.get("/flipkart", (req, res) => {
-  const originalUrl = requireUrlParam(req, res);
-  if (!originalUrl) return;
+  const originalUrl = req.query.url;
+  const title = req.query.title || "";
+  const category = req.query.category || "";
+  const note = req.query.note || "";
 
-  const flipkartTag = "alwaysonsale"; // your Flipkart affiliate ID
+  if (!originalUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Missing ?url parameter",
+    });
+  }
+
+  const flipkartTag = "alwaysonsale";
   const joinChar = originalUrl.includes("?") ? "&" : "?";
   const affiliateUrl = `${originalUrl}${joinChar}affid=${flipkartTag}`;
 
@@ -111,29 +114,38 @@ router.get("/flipkart", (req, res) => {
     tag: flipkartTag,
     clicks: 0,
     createdAt: new Date().toISOString(),
+    title,
+    category,
+    note,
   };
 
   links.push(link);
   saveDB();
 
-  res.json({
-    ok: true,
-    id: link.id,
-    originalUrl,
-    affiliateUrl,
-  });
+  return res.json({ ok: true, link });
 });
 
-// ---------- ADMITAD (Myntra, Ajio, …) ----------
 
+// ---------------------------
+// ADMITAD GENERATOR (auto)
+// ---------------------------
 router.get("/admitad", async (req, res) => {
-  const originalUrl = requireUrlParam(req, res);
-  if (!originalUrl) return;
+  const originalUrl = req.query.url;
+  const title = req.query.title || "";
+  const category = req.query.category || "";
+  const note = req.query.note || "";
+
+  if (!originalUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Missing ?url parameter",
+    });
+  }
 
   const lower = originalUrl.toLowerCase();
-
-  // Find a matching program by domain pattern
-  const program = ADMITAD_PROGRAMS.find((p) => lower.includes(p.pattern));
+  const program = ADMITAD_PROGRAMS.find((p) =>
+    lower.includes(p.pattern)
+  );
 
   if (!program) {
     return res.status(400).json({
@@ -155,78 +167,76 @@ router.get("/admitad", async (req, res) => {
       affiliateUrl,
       clicks: 0,
       createdAt: new Date().toISOString(),
+      title,
+      category,
+      note,
     };
 
     links.push(link);
     saveDB();
 
-    res.json({
-      ok: true,
-      id: link.id,
-      originalUrl,
-      affiliateUrl,
-    });
-  } catch (err) {
-    const details = err.response?.data || err.message;
-    console.error("Admitad API ERROR →", details);
+    res.json({ ok: true, link });
 
-    // TEMP: expose details so we understand what's wrong
-    res.status(500).json({
+  } catch (err) {
+    console.error("Admitad Deeplink ERROR →", err.response?.data || err.message);
+    return res.status(500).json({
       ok: false,
-      error: details,
+      error: "Failed to generate Admitad deeplink",
     });
   }
 });
 
-// ---------- GET SINGLE LINK ----------
 
+// ---------------------------
+// GET ONE
+// ---------------------------
 router.get("/:id", (req, res) => {
-  const { id } = req.params;
-  const link = links.find((l) => l.id === id);
+  const link = links.find((l) => l.id === req.params.id);
 
   if (!link) {
-    return res
-      .status(404)
-      .json({ ok: false, error: `No link found with id ${id}` });
+    return res.status(404).json({
+      ok: false,
+      error: "Link not found",
+    });
   }
 
   res.json({ ok: true, link });
 });
 
-// ---------- REDIRECT & COUNT CLICK ----------
 
+// ---------------------------
+// REDIRECT + COUNT CLICK
+// ---------------------------
 router.get("/go/:id", (req, res) => {
-  const { id } = req.params;
-  const link = links.find((l) => l.id === id);
+  const link = links.find((l) => l.id === req.params.id);
 
   if (!link) {
-    return res
-      .status(404)
-      .json({ ok: false, error: `No link found with id ${id}` });
+    return res.status(404).json({ ok: false, error: "Link not found" });
   }
 
   link.clicks++;
   saveDB();
-
   res.redirect(link.affiliateUrl);
 });
 
-// ---------- DELETE LINK ----------
 
+// ---------------------------
+// DELETE
+// ---------------------------
 router.delete("/:id", (req, res) => {
-  const { id } = req.params;
-  const index = links.findIndex((l) => l.id === id);
+  const index = links.findIndex((l) => l.id === req.params.id);
 
   if (index === -1) {
-    return res
-      .status(404)
-      .json({ ok: false, error: "No link found with that ID" });
+    return res.status(404).json({
+      ok: false,
+      error: "Link not found",
+    });
   }
 
   links.splice(index, 1);
   saveDB();
 
-  res.json({ ok: true, message: `Link ${id} deleted successfully` });
+  res.json({ ok: true, message: "Deleted" });
 });
 
 module.exports = router;
