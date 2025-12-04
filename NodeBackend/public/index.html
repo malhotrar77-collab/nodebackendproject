@@ -33,13 +33,13 @@
 
       h1 {
         margin-top: 0;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
         font-size: 24px;
       }
 
       h2 {
         font-size: 18px;
-        margin-top: 32px;
+        margin-top: 24px;
         margin-bottom: 12px;
       }
 
@@ -169,6 +169,13 @@
         color: #9ca3af;
         margin-top: 4px;
       }
+
+      .summary {
+        font-size: 13px;
+        margin-top: 4px;
+        margin-bottom: 12px;
+        color: #9ca3af;
+      }
     </style>
   </head>
 
@@ -178,6 +185,7 @@
       <div class="small">
         Backend: <code class="mono">/api/links/*</code> (same server)
       </div>
+      <div class="summary" id="summary">Loading summary...</div>
 
       <h2>Create affiliate link</h2>
       <div id="status"></div>
@@ -185,15 +193,14 @@
         <input
           type="text"
           id="original-url"
-          placeholder="Paste Amazon, Flipkart, or Myntra URL"
+          placeholder="Paste Amazon product URL"
         />
         <button id="create-btn">Create affiliate link</button>
       </div>
       <div class="small">
-        Examples:
-        <code class="mono">https://amzn.to/48eIkdx</code> •
-        <code class="mono">https://www.flipkart.com/...</code> •
-        <code class="mono">https://www.myntra.com/...</code>
+        Example:
+        <code class="mono">https://www.amazon.in/...</code> or
+        <code class="mono">https://amzn.to/...</code>
       </div>
 
       <h2>Saved links</h2>
@@ -209,7 +216,9 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody id="links-tbody"></tbody>
+        <tbody id="links-tbody">
+          <!-- rows go here -->
+        </tbody>
       </table>
     </div>
 
@@ -218,6 +227,7 @@
       const inputEl = document.getElementById("original-url");
       const tbodyEl = document.getElementById("links-tbody");
       const createBtn = document.getElementById("create-btn");
+      const summaryEl = document.getElementById("summary");
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
@@ -225,11 +235,24 @@
         if (type) statusEl.classList.add(type);
       }
 
-      // Auto-detect Amazon, Flipkart, Myntra
+      function updateSummary(links) {
+        if (!summaryEl) return;
+        if (!links || !links.length) {
+          summaryEl.textContent = "No links yet. Create your first Amazon link above.";
+          return;
+        }
+        const totalClicks = links.reduce(
+          (sum, l) => sum + (l.clicks || 0),
+          0
+        );
+        summaryEl.textContent = `Total links: ${links.length} • Total clicks: ${totalClicks}`;
+      }
+
+      // Auto-detect Amazon vs Flipkart and call right backend route
       async function createLink() {
         const url = inputEl.value.trim();
         if (!url) {
-          setStatus("Please paste a product URL first.", "error");
+          setStatus("Please paste an Amazon product URL first.", "error");
           return;
         }
 
@@ -237,10 +260,7 @@
         let endpoint = null;
         let sourceLabel = "";
 
-        if (lower.includes("myntra.")) {
-          endpoint = "/api/links/admitad";
-          sourceLabel = "Myntra";
-        } else if (lower.includes("amazon.") || lower.includes("amzn.to")) {
+        if (lower.includes("amazon.") || lower.includes("amzn.to")) {
           endpoint = "/api/links/amazon";
           sourceLabel = "Amazon";
         } else if (lower.includes("flipkart.")) {
@@ -248,17 +268,19 @@
           sourceLabel = "Flipkart";
         } else {
           setStatus(
-            "Supported: Amazon, Flipkart, Myntra (Admitad program)",
+            "Right now this tool only supports Amazon (and later Flipkart / Admitad).",
             "error"
           );
           return;
         }
 
         createBtn.disabled = true;
-        setStatus(`Creating ${sourceLabel} link...`);
+        setStatus(`Creating ${sourceLabel} link...`, "");
 
         try {
-          const res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}`);
+          const res = await fetch(
+            `${endpoint}?url=${encodeURIComponent(url)}`
+          );
           const data = await res.json();
 
           if (!res.ok || !data.ok) {
@@ -269,6 +291,7 @@
           inputEl.value = "";
           await loadLinks();
         } catch (err) {
+          console.error(err);
           setStatus(err.message, "error");
         } finally {
           createBtn.disabled = false;
@@ -276,15 +299,19 @@
       }
 
       async function loadLinks() {
-        setStatus("Loading links...");
+        setStatus("Loading links...", "");
         try {
           const res = await fetch("/api/links/all");
           const data = await res.json();
-
-          if (!data.ok) throw new Error(data.error);
-          renderLinks(data.links);
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Failed to load links");
+          }
+          const links = data.links || [];
+          renderLinks(links);
+          updateSummary(links);
           setStatus(`Loaded ${data.count} link(s).`, "ok");
         } catch (err) {
+          console.error(err);
           setStatus(err.message, "error");
         }
       }
@@ -293,30 +320,86 @@
         tbodyEl.innerHTML = "";
 
         if (!links.length) {
-          tbodyEl.innerHTML =
-            '<tr><td colspan="7">No links yet. Create one above.</td></tr>';
+          const tr = document.createElement("tr");
+          const td = document.createElement("td");
+          td.colSpan = 7;
+          td.textContent = "No links yet. Create one above.";
+          tr.appendChild(td);
+          tbodyEl.appendChild(tr);
           return;
         }
 
         for (const link of links) {
           const tr = document.createElement("tr");
 
-          tr.innerHTML = `
-            <td>${link.id}</td>
-            <td>${link.source || "-"}</td>
-            <td><div class="mono">${link.originalUrl}</div></td>
-            <td><div class="mono">${link.affiliateUrl}</div></td>
-            <td><span class="badge"><span>${link.clicks ||
-              0}</span> clicks</span></td>
-            <td>${link.createdAt
-              ? new Date(link.createdAt).toLocaleString()
-              : "-"}</td>
-            <td class="actions">
-              <button class="secondary" onclick="copyToClipboard('${link.affiliateUrl}')">Copy</button>
-              <button onclick="window.open('/api/links/go/${link.id}', '_blank')">Open</button>
-              <button class="danger" onclick="deleteLink('${link.id}')">Delete</button>
-            </td>
-          `;
+          // ID
+          const tdId = document.createElement("td");
+          tdId.textContent = link.id;
+          tr.appendChild(tdId);
+
+          // Source
+          const tdSource = document.createElement("td");
+          tdSource.textContent = link.source || "-";
+          tr.appendChild(tdSource);
+
+          // Original URL
+          const tdOriginal = document.createElement("td");
+          tdOriginal.innerHTML = `<div class="mono">${link.originalUrl}</div>`;
+          tr.appendChild(tdOriginal);
+
+          // Affiliate URL
+          const tdAff = document.createElement("td");
+          tdAff.innerHTML = `<div class="mono">${link.affiliateUrl}</div>`;
+          tr.appendChild(tdAff);
+
+          // Clicks
+          const tdClicks = document.createElement("td");
+          const clicks = link.clicks || 0;
+          tdClicks.innerHTML = `<span class="badge"><span>${clicks}</span> clicks</span>`;
+          tr.appendChild(tdClicks);
+
+          // Created
+          const tdCreated = document.createElement("td");
+          tdCreated.textContent = link.createdAt
+            ? new Date(link.createdAt).toLocaleString()
+            : "-";
+          tr.appendChild(tdCreated);
+
+          // Actions
+          const tdActions = document.createElement("td");
+          tdActions.className = "actions";
+
+          const copyAffBtn = document.createElement("button");
+          copyAffBtn.className = "secondary";
+          copyAffBtn.textContent = "Copy affiliate URL";
+          copyAffBtn.onclick = () =>
+            copyToClipboard(link.affiliateUrl, "affiliate URL");
+
+          const shortBtn = document.createElement("button");
+          shortBtn.className = "secondary";
+          shortBtn.textContent = "Copy short link";
+          shortBtn.onclick = () => {
+            const shortUrl = `${window.location.origin}/api/links/go/${link.id}`;
+            copyToClipboard(shortUrl, "short tracked URL");
+          };
+
+          const goBtn = document.createElement("button");
+          goBtn.textContent = "Open tracked link";
+          goBtn.onclick = () => {
+            window.open(`/api/links/go/${link.id}`, "_blank");
+          };
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "danger";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.onclick = () => deleteLink(link.id);
+
+          tdActions.appendChild(copyAffBtn);
+          tdActions.appendChild(shortBtn);
+          tdActions.appendChild(goBtn);
+          tdActions.appendChild(deleteBtn);
+
+          tr.appendChild(tdActions);
 
           tbodyEl.appendChild(tr);
         }
@@ -328,21 +411,24 @@
         try {
           const res = await fetch(`/api/links/${id}`, { method: "DELETE" });
           const data = await res.json();
-
-          if (!data.ok) throw new Error(data.error);
-          setStatus(`Link ${id} deleted.`, "ok");
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Failed to delete");
+          }
+          setStatus(data.message || `Link ${id} deleted.`, "ok");
           await loadLinks();
         } catch (err) {
+          console.error(err);
           setStatus(err.message, "error");
         }
       }
 
-      async function copyToClipboard(text) {
+      async function copyToClipboard(text, label = "link URL") {
         try {
           await navigator.clipboard.writeText(text);
-          setStatus("Copied affiliate URL.", "ok");
-        } catch {
-          setStatus("Could not copy.", "error");
+          setStatus(`Copied ${label} to clipboard.`, "ok");
+        } catch (err) {
+          console.error(err);
+          setStatus("Could not copy to clipboard.", "error");
         }
       }
 
@@ -351,6 +437,7 @@
         if (e.key === "Enter") createLink();
       });
 
+      // Load list on page open
       window.addEventListener("DOMContentLoaded", loadLinks);
     </script>
   </body>
