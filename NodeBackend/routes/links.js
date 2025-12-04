@@ -86,7 +86,54 @@ function normalizeAmazonUrl(originalUrl) {
   }
 }
 
-// Fetch product title from Amazon page (very simple scraping)
+// Guess a readable title from the URL slug (no network)
+function guessTitleFromAmazonUrl(urlString) {
+  try {
+    const u = new URL(urlString);
+    const segments = u.pathname.split("/").filter(Boolean);
+    if (!segments.length) return null;
+
+    let slug = null;
+
+    // If we find ".../<slug>/dp/ASIN/..." → use slug before dp
+    const dpIndex = segments.findIndex((s) => s.toLowerCase() === "dp");
+    if (dpIndex > 0) {
+      slug = segments[dpIndex - 1];
+    } else {
+      // otherwise last segment
+      slug = segments[segments.length - 1];
+    }
+
+    if (!slug) return null;
+
+    // remove ASIN-like pieces accidentally captured
+    slug = slug.replace(/B0[A-Z0-9]{8,}/gi, "");
+
+    // replace dashes/underscores with spaces & decode
+    let title = decodeURIComponent(slug)
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!title) return null;
+
+    // basic capitalisation: first letter upper, others mostly as-is
+    title = title
+      .split(" ")
+      .map((word) =>
+        word.length
+          ? word[0].toUpperCase() + word.slice(1)
+          : word
+      )
+      .join(" ");
+
+    return title || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Fetch product title from Amazon page (simple scraping, best-effort)
 async function fetchAmazonTitle(productUrl) {
   try {
     const res = await fetch(productUrl, {
@@ -107,6 +154,12 @@ async function fetchAmazonTitle(productUrl) {
 
     // Try productTitle first
     let m = html.match(/id="productTitle"[^>]*>([^<]+)</i);
+    if (m && m[1]) {
+      return m[1].trim().replace(/\s+/g, " ");
+    }
+
+    // Try og:title
+    m = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["'][^>]*>/i);
     if (m && m[1]) {
       return m[1].trim().replace(/\s+/g, " ");
     }
@@ -136,7 +189,7 @@ router.get("/all", (req, res) => {
   res.json({ ok: true, count: links.length, links });
 });
 
-// ---------- AMAZON CREATOR (URL cleaning + ALWAYS try auto-title) ----------
+// ---------- AMAZON CREATOR ----------
 router.get("/amazon", async (req, res) => {
   const originalUrlRaw = (req.query.url || "").trim();
 
@@ -162,7 +215,12 @@ router.get("/amazon", async (req, res) => {
   // 3) Decide final title
   let finalTitle = titleInput;
 
-  // If no custom title → ALWAYS try to fetch from Amazon
+  // Step A: if no custom title, try to guess from URL
+  if (!finalTitle) {
+    finalTitle = guessTitleFromAmazonUrl(originalUrlRaw);
+  }
+
+  // Step B: if still nothing, best-effort scrape Amazon
   if (!finalTitle) {
     const fetched = await fetchAmazonTitle(canonicalUrl);
     if (fetched) {
@@ -195,7 +253,7 @@ router.get("/amazon", async (req, res) => {
   });
 });
 
-// ---------- FLIPKART CREATOR (simple) ----------
+// ---------- FLIPKART CREATOR ----------
 router.get("/flipkart", (req, res) => {
   const originalUrl = (req.query.url || "").trim();
 
