@@ -22,7 +22,7 @@
       }
 
       .container {
-        max-width: 900px;
+        max-width: 1000px;
         margin: 40px auto;
         background: #020617;
         border-radius: 12px;
@@ -50,9 +50,21 @@
         flex-wrap: wrap;
       }
 
-      input[type="text"] {
+      .row label {
+        font-size: 12px;
+        color: #9ca3af;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
         flex: 1;
-        min-width: 260px;
+        min-width: 160px;
+      }
+
+      input[type="text"] {
         padding: 8px 10px;
         border-radius: 8px;
         border: 1px solid #4b5563;
@@ -189,16 +201,53 @@
 
       <h2>Create affiliate link</h2>
       <div id="status"></div>
+
+      <!-- Row 1: URL + Title -->
       <div class="row">
-        <input
-          type="text"
-          id="original-url"
-          placeholder="Paste Amazon product URL"
-        />
-        <button id="create-btn">Create affiliate link</button>
+        <div class="field" style="flex: 2">
+          <label for="original-url">Product URL (Amazon for now)</label>
+          <input
+            type="text"
+            id="original-url"
+            placeholder="Paste Amazon product URL (or amzn.to short link)"
+          />
+        </div>
+        <div class="field">
+          <label for="title-input">Title (optional)</label>
+          <input
+            type="text"
+            id="title-input"
+            placeholder="e.g. Roadster Black T-shirt"
+          />
+        </div>
       </div>
+
+      <!-- Row 2: Category + Note + Button -->
+      <div class="row">
+        <div class="field">
+          <label for="category-input">Category (optional)</label>
+          <input
+            type="text"
+            id="category-input"
+            placeholder="e.g. T-shirts, Shoes, Electronics"
+          />
+        </div>
+        <div class="field" style="flex: 2">
+          <label for="note-input">Note (optional)</label>
+          <input
+            type="text"
+            id="note-input"
+            placeholder="e.g. Instagram reel, WhatsApp group A"
+          />
+        </div>
+        <div class="field" style="justify-content: flex-end">
+          <label>&nbsp;</label>
+          <button id="create-btn">Create affiliate link</button>
+        </div>
+      </div>
+
       <div class="small">
-        Example:
+        Example URL:
         <code class="mono">https://www.amazon.in/...</code> or
         <code class="mono">https://amzn.to/...</code>
       </div>
@@ -209,6 +258,8 @@
           <tr>
             <th>ID</th>
             <th>Source</th>
+            <th>Title</th>
+            <th>Category</th>
             <th>Original URL</th>
             <th>Affiliate URL</th>
             <th>Clicks</th>
@@ -225,6 +276,9 @@
     <script>
       const statusEl = document.getElementById("status");
       const inputEl = document.getElementById("original-url");
+      const titleEl = document.getElementById("title-input");
+      const categoryEl = document.getElementById("category-input");
+      const noteEl = document.getElementById("note-input");
       const tbodyEl = document.getElementById("links-tbody");
       const createBtn = document.getElementById("create-btn");
       const summaryEl = document.getElementById("summary");
@@ -238,7 +292,8 @@
       function updateSummary(links) {
         if (!summaryEl) return;
         if (!links || !links.length) {
-          summaryEl.textContent = "No links yet. Create your first Amazon link above.";
+          summaryEl.textContent =
+            "No links yet. Create your first Amazon link above.";
           return;
         }
         const totalClicks = links.reduce(
@@ -248,11 +303,15 @@
         summaryEl.textContent = `Total links: ${links.length} • Total clicks: ${totalClicks}`;
       }
 
-      // Auto-detect Amazon vs Flipkart and call right backend route
+      // Auto-detect source (Amazon for now)
       async function createLink() {
         const url = inputEl.value.trim();
+        const title = titleEl.value.trim();
+        const category = categoryEl.value.trim();
+        const note = noteEl.value.trim();
+
         if (!url) {
-          setStatus("Please paste an Amazon product URL first.", "error");
+          setStatus("Please paste a product URL first.", "error");
           return;
         }
 
@@ -266,29 +325,52 @@
         } else if (lower.includes("flipkart.")) {
           endpoint = "/api/links/flipkart";
           sourceLabel = "Flipkart";
+        } else if (lower.includes("myntra.")) {
+          endpoint = "/api/links/admitad";
+          sourceLabel = "Myntra (Admitad)";
         } else {
           setStatus(
-            "Right now this tool only supports Amazon (and later Flipkart / Admitad).",
+            "Right now this tool supports Amazon (Flipkart/Admitad later).",
             "error"
           );
           return;
         }
 
+        const params = new URLSearchParams();
+        params.set("url", url);
+        if (title) params.set("title", title);
+        if (category) params.set("category", category);
+        if (note) params.set("note", note);
+
         createBtn.disabled = true;
         setStatus(`Creating ${sourceLabel} link...`, "");
 
         try {
-          const res = await fetch(
-            `${endpoint}?url=${encodeURIComponent(url)}`
-          );
+          const res = await fetch(`${endpoint}?${params.toString()}`);
           const data = await res.json();
 
           if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Failed to create link");
+            // For Admitad we sometimes get detailed error object
+            const errMsg =
+              typeof data.error === "string"
+                ? data.error
+                : JSON.stringify(data.error || {});
+            throw new Error(errMsg || "Failed to create link");
           }
 
-          setStatus(`Created ${sourceLabel} link #${data.id}`, "ok");
+          const link = data.link;
+          setStatus(
+            `Created ${sourceLabel} link #${link?.id || "?"}`,
+            "ok"
+          );
+
+          // Clear inputs
           inputEl.value = "";
+          // keep title/category/note if you want, or clear:
+          titleEl.value = "";
+          categoryEl.value = "";
+          noteEl.value = "";
+
           await loadLinks();
         } catch (err) {
           console.error(err);
@@ -322,7 +404,7 @@
         if (!links.length) {
           const tr = document.createElement("tr");
           const td = document.createElement("td");
-          td.colSpan = 7;
+          td.colSpan = 9;
           td.textContent = "No links yet. Create one above.";
           tr.appendChild(td);
           tbodyEl.appendChild(tr);
@@ -341,6 +423,16 @@
           const tdSource = document.createElement("td");
           tdSource.textContent = link.source || "-";
           tr.appendChild(tdSource);
+
+          // Title
+          const tdTitle = document.createElement("td");
+          tdTitle.textContent = link.title || "-";
+          tr.appendChild(tdTitle);
+
+          // Category
+          const tdCategory = document.createElement("td");
+          tdCategory.textContent = link.category || "-";
+          tr.appendChild(tdCategory);
 
           // Original URL
           const tdOriginal = document.createElement("td");
