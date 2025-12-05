@@ -1,3 +1,4 @@
+// NodeBackend/index.js
 const express = require("express");
 const path = require("path");
 const app = express();
@@ -8,14 +9,18 @@ const PORT = process.env.PORT || 3000;
 // Serve files from the "public" folder (frontend)
 app.use(express.static(path.join(__dirname, "public")));
 
-// Import links router (includes Amazon, Flipkart, Admitad)
+// Import links router
 const linksRoute = require("./routes/links");
 
 // API Routes
 app.use("/api/links", linksRoute);
 
-// Admitad deep-link route (new)
-app.use("/api/links/admitad", linksRoute);  // <-- important line
+// --- Short public redirect: /g/:id -> /api/links/go/:id ---
+app.get("/g/:id", (req, res) => {
+  const { id } = req.params;
+  // 302 temporary redirect is fine; keeps logic in links router
+  res.redirect(302, `/api/links/go/${encodeURIComponent(id)}`);
+});
 
 // Health check
 app.get("/ping", (req, res) => {
