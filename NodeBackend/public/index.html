@@ -23,7 +23,7 @@
 
       .container {
         max-width: 1000px;
-        margin: 32px auto;
+        margin: 40px auto;
         background: #020617;
         border-radius: 12px;
         padding: 24px 28px 32px;
@@ -33,60 +33,37 @@
 
       h1 {
         margin-top: 0;
-        margin-bottom: 8px;
+        margin-bottom: 16px;
         font-size: 24px;
       }
 
       h2 {
         font-size: 18px;
-        margin-top: 24px;
+        margin-top: 32px;
         margin-bottom: 12px;
-      }
-
-      .small {
-        font-size: 12px;
-        color: #9ca3af;
-        margin-top: 4px;
       }
 
       .row {
         display: flex;
         gap: 12px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         flex-wrap: wrap;
       }
 
-      .row label {
-        font-size: 13px;
-        color: #9ca3af;
-      }
-
-      .field-group {
-        flex: 1;
-        min-width: 220px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
       input[type="text"] {
+        flex: 1;
+        min-width: 260px;
         padding: 8px 10px;
         border-radius: 8px;
         border: 1px solid #4b5563;
         background: #020617;
         color: #e5e7eb;
         outline: none;
-        font-size: 14px;
       }
 
       input[type="text"]:focus {
         border-color: #f97316;
         box-shadow: 0 0 0 1px #f97316;
-      }
-
-      input[disabled] {
-        opacity: 0.55;
-        cursor: not-allowed;
       }
 
       button {
@@ -129,15 +106,6 @@
 
       #status.error {
         color: #f97373;
-      }
-
-      .checkbox-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        color: #e5e7eb;
-        margin-bottom: 4px;
       }
 
       table {
@@ -196,17 +164,18 @@
         font-weight: 600;
       }
 
-      .pill {
-        display: inline-flex;
-        padding: 1px 6px;
-        border-radius: 999px;
-        font-size: 11px;
-        background: #111827;
-        color: #e5e7eb;
+      .small {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 4px;
       }
 
-      .nowrap {
-        white-space: nowrap;
+      .pill {
+        display: inline-flex;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #111827;
+        font-size: 11px;
       }
     </style>
   </head>
@@ -215,71 +184,48 @@
     <div class="container">
       <h1>Affiliate Links Dashboard</h1>
       <div class="small">
-        Backend: <code class="mono">/api/links/*</code> (same server) • Project:
-        <span class="pill">AlwaysOnSale</span>
+        Backend: <code class="mono">/api/links/*</code> (same server) • Short
+        URLs: <code class="mono">/g/:id</code>
       </div>
 
-      <h2>Create Amazon affiliate link</h2>
-      <div class="small">
-        <strong>Step:</strong> Paste Amazon URL → choose auto/manual title → click
-        “Create affiliate link”.
-      </div>
-
+      <h2>Create affiliate link</h2>
       <div id="status"></div>
 
-      <!-- Form rows -->
+      <!-- Row 1: Product URL + button -->
       <div class="row">
-        <div class="field-group">
-          <label for="original-url">Product URL (Amazon)</label>
-          <input
-            type="text"
-            id="original-url"
-            placeholder="Paste Amazon product URL or amzn.to short link"
-          />
-        </div>
+        <input
+          type="text"
+          id="original-url"
+          placeholder="Paste Amazon or Flipkart product URL"
+        />
       </div>
 
+      <!-- Row 2: Title + auto-title checkbox -->
       <div class="row">
-        <div class="field-group">
-          <label for="title-input">Title (optional if auto)</label>
-          <input
-            type="text"
-            id="title-input"
-            placeholder="e.g. Roadster Black T-shirt"
-          />
-        </div>
-
-        <div class="field-group">
-          <label for="category-input">Category (optional)</label>
-          <input
-            type="text"
-            id="category-input"
-            placeholder="e.g. T-shirts, Shoes, Electronics"
-          />
-        </div>
+        <input
+          type="text"
+          id="title-input"
+          placeholder="Title (optional if auto)"
+        />
+        <label class="small" style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="auto-title" checked />
+          Auto title from Amazon (recommended)
+        </label>
       </div>
 
+      <!-- Row 3: Category + Note -->
       <div class="row">
-        <div class="field-group">
-          <label for="note-input">Note (optional)</label>
-          <input
-            type="text"
-            id="note-input"
-            placeholder="e.g. Instagram reel, WhatsApp group A"
-          />
-        </div>
-        <div
-          class="field-group"
-          style="justify-content: flex-end; align-items: flex-start"
-        >
-          <div class="checkbox-row">
-            <input type="checkbox" id="auto-title" checked />
-            <label for="auto-title" class="nowrap">
-              Auto title from Amazon (recommended)
-            </label>
-          </div>
-          <button id="create-btn">Create affiliate link</button>
-        </div>
+        <input
+          type="text"
+          id="category-input"
+          placeholder="Category (optional, e.g. gloves, caps)"
+        />
+        <input
+          type="text"
+          id="note-input"
+          placeholder="Note (optional, e.g. ‘Instagram reel, group A’)"
+        />
+        <button id="create-btn">Create affiliate link</button>
       </div>
 
       <div class="small">
@@ -311,7 +257,7 @@
 
     <script>
       const statusEl = document.getElementById("status");
-      const inputUrlEl = document.getElementById("original-url");
+      const inputEl = document.getElementById("original-url");
       const titleEl = document.getElementById("title-input");
       const categoryEl = document.getElementById("category-input");
       const noteEl = document.getElementById("note-input");
@@ -325,64 +271,71 @@
         if (type) statusEl.classList.add(type);
       }
 
-      // Toggle title input based on auto-title checkbox
-      function refreshTitleInputState() {
-        const auto = autoTitleEl.checked;
-        titleEl.disabled = auto;
-        if (auto) {
-          titleEl.placeholder = "Title will be fetched from Amazon automatically";
-        } else {
-          titleEl.placeholder = "e.g. Roadster Black T-shirt";
-        }
+      function boolToParam(val) {
+        return val ? "1" : "0";
       }
 
-      autoTitleEl.addEventListener("change", refreshTitleInputState);
-      refreshTitleInputState();
-
+      // CREATE LINK (Amazon or Flipkart)
       async function createLink() {
-        const url = inputUrlEl.value.trim();
-        const manualTitle = titleEl.value.trim();
+        const url = inputEl.value.trim();
+        const title = titleEl.value.trim();
         const category = categoryEl.value.trim();
         const note = noteEl.value.trim();
         const autoTitle = autoTitleEl.checked;
 
         if (!url) {
-          setStatus("Please paste an Amazon product URL first.", "error");
+          setStatus(
+            "Please paste an Amazon or Flipkart product URL first.",
+            "error"
+          );
           return;
         }
 
         const lower = url.toLowerCase();
-        if (!lower.includes("amazon.") && !lower.includes("amzn.to")) {
-          setStatus("This button currently supports Amazon URLs only.", "error");
+        let endpoint = null;
+        let sourceLabel = "";
+
+        if (lower.includes("amazon.") || lower.includes("amzn.to")) {
+          endpoint = "/api/links/amazon";
+          sourceLabel = "Amazon";
+        } else if (lower.includes("flipkart.")) {
+          endpoint = "/api/links/flipkart";
+          sourceLabel = "Flipkart";
+        } else {
+          setStatus(
+            "Right now this tool only supports Amazon and Flipkart product links.",
+            "error"
+          );
           return;
         }
 
         const params = new URLSearchParams();
         params.set("url", url);
-        if (!autoTitle && manualTitle) {
-          params.set("title", manualTitle);
-        }
+        if (title) params.set("title", title);
         if (category) params.set("category", category);
         if (note) params.set("note", note);
-        if (autoTitle) params.set("autoTitle", "1");
+
+        if (endpoint === "/api/links/amazon") {
+          if (autoTitle) {
+            params.set("autoTitle", boolToParam(true));
+          }
+        }
 
         createBtn.disabled = true;
-        setStatus("Creating Amazon link...", "");
+        setStatus(`Creating ${sourceLabel} link...`, "");
 
         try {
-          const res = await fetch(`/api/links/amazon?${params.toString()}`);
+          const res = await fetch(`${endpoint}?${params.toString()}`);
           const data = await res.json();
 
           if (!res.ok || !data.ok) {
             throw new Error(data.error || "Failed to create link");
           }
 
-          setStatus(`Created Amazon link #${data.id}`, "ok");
-          // Clear only URL and note, keep category to batch-add similar items
-          inputUrlEl.value = "";
-          noteEl.value = "";
-          if (!autoTitle) titleEl.value = "";
-
+          setStatus(`Created ${sourceLabel} link #${data.id}`, "ok");
+          // Clear only URL (keep category/note if you want)
+          inputEl.value = "";
+          if (!title) titleEl.value = "";
           await loadLinks();
         } catch (err) {
           console.error(err);
@@ -421,44 +374,55 @@
           return;
         }
 
+        const origin = window.location.origin;
+
         for (const link of links) {
           const tr = document.createElement("tr");
 
+          // ID
           const tdId = document.createElement("td");
           tdId.textContent = link.id;
           tr.appendChild(tdId);
 
+          // Source
           const tdSource = document.createElement("td");
           tdSource.textContent = link.source || "-";
           tr.appendChild(tdSource);
 
+          // Title
           const tdTitle = document.createElement("td");
           tdTitle.textContent = link.title || "-";
           tr.appendChild(tdTitle);
 
+          // Category
           const tdCategory = document.createElement("td");
           tdCategory.textContent = link.category || "-";
           tr.appendChild(tdCategory);
 
+          // Original URL
           const tdOriginal = document.createElement("td");
           tdOriginal.innerHTML = `<div class="mono">${link.originalUrl}</div>`;
           tr.appendChild(tdOriginal);
 
+          // Affiliate URL
           const tdAff = document.createElement("td");
           tdAff.innerHTML = `<div class="mono">${link.affiliateUrl}</div>`;
           tr.appendChild(tdAff);
 
+          // Clicks
           const tdClicks = document.createElement("td");
           const clicks = link.clicks || 0;
           tdClicks.innerHTML = `<span class="badge"><span>${clicks}</span> clicks</span>`;
           tr.appendChild(tdClicks);
 
+          // Created
           const tdCreated = document.createElement("td");
           tdCreated.textContent = link.createdAt
             ? new Date(link.createdAt).toLocaleString()
             : "-";
           tr.appendChild(tdCreated);
 
+          // Actions
           const tdActions = document.createElement("td");
           tdActions.className = "actions";
 
@@ -467,11 +431,11 @@
           copyAffBtn.textContent = "Copy affiliate URL";
           copyAffBtn.onclick = () => copyToClipboard(link.affiliateUrl);
 
-          const shortUrl = `${window.location.origin}/api/links/go/${link.id}`;
-          const copyShortBtn = document.createElement("button");
-          copyShortBtn.className = "secondary";
-          copyShortBtn.textContent = "Copy short link";
-          copyShortBtn.onclick = () => copyToClipboard(shortUrl);
+          const shortUrl = `${origin}/g/${link.id}`;
+          const shortBtn = document.createElement("button");
+          shortBtn.className = "secondary";
+          shortBtn.textContent = "Copy short link";
+          shortBtn.onclick = () => copyToClipboard(shortUrl);
 
           const goBtn = document.createElement("button");
           goBtn.textContent = "Open tracked link";
@@ -485,7 +449,7 @@
           deleteBtn.onclick = () => deleteLink(link.id);
 
           tdActions.appendChild(copyAffBtn);
-          tdActions.appendChild(copyShortBtn);
+          tdActions.appendChild(shortBtn);
           tdActions.appendChild(goBtn);
           tdActions.appendChild(deleteBtn);
 
@@ -523,7 +487,7 @@
       }
 
       createBtn.addEventListener("click", createLink);
-      inputUrlEl.addEventListener("keydown", (e) => {
+      inputEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") createLink();
       });
 
