@@ -109,15 +109,17 @@ async function fetchAmazonDetails(productUrl) {
     // ---- main image ----
     let imageUrl = null;
 
-    // NOTE: the double backslashes are important so Node parses the regex correctly
-    let imgMatch = html.match(
-      /"hiRes"\s*:\s*"(https:\\\\/\\\\/m\.media-amazon\.com[^"]+)"/
+    // Use RegExp constructor so Node doesn’t get confused by literal escaping
+    const hiResRe = new RegExp(
+      '"hiRes"\\s*:\\s*"(https:\\\\/\\\\/m\\.media-amazon\\.com[^"]+)"'
+    );
+    const largeRe = new RegExp(
+      '"large"\\s*:\\s*"(https:\\\\/\\\\/m\\.media-amazon\\.com[^"]+)"'
     );
 
+    let imgMatch = html.match(hiResRe);
     if (!imgMatch) {
-      imgMatch = html.match(
-        /"large"\s*:\s*"(https:\\\\/\\\\/m\.media-amazon\.com[^"]+)"/
-      );
+      imgMatch = html.match(largeRe);
     }
 
     if (imgMatch && imgMatch[1]) {
