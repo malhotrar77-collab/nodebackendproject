@@ -1,495 +1,218 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="verify-admitad" content="6d956ec42a" />
-    <title>Affiliate Links Dashboard</title>
-    <style>
-      body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
-        background: #0f172a;
-        color: #e5e7eb;
-        margin: 0;
-        padding: 0;
-      }
-
-      .container {
-        max-width: 1100px;
-        margin: 40px auto;
-        background: #020617;
-        border-radius: 12px;
-        padding: 24px 28px 32px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-        border: 1px solid #1f2937;
-      }
-
-      h1 {
-        margin-top: 0;
-        margin-bottom: 16px;
-        font-size: 24px;
-      }
-
-      h2 {
-        font-size: 18px;
-        margin-top: 32px;
-        margin-bottom: 12px;
-      }
-
-      .row {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 12px;
-        flex-wrap: wrap;
-      }
-
-      input[type="text"] {
-        flex: 1;
-        min-width: 260px;
-        padding: 8px 10px;
-        border-radius: 8px;
-        border: 1px solid #4b5563;
-        background: #020617;
-        color: #e5e7eb;
-        outline: none;
-      }
-
-      input[type="text"]:focus {
-        border-color: #f97316;
-        box-shadow: 0 0 0 1px #f97316;
-      }
-
-      button {
-        padding: 8px 14px;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-        font-size: 14px;
-        background: #f97316;
-        color: #020617;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-
-      button.secondary {
-        background: #111827;
-        color: #e5e7eb;
-        border: 1px solid #4b5563;
-      }
-
-      button.danger {
-        background: #ef4444;
-        color: #fee2e2;
-      }
-
-      button:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-
-      #status {
-        font-size: 13px;
-        min-height: 18px;
-        margin-bottom: 8px;
-      }
-
-      #status.ok {
-        color: #4ade80;
-      }
-
-      #status.error {
-        color: #f97373;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-        margin-top: 8px;
-      }
-
-      th,
-      td {
-        padding: 6px 8px;
-        border-bottom: 1px solid #111827;
-        text-align: left;
-        vertical-align: top;
-      }
-
-      th {
-        background: #020617;
-        position: sticky;
-        top: 0;
-        z-index: 1;
-      }
-
-      td.actions {
-        white-space: nowrap;
-        display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
-      }
-
-      .mono {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-size: 12px;
-        word-break: break-all;
-      }
-
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 6px;
-        border-radius: 999px;
-        background: #111827;
-        font-size: 11px;
-        gap: 4px;
-      }
-
-      .badge span {
-        font-weight: 600;
-      }
-
-      .small {
-        font-size: 12px;
-        color: #9ca3af;
-        margin-top: 4px;
-      }
-
-      .thumb {
-        width: 60px;
-        height: 60px;
-        object-fit: contain;
-        border-radius: 6px;
-        border: 1px solid #1f2937;
-        background: #020617;
-      }
-
-      .thumb-empty {
-        width: 60px;
-        height: 60px;
-        border-radius: 6px;
-        border: 1px dashed #374151;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        color: #4b5563;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="container">
-      <h1>Affiliate Links Dashboard</h1>
-      <div class="small">
-        Backend: <code class="mono">/api/links/*</code>,
-        short redirects: <code class="mono">/api/links/go/:id</code>
-      </div>
-
-      <h2>Create affiliate link</h2>
-      <div id="status"></div>
-
-      <div class="row">
-        <input
-          type="text"
-          id="original-url"
-          placeholder="Paste Amazon product URL"
-        />
-      </div>
-
-      <div class="row">
-        <input
-          type="text"
-          id="title-input"
-          placeholder="Title (optional if auto)"
-        />
-        <input
-          type="text"
-          id="category-input"
-          placeholder="Category (optional, e.g. gloves, caps)"
-        />
-      </div>
-
-      <div class="row">
-        <input
-          type="text"
-          id="note-input"
-          placeholder="Note (optional, e.g. 'Instagram reel, group A')"
-        />
-      </div>
-
-      <div class="row">
-        <label style="display: inline-flex; align-items: center; gap: 6px">
-          <input type="checkbox" id="auto-title-checkbox" checked />
-          <span class="small">Auto title from Amazon (recommended)</span>
-        </label>
-
-        <button id="create-btn">Create affiliate link</button>
-      </div>
-
-      <div class="small" style="margin-top: 4px">
-        Example URL:
-        <code class="mono">https://amzn.to/48eIkdx</code> or
-        <code class="mono">https://www.amazon.in/...</code>
-      </div>
-
-      <h2>Saved links</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Source</th>
-            <th>Image</th>
-            <th>Title</th>
-            <th>Category</th>
-            <th>Original URL</th>
-            <th>Affiliate URL</th>
-            <th>Clicks</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="links-tbody"></tbody>
-      </table>
-    </div>
-
-    <script>
-      const statusEl = document.getElementById("status");
-      const inputEl = document.getElementById("original-url");
-      const titleEl = document.getElementById("title-input");
-      const categoryEl = document.getElementById("category-input");
-      const noteEl = document.getElementById("note-input");
-      const autoTitleEl = document.getElementById("auto-title-checkbox");
-      const tbodyEl = document.getElementById("links-tbody");
-      const createBtn = document.getElementById("create-btn");
-
-      function setStatus(msg, type = "") {
-        statusEl.textContent = msg || "";
-        statusEl.className = "";
-        if (type) statusEl.classList.add(type);
-      }
-
-      function shortId(link) {
-        const id = link.id || link._id || "";
-        if (!id) return "-";
-        return id.slice(-6);
-      }
-
-      // Create Amazon link
-      async function createLink() {
-        const url = inputEl.value.trim();
-        if (!url) {
-          setStatus("Please paste an Amazon product URL first.", "error");
-          return;
-        }
-
-        const params = new URLSearchParams();
-        params.set("url", url);
-        if (titleEl.value.trim()) params.set("title", titleEl.value.trim());
-        if (categoryEl.value.trim())
-          params.set("category", categoryEl.value.trim());
-        if (noteEl.value.trim()) params.set("note", noteEl.value.trim());
-        params.set("autoTitle", autoTitleEl.checked ? "1" : "0");
-
-        createBtn.disabled = true;
-        setStatus("Creating Amazon link...", "");
-
-        try {
-          const res = await fetch(`/api/links/amazon?${params.toString()}`);
-          const data = await res.json();
-
-          if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Failed to create link");
-          }
-
-          setStatus(`Created link #${data.id}`, "ok");
-          inputEl.value = "";
-          titleEl.value = "";
-          // keep category/note so user can paste more items for same group
-          await loadLinks();
-        } catch (err) {
-          console.error(err);
-          setStatus(err.message, "error");
-        } finally {
-          createBtn.disabled = false;
-        }
-      }
-
-      async function loadLinks() {
-        setStatus("Loading links...", "");
-        try {
-          const res = await fetch("/api/links/all");
-          const data = await res.json();
-          if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Failed to load links");
-          }
-          renderLinks(data.links || []);
-          setStatus(`Loaded ${data.count} link(s).`, "ok");
-        } catch (err) {
-          console.error(err);
-          setStatus(err.message, "error");
-        }
-      }
-
-      function renderLinks(links) {
-        tbodyEl.innerHTML = "";
-
-        if (!links.length) {
-          const tr = document.createElement("tr");
-          const td = document.createElement("td");
-          td.colSpan = 10;
-          td.textContent = "No links yet. Create one above.";
-          tr.appendChild(td);
-          tbodyEl.appendChild(tr);
-          return;
-        }
-
-        for (const link of links) {
-          const tr = document.createElement("tr");
-          const linkId = link.id || link._id;
-
-          // ID
-          const tdId = document.createElement("td");
-          tdId.textContent = shortId(link);
-          tr.appendChild(tdId);
-
-          // Source
-          const tdSource = document.createElement("td");
-          tdSource.textContent = link.source || "-";
-          tr.appendChild(tdSource);
-
-          // Image
-          const tdImg = document.createElement("td");
-          const imgUrl =
-            link.imageUrl ||
-            (Array.isArray(link.imageUrls) && link.imageUrls[0]) ||
-            null;
-
-          if (imgUrl) {
-            const img = document.createElement("img");
-            img.src = imgUrl;
-            img.alt = link.title || "Product image";
-            img.loading = "lazy";
-            img.className = "thumb";
-            tdImg.appendChild(img);
-          } else {
-            const div = document.createElement("div");
-            div.className = "thumb-empty";
-            div.textContent = "no img";
-            tdImg.appendChild(div);
-          }
-          tr.appendChild(tdImg);
-
-          // Title
-          const tdTitle = document.createElement("td");
-          tdTitle.textContent = link.title || "-";
-          tr.appendChild(tdTitle);
-
-          // Category
-          const tdCat = document.createElement("td");
-          tdCat.textContent = link.category || "-";
-          tr.appendChild(tdCat);
-
-          // Original URL
-          const tdOriginal = document.createElement("td");
-          tdOriginal.innerHTML = `<div class="mono">${link.originalUrl}</div>`;
-          tr.appendChild(tdOriginal);
-
-          // Affiliate URL
-          const tdAff = document.createElement("td");
-          tdAff.innerHTML = `<div class="mono">${link.affiliateUrl}</div>`;
-          tr.appendChild(tdAff);
-
-          // Clicks
-          const tdClicks = document.createElement("td");
-          const clicks = link.clicks || 0;
-          tdClicks.innerHTML = `<span class="badge"><span>${clicks}</span> clicks</span>`;
-          tr.appendChild(tdClicks);
-
-          // Created
-          const tdCreated = document.createElement("td");
-          tdCreated.textContent = link.createdAt
-            ? new Date(link.createdAt).toLocaleString()
-            : "-";
-          tr.appendChild(tdCreated);
-
-          // Actions
-          const tdActions = document.createElement("td");
-          tdActions.className = "actions";
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "secondary";
-          copyBtn.textContent = "Copy affiliate URL";
-          copyBtn.onclick = () => copyToClipboard(link.affiliateUrl);
-
-          const shortBtn = document.createElement("button");
-          shortBtn.className = "secondary";
-          shortBtn.textContent = "Copy short link";
-          shortBtn.onclick = () =>
-            copyToClipboard(`/api/links/go/${linkId || ""}`);
-
-          const goBtn = document.createElement("button");
-          goBtn.textContent = "Open tracked link";
-          goBtn.onclick = () => {
-            window.open(`/api/links/go/${linkId || ""}`, "_blank");
-          };
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "danger";
-          deleteBtn.textContent = "Delete";
-          deleteBtn.onclick = () => deleteLink(linkId);
-
-          tdActions.appendChild(copyBtn);
-          tdActions.appendChild(shortBtn);
-          tdActions.appendChild(goBtn);
-          tdActions.appendChild(deleteBtn);
-
-          tr.appendChild(tdActions);
-
-          tbodyEl.appendChild(tr);
-        }
-      }
-
-      async function deleteLink(id) {
-        if (!id) {
-          alert("Missing link id.");
-          return;
-        }
-
-        if (!confirm(`Delete link #${id}?`)) return;
-
-        try {
-          const res = await fetch(`/api/links/${id}`, { method: "DELETE" });
-          const data = await res.json();
-          if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Failed to delete");
-          }
-          setStatus(data.message || `Link ${id} deleted.`, "ok");
-          await loadLinks();
-        } catch (err) {
-          console.error(err);
-          setStatus(err.message, "error");
-        }
-      }
-
-      async function copyToClipboard(text) {
-        try {
-          await navigator.clipboard.writeText(text);
-          setStatus("Copied to clipboard.", "ok");
-        } catch (err) {
-          console.error(err);
-          setStatus("Could not copy to clipboard.", "error");
-        }
-      }
-
-      createBtn.addEventListener("click", createLink);
-      inputEl.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") createLink();
-      });
-
-      window.addEventListener("DOMContentLoaded", loadLinks);
-    </script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Affiliate Links Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: white;
+    }
+    input, button {
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      outline: none;
+    }
+    input {
+      width: 100%;
+      margin-bottom: 10px;
+      background: #1e293b;
+      color: #e2e8f0;
+    }
+    button {
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button.primary {
+      background: #fb923c;
+      color: black;
+    }
+    button.secondary {
+      background: #334155;
+      color: white;
+      margin-right: 6px;
+    }
+    button.danger {
+      background: #ef4444;
+      color: white;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 25px;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #334155;
+      text-align: left;
+    }
+    th {
+      background: #1e293b;
+    }
+    img.product-img {
+      width: 70px;
+      height: 70px;
+      object-fit: contain;
+      background: #020617;
+      border-radius: 6px;
+    }
+    .mono {
+      font-family: monospace;
+      word-break: break-all;
+    }
+    .actions button {
+      margin-bottom: 5px;
+      width: 120px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Affiliate Links Dashboard</h1>
+
+<div id="status" style="margin-bottom: 10px; color: #4ade80;">
+  Loading…
+</div>
+
+<!-- Input form -->
+<input id="urlInput" placeholder="Paste Amazon product URL" />
+<input id="titleInput" placeholder="Title (optional if auto)" />
+<input id="categoryInput" placeholder="Category (optional, e.g., bags, shoes)" />
+<input id="noteInput" placeholder="Note (optional, e.g., Instagram reel, group A)" />
+
+<label style="display:flex;align-items:center;margin:8px 0;">
+  <input type="checkbox" id="autoTitle" checked />
+  <span style="margin-left:6px;">Auto title from Amazon (recommended)</span>
+</label>
+
+<button class="primary" onclick="createLink()">Create affiliate link</button>
+
+<!-- TABLE -->
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Source</th>
+      <th>Image</th>
+      <th>Title</th>
+      <th>Category</th>
+      <th>Original URL</th>
+      <th>Affiliate URL</th>
+      <th>Clicks</th>
+      <th>Created</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<script>
+const tbody = document.getElementById("tbody");
+const statusEl = document.getElementById("status");
+
+async function loadLinks() {
+  const res = await fetch("/api/links/all");
+  const json = await res.json();
+  if (!json.success) {
+    statusEl.textContent = "Failed to load links.";
+    return;
+  }
+  statusEl.textContent = `Loaded ${json.links.length} link(s).`;
+  renderLinks(json.links);
+}
+
+function renderLinks(links) {
+  tbody.innerHTML = "";
+
+  links.forEach(link => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${link.id}</td>
+      <td>${link.source}</td>
+      <td>${link.imageUrl ? 
+          `<img class="product-img" src="${link.imageUrl}" referrerpolicy="no-referrer" />`
+          : "No image"}</td>
+      <td>${link.title || "-"}</td>
+      <td>${link.category || "-"}</td>
+      <td class="mono">${link.originalUrl}</td>
+      <td class="mono">${link.affiliateUrl}</td>
+      <td>${link.clicks || 0} clicks</td>
+      <td>${new Date(link.createdAt).toLocaleString()}</td>
+      <td class="actions">
+        <button class="secondary" onclick="copy('${link.affiliateUrl}')">Copy affiliate URL</button>
+        <button class="secondary" onclick="copy('${window.location.origin}/api/links/go/${link.id}')">Copy short link</button>
+        <button onclick="window.open('/api/links/go/${link.id}', '_blank')">Open tracked link</button>
+        <button class="danger" onclick="deleteLink('${link.id}')">Delete</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+// COPY function
+function copy(text) {
+  navigator.clipboard.writeText(text);
+  alert("Copied!");
+}
+
+// CREATE new link
+async function createLink() {
+  const url = document.getElementById("urlInput").value.trim();
+  const title = document.getElementById("titleInput").value.trim();
+  const category = document.getElementById("categoryInput").value.trim();
+  const note = document.getElementById("noteInput").value.trim();
+  const autoTitle = document.getElementById("autoTitle").checked;
+
+  const body = { url, title, category, note, autoTitle };
+
+  const res = await fetch("/api/links/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    alert("Create failed: " + json.message);
+    return;
+  }
+
+  alert("Created!");
+  loadLinks();
+}
+
+// DELETE a link
+async function deleteLink(id) {
+  if (!confirm(`Delete link ${id}?`)) return;
+
+  const res = await fetch(`/api/links/delete/${id}`, { method: "DELETE" });
+  const json = await res.json();
+
+  if (!json.success) {
+    alert("Failed to delete link: " + json.message);
+    return;
+  }
+
+  alert("Deleted!");
+  loadLinks();
+}
+
+loadLinks();
+</script>
+
+</body>
 </html>
