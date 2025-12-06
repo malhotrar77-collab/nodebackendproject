@@ -9,7 +9,37 @@ const app = express();
 // IMPORTANT for Render: use their assigned port
 const PORT = process.env.PORT || 3000;
 
-// Serve files from the "public" folder (frontend)
+// Serve files from the "public" folder (frontend)// NodeBackend/index.js
+
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+
+require("./db"); // connects Mongo
+const linksRoute = require("./routes/links");
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// API
+app.use("/api/links", linksRoute);
+
+// Serve frontend
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// PORT for Render
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // Parse JSON body (for future APIs)
