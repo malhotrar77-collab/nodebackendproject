@@ -2,21 +2,37 @@
 
 const express = require("express");
 const router = express.Router();
-const { createAdmitadDeeplink } = require("./admitadClient"); // kept for future
-const Link = require("../models/Link");
+const { Types } = require("mongoose");
 
-// ---------- SMALL HELPERS ----------
+// Admitad client (for later when programs are approved)
+const { createAdmitadDeeplink } = require("./admitadClient");
 
-// Turn Mongo doc into plain object that frontend likes
-function mapLink(doc) {
-  const obj = doc.toObject();
-  obj.id = obj._id.toString();
-  delete obj._id;
-  delete obj.__v;
-  return obj;
+// Mongoose model
+const Link = require("../models/link");
+
+// -------------------- CONFIG --------------------
+
+// Map Admitad programs (we’ll use this once you’re approved)
+const ADMITAD_PROGRAMS = [
+  {
+    key: "myntra",
+    pattern: "myntra.com",
+    campaignId: 123456, // TODO: replace with real Myntra campaign ID when approved
+  },
+];
+
+// Amazon tag
+const AMAZON_TAG = "alwaysonsal08-21";
+
+// -------------------- HELPERS --------------------
+
+function boolFromQuery(v) {
+  if (!v) return false;
+  const s = String(v).toLowerCase();
+  return s === "1" || s === "true" || s === "yes" || s === "on";
 }
 
-// Clean amazon URL -> canonical https://www.amazon.in/dp/ASIN
+// Clean Amazon URL -> https://www.amazon.in/dp/ASIN (keep amzn.to links as-is)
 function normalizeAmazonUrl(originalUrl) {
   try {
     const u = new URL(originalUrl);
@@ -24,6 +40,7 @@ function normalizeAmazonUrl(originalUrl) {
 
     // keep short links as they are
     if (host === "amzn.to") return originalUrl;
+
     if (!host.includes("amazon.")) return originalUrl;
 
     const segments = u.pathname.split("/").filter(Boolean);
@@ -48,25 +65,22 @@ function normalizeAmazonUrl(originalUrl) {
       }
     }
 
-    if (!asin) return originalUrl;
+    if (!asin) {
+      return originalUrl;
+    }
 
     return `${u.protocol}//${host}/dp/${asin}`;
-  } catch {
+  } catch (e) {
     return originalUrl;
   }
 }
 
-function boolFromQuery(v) {
-  if (!v) return false;
-  const s = String(v).toLowerCase();
-  return s === "1" || s === "true" || s === "yes" || s === "on";
-}
-
-// Very lightweight Amazon scraper (title + main image)
+// Fetch product title + main image from Amazon page (simple scraping)
 async function fetchAmazonDetails(productUrl) {
   try {
     const res = await fetch(productUrl, {
       headers: {
+        // Pretend to be a real browser
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
           "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
@@ -94,16 +108,20 @@ async function fetchAmazonDetails(productUrl) {
 
     // ---- main image ----
     let imageUrl = null;
-    // Try JSON blobs with hiRes / large images
+
+    // NOTE: the double backslashes are important so Node parses the regex correctly
     let imgMatch = html.match(
-      /"hiRes"\s*:\s*"(https:\\/\\/m\.media-amazon\.com[^"]+)"/
+      /"hiRes"\s*:\s*"(https:\\\\/\\\\/m\.media-amazon\.com[^"]+)"/
     );
+
     if (!imgMatch) {
       imgMatch = html.match(
-        /"large"\s*:\s*"(https:\\/\\/m\.media-amazon\.com[^"]+)"/
+        /"large"\s*:\s*"(https:\\\\/\\\\/m\.media-amazon\.com[^"]+)"/
       );
     }
+
     if (imgMatch && imgMatch[1]) {
+      // convert \"https:\/\/..\" into "https://.."
       imageUrl = imgMatch[1].replace(/\\\//g, "/");
     }
 
@@ -114,81 +132,189 @@ async function fetchAmazonDetails(productUrl) {
   }
 }
 
-// ---------- ROUTES ----------
+// -------------------- ROUTES --------------------
 
-// health test
+// Quick test
 router.get("/test", (req, res) => {
-  res.json({ ok: true, message: "links router working with Mongo" });
+  res.json({ status: "links router working" });
 });
 
-// get all links (newest first)
+// Get all links (newest first)
 router.get("/all", async (req, res) => {
   try {
-    const docs = await Link.find().sort({ createdAt: -1 });
-    const links = docs.map(mapLink);
+    const links = await Link.find().sort({ createdAt: -1 }).lean();
     res.json({ ok: true, count: links.length, links });
   } catch (err) {
-    console.error("GET /all error:", err);
+    console.error("Error loading links:", err);
     res.status(500).json({ ok: false, error: "Failed to load links." });
   }
 });
 
-// create Amazon link (with auto title + image)
+// ---------- AMAZON CREATOR (with URL cleaning + auto title + image) ----------
 router.get("/amazon", async (req, res) => {
+  const originalUrlRaw = (req.query.url || "").trim();
+
+  if (!originalUrlRaw) {
+    return res.status(400).json({
+      ok: false,
+      error: "Please provide url query param: ?url=...",
+    });
+  }
+
+  const titleInput = (req.query.title || "").trim();
+  const categoryInput = (req.query.category || "").trim();
+  const noteInput = (req.query.note || "").trim();
+  const autoTitle = boolFromQuery(req.query.autoTitle);
+
+  // 1) Clean the Amazon URL (dp/ASIN)
+  const canonicalUrl = normalizeAmazonUrl(originalUrlRaw);
+
+  // 2) Build affiliate URL on top of CLEAN URL
+  const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+  const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
+
+  // 3) Optionally fetch title + image from Amazon
+  let finalTitle = titleInput || null;
+  let imageUrl = null;
+
+  if (!finalTitle && autoTitle) {
+    const { title, imageUrl: fetchedImage } = await fetchAmazonDetails(
+      canonicalUrl
+    );
+    if (title) finalTitle = title;
+    if (fetchedImage) imageUrl = fetchedImage;
+  }
+
   try {
-    const originalUrlRaw = (req.query.url || "").trim();
-    if (!originalUrlRaw) {
-      return res.status(400).json({
-        ok: false,
-        error: "Please provide url query param: ?url=...",
-      });
-    }
-
-    const manualTitle = (req.query.title || "").trim();
-    const category = (req.query.category || "").trim();
-    const note = (req.query.note || "").trim();
-    const autoTitle = boolFromQuery(req.query.autoTitle);
-
-    const canonicalUrl = normalizeAmazonUrl(originalUrlRaw);
-    const joinChar = canonicalUrl.includes("?") ? "&" : "?";
-    const AMAZON_TAG = "alwaysonsal08-21";
-    const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
-
-    let finalTitle = manualTitle;
-    let imageUrl = null;
-
-    if (autoTitle || !manualTitle) {
-      const scraped = await fetchAmazonDetails(canonicalUrl);
-      if (scraped.title && !manualTitle) finalTitle = scraped.title;
-      if (scraped.imageUrl) imageUrl = scraped.imageUrl;
-    }
-
-    const linkDoc = await Link.create({
+    const doc = await Link.create({
       source: "amazon",
       originalUrl: canonicalUrl,
       rawOriginalUrl: originalUrlRaw,
       affiliateUrl,
       tag: AMAZON_TAG,
-      title: finalTitle || null,
-      category: category || null,
-      note: note || null,
+      title: finalTitle,
+      category: categoryInput || null,
+      note: noteInput || null,
       imageUrl: imageUrl || null,
+      images: imageUrl ? [imageUrl] : [],
       clicks: 0,
     });
 
-    const link = mapLink(linkDoc);
-    res.json({ ok: true, id: link.id, link });
+    res.json({
+      ok: true,
+      id: String(doc._id),
+      link: doc,
+    });
   } catch (err) {
-    console.error("CREATE /amazon error:", err);
+    console.error("Error creating Amazon link:", err);
     res.status(500).json({ ok: false, error: "Failed to create Amazon link." });
   }
 });
 
-// delete link
+// ---------- FLIPKART CREATOR (simple, no scraping yet) ----------
+router.get("/flipkart", async (req, res) => {
+  const originalUrl = (req.query.url || "").trim();
+
+  if (!originalUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Please provide url query param: ?url=...",
+    });
+  }
+
+  const titleInput = (req.query.title || "").trim();
+  const categoryInput = (req.query.category || "").trim();
+  const noteInput = (req.query.note || "").trim();
+
+  const flipkartTag = "alwaysonsale";
+  const joinChar = originalUrl.includes("?") ? "&" : "?";
+  const affiliateUrl = `${originalUrl}${joinChar}affid=${flipkartTag}`;
+
+  try {
+    const doc = await Link.create({
+      source: "flipkart",
+      originalUrl,
+      affiliateUrl,
+      tag: flipkartTag,
+      title: titleInput || null,
+      category: categoryInput || null,
+      note: noteInput || null,
+      clicks: 0,
+    });
+
+    res.json({
+      ok: true,
+      id: String(doc._id),
+      link: doc,
+    });
+  } catch (err) {
+    console.error("Error creating Flipkart link:", err);
+    res.status(500).json({ ok: false, error: "Failed to create Flipkart link." });
+  }
+});
+
+// ---------- REDIRECT + COUNT CLICK ----------
+// (Put this BEFORE "/:id" so it doesn’t get captured by that route)
+router.get("/go/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!Types.ObjectId.isValid(id)) {
+    return res
+      .status(404)
+      .json({ ok: false, error: "No link found with that ID" });
+  }
+
+  try {
+    const doc = await Link.findById(id);
+    if (!doc) {
+      return res
+        .status(404)
+        .json({ ok: false, error: "No link found with that ID" });
+    }
+
+    doc.clicks = (doc.clicks || 0) + 1;
+    await doc.save();
+
+    res.redirect(doc.affiliateUrl);
+  } catch (err) {
+    console.error("Error redirecting link:", err);
+    res.status(500).json({ ok: false, error: "Failed to redirect link." });
+  }
+});
+
+// ---------- GET SINGLE ----------
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!Types.ObjectId.isValid(id)) {
+    return res
+      .status(404)
+      .json({ ok: false, error: `No link found with id ${id}` });
+  }
+
+  try {
+    const doc = await Link.findById(id);
+    if (!doc) {
+      return res
+        .status(404)
+        .json({ ok: false, error: `No link found with id ${id}` });
+    }
+
+    res.json({ ok: true, link: doc });
+  } catch (err) {
+    console.error("Error fetching link:", err);
+    res.status(500).json({ ok: false, error: "Failed to fetch link." });
+  }
+});
+
+// ---------- DELETE ----------
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
-  if (!id) {
-    return res.status(400).json({ ok: false, error: "Missing link id." });
+
+  if (!Types.ObjectId.isValid(id)) {
+    return res
+      .status(404)
+      .json({ ok: false, error: "No link found with that ID" });
   }
 
   try {
@@ -196,37 +322,17 @@ router.delete("/:id", async (req, res) => {
     if (!deleted) {
       return res
         .status(404)
-        .json({ ok: false, error: "No link found with that ID." });
+        .json({ ok: false, error: "No link found with that ID" });
     }
-    res.json({ ok: true, message: `Link ${id} deleted successfully.` });
+
+    res.json({ ok: true, message: `Link ${id} deleted successfully` });
   } catch (err) {
-    console.error("DELETE /:id error:", err);
+    console.error("Error deleting link:", err);
     res.status(500).json({ ok: false, error: "Failed to delete link." });
   }
 });
 
-// redirect + count click
-router.get("/go/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const link = await Link.findById(id);
-    if (!link) {
-      return res
-        .status(404)
-        .json({ ok: false, error: `No link found with id ${id}` });
-    }
-
-    link.clicks = (link.clicks || 0) + 1;
-    await link.save();
-
-    res.redirect(link.affiliateUrl);
-  } catch (err) {
-    console.error("GO /go/:id error:", err);
-    res.status(500).json({ ok: false, error: "Failed to open tracked link." });
-  }
-});
-
-// ----- Admitad route kept for later (will still return invalid_scope for now) -----
+// ---------- ADMITAD (will return invalid_scope until you’re approved) ----------
 router.get("/admitad", async (req, res) => {
   const originalUrl = (req.query.url || "").trim();
 
@@ -237,21 +343,34 @@ router.get("/admitad", async (req, res) => {
     });
   }
 
-  // when we really use this, we’ll plug in campaign config here
+  const lower = originalUrl.toLowerCase();
+  const program = ADMITAD_PROGRAMS.find((p) => lower.includes(p.pattern));
+
+  if (!program) {
+    return res.status(400).json({
+      ok: false,
+      error: "No matching Admitad program for this URL.",
+    });
+  }
+
   try {
     const affiliateUrl = await createAdmitadDeeplink({
-      campaignId: 123456,
+      campaignId: program.campaignId,
       url: originalUrl,
     });
 
-    const linkDoc = await Link.create({
-      source: "admitad",
+    const doc = await Link.create({
+      source: `admitad-${program.key}`,
       originalUrl,
       affiliateUrl,
+      clicks: 0,
     });
 
-    const link = mapLink(linkDoc);
-    res.json({ ok: true, id: link.id, link });
+    res.json({
+      ok: true,
+      id: String(doc._id),
+      link: doc,
+    });
   } catch (err) {
     console.error("Admitad API ERROR →", err.response?.data || err.message);
     res.status(500).json({
