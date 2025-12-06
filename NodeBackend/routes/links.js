@@ -4,6 +4,7 @@ const express = require("express");
 const router = express.Router();
 const { createAdmitadDeeplink } = require("./admitadClient"); // still for future
 const Link = require("../models/link");
+const mongoose = require("../db");
 
 // ---------- CONFIG ----------
 
@@ -31,7 +32,7 @@ function normalizeAmazonUrl(originalUrl) {
     const u = new URL(originalUrl);
     const host = u.hostname.toLowerCase();
 
-    // keep shortlinks as-is (we'll just add the tag)
+    // keep shortlinks as they are
     if (host === "amzn.to") return originalUrl;
 
     if (!host.includes("amazon.")) return originalUrl;
@@ -99,9 +100,7 @@ async function scrapeAmazonMeta(productUrl) {
 
     // Image: grab first m.media-amazon.com jpg
     let imageUrl = null;
-    const imgMatch = html.match(
-      /https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/
-    );
+    const imgMatch = html.match(/https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/);
     if (imgMatch && imgMatch[0]) {
       imageUrl = imgMatch[0];
     }
@@ -150,15 +149,10 @@ function inferCategoryFromTitle(title) {
   )
     return "clothing";
 
-  if (
-    t.includes("watch") &&
-    !t.includes("smartwatch") &&
-    !t.includes("smart watch")
-  )
+  if (t.includes("watch") && !t.includes("smartwatch") && !t.includes("smart watch"))
     return "watches";
 
-  if (t.includes("smartwatch") || t.includes("smart watch"))
-    return "smartwatches";
+  if (t.includes("smartwatch") || t.includes("smart watch")) return "smartwatches";
 
   if (
     t.includes("phone") ||
@@ -205,6 +199,21 @@ function inferCategoryFromTitle(title) {
 
 // ---------- ROUTES ----------
 
+// DB status helper (for debugging)
+router.get("/dbtest", (req, res) => {
+  const rs = mongoose.connection.readyState; // 0=disconnected,1=connected,2=connecting,3=disconnecting
+  res.json({
+    ok: true,
+    readyState: rs,
+    message:
+      rs === 1
+        ? "MongoDB connected"
+        : rs === 2
+        ? "MongoDB connecting"
+        : "MongoDB NOT connected",
+  });
+});
+
 // Simple test
 router.get("/test", (req, res) => {
   res.json({ success: true, message: "links router working" });
@@ -221,30 +230,31 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// Create (Amazon only for now)
+// Create (Amazon only for now, including amzn.to short links)
 router.post("/create", async (req, res) => {
   try {
     const rawUrl = (req.body.url || "").trim();
     if (!rawUrl) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing url" });
+      return res.status(400).json({ success: false, message: "Missing url" });
     }
 
-    // Allow both full Amazon URLs and amzn.to short links
-    let host;
+    let u;
     try {
-      host = new URL(rawUrl).hostname.toLowerCase();
+      u = new URL(rawUrl);
     } catch {
-      host = "";
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid URL format." });
     }
+
+    const host = u.hostname.toLowerCase();
     const isAmazon =
-      host === "amzn.to" || host.includes("amazon.");
+      host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
 
     if (!isAmazon) {
       return res.status(400).json({
         success: false,
-        message: "Right now only Amazon product URLs are supported.",
+        message: "Right now only Amazon product URLs (including amzn.to) are supported.",
       });
     }
 
@@ -299,9 +309,7 @@ router.post("/create", async (req, res) => {
     res.json({ success: true, link: doc });
   } catch (err) {
     console.error("POST /create error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to create link" });
+    res.status(500).json({ success: false, message: "Failed to create link" });
   }
 });
 
@@ -312,9 +320,7 @@ router.get("/go/:id", async (req, res) => {
     const link = await Link.findOne({ id });
 
     if (!link) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Link not found" });
+      return res.status(404).json({ success: false, message: "Link not found" });
     }
 
     link.clicks = (link.clicks || 0) + 1;
