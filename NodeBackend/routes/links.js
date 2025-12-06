@@ -2,7 +2,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { createAdmitadDeeplink } = require("./admitadClient"); // still for future
+const { createAdmitadDeeplink } = require("./admitadClient"); // kept for future
 const Link = require("../models/link");
 
 // ---------- CONFIG ----------
@@ -31,7 +31,8 @@ function normalizeAmazonUrl(originalUrl) {
     const u = new URL(originalUrl);
     const host = u.hostname.toLowerCase();
 
-    if (host === "amzn.to") return originalUrl; // keep shortlinks
+    // keep shortlinks exactly as they are
+    if (host === "amzn.to") return originalUrl;
 
     if (!host.includes("amazon.")) return originalUrl;
 
@@ -133,15 +134,12 @@ function inferCategoryFromTitle(title) {
     return "footwear";
   if (t.includes("tote bag") || t.includes("handbag") || t.includes("backpack"))
     return "bags";
-  if (t.includes("wallet"))
-    return "wallets";
+  if (t.includes("wallet")) return "wallets";
 
   if (t.includes("t-shirt") || t.includes("t shirt") || t.includes("tee"))
     return "tshirts";
-  if (t.includes("jeans") || t.includes("denim"))
-    return "jeans";
-  if (t.includes("hoodie") || t.includes("sweatshirt"))
-    return "hoodies";
+  if (t.includes("jeans") || t.includes("denim")) return "jeans";
+  if (t.includes("hoodie") || t.includes("sweatshirt")) return "hoodies";
   if (
     t.includes("shirt") ||
     t.includes("kurta") ||
@@ -170,8 +168,7 @@ function inferCategoryFromTitle(title) {
   )
     return "mobiles";
 
-  if (t.includes("laptop") || t.includes("notebook"))
-    return "laptops";
+  if (t.includes("laptop") || t.includes("notebook")) return "laptops";
 
   if (
     t.includes("headphone") ||
@@ -234,14 +231,28 @@ router.post("/create", async (req, res) => {
         .json({ success: false, message: "Missing url" });
     }
 
-    // Only Amazon supported for now
-    const lower = rawUrl.toLowerCase();
-    if (!lower.includes("amazon.")) {
+    // ---- Allow amazon.* and amzn.to ----
+    let host = "";
+    try {
+      host = new URL(rawUrl).hostname.toLowerCase();
+    } catch (_) {
+      // invalid URL
       return res.status(400).json({
         success: false,
-        message: "Right now only Amazon product URLs are supported.",
+        message: "Please paste a valid Amazon or amzn.to URL.",
       });
     }
+
+    const isAmazon =
+      host === "amzn.to" || host.includes("amazon.");
+
+    if (!isAmazon) {
+      return res.status(400).json({
+        success: false,
+        message: "Right now only Amazon (amazon.* or amzn.to) product URLs are supported.",
+      });
+    }
+    // --------------------------------------
 
     const manualTitle = (req.body.title || "").trim();
     const manualCategory = (req.body.category || "").trim();
@@ -252,15 +263,16 @@ router.post("/create", async (req, res) => {
     const joinChar = canonicalUrl.includes("?") ? "&" : "?";
     const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
 
-    // Scrape page (for title + image)
+    // Scrape page (for title + image).
+    // For amzn.to this might not work (redirect page), which is fine.
     let scrapedTitle = null;
     let imageUrl = null;
     try {
       const scraped = await scrapeAmazonMeta(canonicalUrl);
       scrapedTitle = scraped.title;
       imageUrl = scraped.imageUrl;
-    } catch (_) {
-      // ignore scraping failures
+    } catch {
+      // ignore scraping failures completely
     }
 
     // Decide final title
