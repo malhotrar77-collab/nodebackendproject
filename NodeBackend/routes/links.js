@@ -2,7 +2,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { createAdmitadDeeplink } = require("./admitadClient"); // kept for future
+const { createAdmitadDeeplink } = require("./admitadClient"); // still for future
 const Link = require("../models/link");
 
 // ---------- CONFIG ----------
@@ -31,7 +31,7 @@ function normalizeAmazonUrl(originalUrl) {
     const u = new URL(originalUrl);
     const host = u.hostname.toLowerCase();
 
-    // keep shortlinks exactly as they are
+    // keep shortlinks as-is (we'll just add the tag)
     if (host === "amzn.to") return originalUrl;
 
     if (!host.includes("amazon.")) return originalUrl;
@@ -231,28 +231,22 @@ router.post("/create", async (req, res) => {
         .json({ success: false, message: "Missing url" });
     }
 
-    // ---- Allow amazon.* and amzn.to ----
-    let host = "";
+    // Allow both full Amazon URLs and amzn.to short links
+    let host;
     try {
       host = new URL(rawUrl).hostname.toLowerCase();
-    } catch (_) {
-      // invalid URL
-      return res.status(400).json({
-        success: false,
-        message: "Please paste a valid Amazon or amzn.to URL.",
-      });
+    } catch {
+      host = "";
     }
-
     const isAmazon =
       host === "amzn.to" || host.includes("amazon.");
 
     if (!isAmazon) {
       return res.status(400).json({
         success: false,
-        message: "Right now only Amazon (amazon.* or amzn.to) product URLs are supported.",
+        message: "Right now only Amazon product URLs are supported.",
       });
     }
-    // --------------------------------------
 
     const manualTitle = (req.body.title || "").trim();
     const manualCategory = (req.body.category || "").trim();
@@ -263,16 +257,15 @@ router.post("/create", async (req, res) => {
     const joinChar = canonicalUrl.includes("?") ? "&" : "?";
     const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
 
-    // Scrape page (for title + image).
-    // For amzn.to this might not work (redirect page), which is fine.
+    // Scrape page (for title + image)
     let scrapedTitle = null;
     let imageUrl = null;
     try {
       const scraped = await scrapeAmazonMeta(canonicalUrl);
       scrapedTitle = scraped.title;
       imageUrl = scraped.imageUrl;
-    } catch {
-      // ignore scraping failures completely
+    } catch (_) {
+      // ignore scraping failures
     }
 
     // Decide final title
