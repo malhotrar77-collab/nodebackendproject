@@ -2,40 +2,47 @@
 
 const mongoose = require("mongoose");
 
+const priceSchema = new mongoose.Schema(
+  {
+    current: Number,          // current selling price
+    original: Number,         // MRP / original price, if found
+    currency: String,         // e.g. "₹"
+    discountPercent: Number,  // computed if we have both prices
+  },
+  { _id: false }
+);
+
 const linkSchema = new mongoose.Schema(
   {
-    source: { type: String, required: true },        // "amazon", "flipkart", "admitad-myntra", etc.
-    originalUrl: { type: String, required: true },   // cleaned / canonical URL
-    rawOriginalUrl: { type: String },                // what user pasted
-    affiliateUrl: { type: String, required: true },
-    tag: { type: String },
+    // Basic source info
+    source: { type: String, required: true }, // "amazon", "flipkart", "admitad-myntra", etc.
 
-    // Extra metadata
-    title: { type: String },
-    category: { type: String },
-    note: { type: String },
+    // URLs
+    originalUrl: { type: String, required: true },  // what user pasted
+    canonicalUrl: String,                           // cleaned dp URL
+    affiliateUrl: { type: String, required: true }, // with tag/affid
+    tag: String,                                    // our tag (amazon / flipkart)
 
-    // Future: images, prices, etc.
-    images: [{ type: String }],
-    price: { type: Number }, // optional, for later
+    // Product info
+    title: String,
+    category: String,
+    note: String,           // user note from UI (e.g. "Insta reel group A")
 
+    // Images
+    imageUrl: String,       // main image
+    imageUrls: [String],    // extra images
+
+    // Price + ratings
+    price: priceSchema,
+    rating: Number,         // e.g. 4.3
+    ratingCount: Number,    // e.g. 11811
+
+    // Analytics
     clicks: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now }
   },
   {
-    versionKey: false
+    timestamps: true, // createdAt, updatedAt
   }
 );
 
-// Transform _id -> id for API responses
-linkSchema.set("toJSON", {
-  transform: (doc, ret) => {
-    ret.id = String(ret._id);
-    delete ret._id;
-    return ret;
-  }
-});
-
-const Link = mongoose.model("Link", linkSchema);
-
-module.exports = Link;
+module.exports = mongoose.model("Link", linkSchema);
