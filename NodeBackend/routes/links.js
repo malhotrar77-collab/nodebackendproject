@@ -2,33 +2,36 @@
 
 const express = require("express");
 const router = express.Router();
-
-const { createAdmitadDeeplink } = require("./admitadClient"); // still here for future
+const { createAdmitadDeeplink } = require("./admitadClient"); // still for future
 const Link = require("../models/link");
 
-// -------------------- CONFIG --------------------
+// ---------- CONFIG ----------
 
-// Map Admitad programs (for later, when approvals come)
+const AMAZON_TAG = "alwaysonsal08-21";
+
+// For later when Admitad programs are approved
 const ADMITAD_PROGRAMS = [
   {
     key: "myntra",
     pattern: "myntra.com",
-    campaignId: 123456, // TODO: replace with real Myntra campaign ID when approved
+    campaignId: 123456, // TODO: real campaign ID later
   },
 ];
 
-const AMAZON_TAG = "alwaysonsal08-21";
+// ---------- HELPERS ----------
 
-// -------------------- HELPERS --------------------
+// Generate short human-safe ID like "447a01"
+function generateId() {
+  return Math.random().toString(16).slice(2, 8);
+}
 
-// Clean Amazon URL -> https://www.amazon.in/dp/ASIN   (or leave amzn.to short links)
+// Canonical Amazon URL: https://www.amazon.in/dp/ASIN  (keep amzn.to as-is)
 function normalizeAmazonUrl(originalUrl) {
   try {
     const u = new URL(originalUrl);
     const host = u.hostname.toLowerCase();
 
-    // keep short links as they are
-    if (host === "amzn.to") return originalUrl;
+    if (host === "amzn.to") return originalUrl; // keep shortlinks
 
     if (!host.includes("amazon.")) return originalUrl;
 
@@ -57,13 +60,13 @@ function normalizeAmazonUrl(originalUrl) {
     if (!asin) return originalUrl;
 
     return `${u.protocol}//${host}/dp/${asin}`;
-  } catch {
+  } catch (e) {
     return originalUrl;
   }
 }
 
-// Very lightweight scraper – title + first image URL
-async function fetchAmazonMeta(productUrl) {
+// Very simple Amazon page scrape for title + one image URL
+async function scrapeAmazonMeta(productUrl) {
   try {
     const res = await fetch(productUrl, {
       headers: {
@@ -74,222 +77,239 @@ async function fetchAmazonMeta(productUrl) {
     });
 
     if (!res.ok) {
-      console.warn("Amazon fetch failed:", res.status);
-      return {};
+      console.warn("Amazon fetch status:", res.status);
+      return { title: null, imageUrl: null };
     }
 
     const html = await res.text();
 
-    // ---- TITLE ----
+    // Title from #productTitle
     let title = null;
     let m = html.match(/id="productTitle"[^>]*>([^<]+)</i);
     if (m && m[1]) {
       title = m[1].trim().replace(/\s+/g, " ");
     } else {
+      // Fallback: <title>...</title>
       m = html.match(/<title>([^<]+)<\/title>/i);
       if (m && m[1]) {
         title = m[1].trim().replace(/\s+/g, " ");
       }
     }
 
-    // ---- IMAGE (first https://m.media-amazon.com...) ----
+    // Image: grab first m.media-amazon.com jpg
     let imageUrl = null;
-    const marker = "https://m.media-amazon.com";
-    const idx = html.indexOf(marker);
-    if (idx !== -1) {
-      let end = idx;
-      while (end < html.length && html[end] !== '"' && html[end] !== "'") {
-        end++;
-      }
-      imageUrl = html.slice(idx, end);
+    const imgMatch = html.match(
+      /https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/
+    );
+    if (imgMatch && imgMatch[0]) {
+      imageUrl = imgMatch[0];
     }
 
     return { title, imageUrl };
   } catch (err) {
-    console.error("Error fetching Amazon meta:", err.message);
-    return {};
+    console.error("Error scraping Amazon:", err.message);
+    return { title: null, imageUrl: null };
   }
 }
 
-// Read boolean from query (?autoTitle=1/true/yes/on)
-function boolFromQuery(v) {
+// Convert "true"/"1"/"on" to boolean
+function boolFromQueryOrBody(v) {
+  if (typeof v === "boolean") return v;
   if (!v) return false;
   const s = String(v).toLowerCase();
   return s === "1" || s === "true" || s === "yes" || s === "on";
 }
 
-// Auto-infer category from title keywords
-function autoCategory(title) {
+// ---------- AUTO-CATEGORY v2 ----------
+
+function inferCategoryFromTitle(title) {
   if (!title) return null;
   const t = title.toLowerCase();
 
-  if (t.includes("shoe") || t.includes("sneaker") || t.includes("boot"))
+  // More specific first
+  if (t.includes("sneaker") || t.includes("running shoe") || t.includes("sports shoe"))
+    return "shoes";
+  if (t.includes("loafer") || t.includes("sandal") || t.includes("flip flop"))
     return "footwear";
-
-  if (t.includes("bag") || t.includes("purse") || t.includes("handbag") || t.includes("tote"))
+  if (t.includes("tote bag") || t.includes("handbag") || t.includes("backpack"))
     return "bags";
+  if (t.includes("wallet"))
+    return "wallets";
 
+  if (t.includes("t-shirt") || t.includes("t shirt") || t.includes("tee"))
+    return "tshirts";
+  if (t.includes("jeans") || t.includes("denim"))
+    return "jeans";
+  if (t.includes("hoodie") || t.includes("sweatshirt"))
+    return "hoodies";
   if (
-    t.includes("jeans") ||
-    t.includes("trouser") ||
     t.includes("shirt") ||
-    t.includes("t-shirt") ||
-    t.includes("hoodie") ||
-    t.includes("jacket")
+    t.includes("kurta") ||
+    t.includes("trouser") ||
+    t.includes("pants") ||
+    t.includes("shorts") ||
+    t.includes("jogger")
   )
     return "clothing";
 
-  if (t.includes("watch")) return "accessories";
-  if (t.includes("glove")) return "gloves";
+  if (
+    t.includes("watch") &&
+    !t.includes("smartwatch") &&
+    !t.includes("smart watch")
+  )
+    return "watches";
 
+  if (t.includes("smartwatch") || t.includes("smart watch"))
+    return "smartwatches";
+
+  if (
+    t.includes("phone") ||
+    t.includes("iphone") ||
+    t.includes("smartphone") ||
+    t.includes("mobile")
+  )
+    return "mobiles";
+
+  if (t.includes("laptop") || t.includes("notebook"))
+    return "laptops";
+
+  if (
+    t.includes("headphone") ||
+    t.includes("earbud") ||
+    t.includes("ear buds") ||
+    t.includes("earphone")
+  )
+    return "audio";
+
+  if (
+    t.includes("mixer") ||
+    t.includes("blender") ||
+    t.includes("cooker") ||
+    t.includes("fryer") ||
+    t.includes("microwave")
+  )
+    return "kitchen";
+
+  if (
+    t.includes("sofa") ||
+    t.includes("bed sheet") ||
+    t.includes("bedsheet") ||
+    t.includes("pillow") ||
+    t.includes("cushion")
+  )
+    return "home";
+
+  if (t.includes("cream") || t.includes("serum") || t.includes("shampoo"))
+    return "beauty";
+
+  // fallback
   return null;
 }
 
-// -------------------- ROUTES --------------------
+// ---------- ROUTES ----------
 
-// Simple health check for this router
+// Simple test
 router.get("/test", (req, res) => {
-  res.json({ status: "links router working" });
+  res.json({ success: true, message: "links router working" });
 });
 
-// Get ALL links (latest first)
+// Get all links
 router.get("/all", async (req, res) => {
   try {
     const links = await Link.find().sort({ createdAt: -1 }).lean();
-    res.json({ ok: true, count: links.length, links });
+    res.json({ success: true, links });
   } catch (err) {
     console.error("GET /all error:", err);
-    res.status(500).json({ ok: false, error: "Failed to load links." });
+    res.status(500).json({ success: false, message: "Failed to load links" });
   }
 });
 
-// ---------- AMAZON CREATOR (with URL cleaning + auto title + image + auto category) ----------
-router.get("/amazon", async (req, res) => {
-  const originalUrlRaw = (req.query.url || "").trim();
-
-  if (!originalUrlRaw) {
-    return res.status(400).json({
-      ok: false,
-      error: "Please provide url query param: ?url=...",
-    });
-  }
-
-  let titleInput = (req.query.title || "").trim();
-  let categoryInput = (req.query.category || "").trim();
-  const noteInput = (req.query.note || "").trim();
-  const autoTitle = boolFromQuery(req.query.autoTitle);
-
-  const canonicalUrl = normalizeAmazonUrl(originalUrlRaw);
-  const joinChar = canonicalUrl.includes("?") ? "&" : "?";
-  const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
-
-  let finalTitle = titleInput || null;
-  let finalCategory = categoryInput || null;
-  let imageUrl = null;
-
-  // Only call Amazon if needed
-  if (autoTitle || !finalTitle || !finalCategory || !imageUrl) {
-    const meta = await fetchAmazonMeta(canonicalUrl);
-    if (!finalTitle && meta.title) finalTitle = meta.title;
-    if (!imageUrl && meta.imageUrl) imageUrl = meta.imageUrl;
-  }
-
-  // Auto category from title if user did not set one
-  if (!finalCategory) {
-    finalCategory = autoCategory(finalTitle);
-  }
-
+// Create (Amazon only for now)
+router.post("/create", async (req, res) => {
   try {
-    const link = new Link({
+    const rawUrl = (req.body.url || "").trim();
+    if (!rawUrl) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing url" });
+    }
+
+    // Only Amazon supported for now
+    const lower = rawUrl.toLowerCase();
+    if (!lower.includes("amazon.")) {
+      return res.status(400).json({
+        success: false,
+        message: "Right now only Amazon product URLs are supported.",
+      });
+    }
+
+    const manualTitle = (req.body.title || "").trim();
+    const manualCategory = (req.body.category || "").trim();
+    const note = (req.body.note || "").trim();
+    const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
+
+    const canonicalUrl = normalizeAmazonUrl(rawUrl);
+    const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+    const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
+
+    // Scrape page (for title + image)
+    let scrapedTitle = null;
+    let imageUrl = null;
+    try {
+      const scraped = await scrapeAmazonMeta(canonicalUrl);
+      scrapedTitle = scraped.title;
+      imageUrl = scraped.imageUrl;
+    } catch (_) {
+      // ignore scraping failures
+    }
+
+    // Decide final title
+    let finalTitle = manualTitle || null;
+    if (!finalTitle && autoTitle && scrapedTitle) {
+      finalTitle = scrapedTitle;
+    }
+
+    // Auto-category v2
+    let finalCategory = manualCategory || null;
+    if (!finalCategory) {
+      finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
+    }
+
+    const doc = await Link.create({
+      id: generateId(),
       source: "amazon",
-      originalUrl: canonicalUrl,
-      rawOriginalUrl: originalUrlRaw,
-      affiliateUrl,
-      tag: AMAZON_TAG,
       title: finalTitle,
       category: finalCategory,
-      note: noteInput || null,
+      note: note || null,
+      originalUrl: canonicalUrl,
+      rawOriginalUrl: rawUrl,
+      affiliateUrl,
+      tag: AMAZON_TAG,
       imageUrl: imageUrl || null,
       images: imageUrl ? [imageUrl] : [],
       price: null,
       clicks: 0,
     });
 
-    await link.save();
-    res.json({ ok: true, id: link._id, link });
+    res.json({ success: true, link: doc });
   } catch (err) {
-    console.error("CREATE /amazon error:", err);
-    res.status(500).json({ ok: false, error: "Failed to create Amazon link." });
+    console.error("POST /create error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to create link" });
   }
 });
 
-// ---------- FLIPKART CREATOR (basic for now) ----------
-router.get("/flipkart", async (req, res) => {
-  const originalUrl = (req.query.url || "").trim();
-
-  if (!originalUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: "Please provide url query param: ?url=...",
-    });
-  }
-
-  const flipkartTag = "alwaysonsale"; // your Flipkart affiliate ID
-  const joinChar = originalUrl.includes("?") ? "&" : "?";
-  const affiliateUrl = `${originalUrl}${joinChar}affid=${flipkartTag}`;
-
-  const titleInput = (req.query.title || "").trim();
-  const categoryInput = (req.query.category || "").trim();
-  const noteInput = (req.query.note || "").trim();
-
-  try {
-    const link = new Link({
-      source: "flipkart",
-      originalUrl,
-      rawOriginalUrl: originalUrl,
-      affiliateUrl,
-      tag: flipkartTag,
-      title: titleInput || null,
-      category: categoryInput || null,
-      note: noteInput || null,
-      imageUrl: null,
-      images: [],
-      price: null,
-      clicks: 0,
-    });
-
-    await link.save();
-    res.json({ ok: true, id: link._id, link });
-  } catch (err) {
-    console.error("CREATE /flipkart error:", err);
-    res.status(500).json({ ok: false, error: "Failed to create Flipkart link." });
-  }
-});
-
-// ---------- GET SINGLE ----------
-router.get("/item/:id", async (req, res) => {
-  try {
-    const link = await Link.findById(req.params.id).lean();
-    if (!link) {
-      return res
-        .status(404)
-        .json({ ok: false, error: `No link found with id ${req.params.id}` });
-    }
-    res.json({ ok: true, link });
-  } catch (err) {
-    console.error("GET /item/:id error:", err);
-    res.status(500).json({ ok: false, error: "Failed to load link." });
-  }
-});
-
-// ---------- REDIRECT + COUNT CLICK ----------
+// Redirect + click count
 router.get("/go/:id", async (req, res) => {
   try {
-    const link = await Link.findById(req.params.id);
+    const { id } = req.params;
+    const link = await Link.findOne({ id });
+
     if (!link) {
       return res
         .status(404)
-        .json({ ok: false, error: `No link found with id ${req.params.id}` });
+        .json({ success: false, message: "Link not found" });
     }
 
     link.clicks = (link.clicks || 0) + 1;
@@ -297,36 +317,41 @@ router.get("/go/:id", async (req, res) => {
 
     res.redirect(link.affiliateUrl);
   } catch (err) {
-    console.error("GO /go/:id error:", err);
-    res.status(500).json({ ok: false, error: "Failed to redirect." });
+    console.error("GET /go/:id error:", err);
+    res.status(500).json({ success: false, message: "Redirect failed" });
   }
 });
 
-// ---------- DELETE ----------
-router.delete("/:id", async (req, res) => {
+// Delete
+router.delete("/delete/:id", async (req, res) => {
   try {
-    const link = await Link.findByIdAndDelete(req.params.id);
-    if (!link) {
+    const { id } = req.params;
+    const result = await Link.deleteOne({ id });
+
+    if (!result.deletedCount) {
       return res
         .status(404)
-        .json({ ok: false, error: "No link found with that ID" });
+        .json({ success: false, message: "No link with that ID" });
     }
-    res.json({ ok: true, message: `Link ${req.params.id} deleted successfully` });
+
+    res.json({ success: true });
   } catch (err) {
-    console.error("DELETE /:id error:", err);
-    res.status(500).json({ ok: false, error: "Failed to delete link." });
+    console.error("DELETE /delete/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete link" });
   }
 });
 
-// ---------- ADMITAD (kept for future – still invalid_scope until approvals) ----------
+// ---------- Admitad (will show invalid_scope until approved) ----------
+
 router.get("/admitad", async (req, res) => {
   const originalUrl = (req.query.url || "").trim();
 
   if (!originalUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: "Missing ?url parameter",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing ?url parameter" });
   }
 
   const lower = originalUrl.toLowerCase();
@@ -334,8 +359,8 @@ router.get("/admitad", async (req, res) => {
 
   if (!program) {
     return res.status(400).json({
-      ok: false,
-      error: "No matching Admitad program for this URL.",
+      success: false,
+      message: "No matching Admitad program for this URL.",
     });
   }
 
@@ -345,28 +370,23 @@ router.get("/admitad", async (req, res) => {
       url: originalUrl,
     });
 
-    const link = new Link({
+    const doc = await Link.create({
+      id: generateId(),
       source: `admitad-${program.key}`,
       originalUrl,
-      rawOriginalUrl: originalUrl,
       affiliateUrl,
-      tag: null,
-      title: null,
-      category: null,
-      note: null,
-      imageUrl: null,
-      images: [],
-      price: null,
       clicks: 0,
     });
 
-    await link.save();
-    res.json({ ok: true, id: link._id, link });
+    res.json({ success: true, link: doc });
   } catch (err) {
     console.error("Admitad API ERROR →", err.response?.data || err.message);
     res.status(500).json({
-      ok: false,
-      error: err.response?.data || "Failed to generate Admitad deeplink.",
+      success: false,
+      message:
+        err.response?.data?.error_description ||
+        err.response?.data?.error ||
+        "Failed to generate Admitad deeplink.",
     });
   }
 });
