@@ -1,28 +1,37 @@
 // NodeBackend/models/link.js
-const mongoose = require("../db");
+const mongoose = require("mongoose");
 
 const linkSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true, unique: true }, // short human id (e.g. "447a01")
+    // short human id, e.g. "3db5e0"
+    id: { type: String, required: true, unique: true },
+
     source: { type: String, default: "amazon" },
 
-    title: { type: String, default: null },
-    category: { type: String, default: null },
-    note: { type: String, default: null },
+    title: { type: String },
+    category: { type: String },
+    note: { type: String },
 
-    // NEW: short marketing description for storefront cards
-    description: { type: String, default: null },
+    originalUrl: { type: String },
+    rawOriginalUrl: { type: String },
 
-    originalUrl: { type: String, required: true },
-    rawOriginalUrl: { type: String, default: null },
-    affiliateUrl: { type: String, required: true },
-    tag: { type: String, default: null },
+    affiliateUrl: { type: String },
+    tag: { type: String },
 
-    imageUrl: { type: String, default: null }, // main image
-    images: { type: [String], default: [] },   // extra images later
-    price: { type: String, default: null },
+    imageUrl: { type: String },
+    images: [{ type: String }],
+
+    // pricing
+    price: { type: Number, default: null },        // latest price
+    prevPrice: { type: Number, default: null },    // previous price (for "price dropped")
+    priceCurrency: { type: String, default: "INR" },
 
     clicks: { type: Number, default: 0 },
+
+    // health / status
+    isActive: { type: Boolean, default: true },    // false = hide from store
+    statusReason: { type: String, default: null }, // e.g. "expired", "404", "unavailable"
+    lastCheckedAt: { type: Date, default: null },  // last time daily refresh touched it
   },
   {
     timestamps: true, // createdAt, updatedAt
