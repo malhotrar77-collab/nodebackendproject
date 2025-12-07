@@ -79,7 +79,6 @@
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 10px;
-        align-items: flex-start;
       }
 
       .headline h1 {
@@ -93,37 +92,18 @@
         color: #9ca3af;
       }
 
-      .controls {
+      .controls-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 10px;
         align-items: center;
-      }
-
-      .controls input,
-      .controls select {
-        font-size: 13px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        border: 1px solid #4b5563;
-        background: #020617;
-        color: #e5e7eb;
-        outline: none;
-      }
-
-      .controls input:focus,
-      .controls select:focus {
-        border-color: #f97316;
-        box-shadow: 0 0 0 1px #f97316;
-      }
-
-      .controls input {
-        min-width: 160px;
+        justify-content: space-between;
+        margin: 10px 0 16px;
       }
 
       #status {
         font-size: 13px;
-        margin: 4px 0 10px;
+        margin: 4px 0;
         min-height: 16px;
       }
 
@@ -135,28 +115,57 @@
         color: #f97373;
       }
 
-      .filters {
+      .pill-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 14px;
+        gap: 6px;
       }
 
-      .filter-pill {
-        font-size: 12px;
+      .pill {
+        font-size: 11px;
         padding: 4px 10px;
         border-radius: 999px;
         border: 1px solid #1f2937;
         background: #020617;
         color: #9ca3af;
         cursor: pointer;
-        white-space: nowrap;
       }
 
-      .filter-pill.active {
+      .pill.active {
         background: #f97316;
         color: #020617;
         border-color: #f97316;
+      }
+
+      .search-sort {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .search-input {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #e5e7eb;
+        font-size: 13px;
+        min-width: 180px;
+        outline: none;
+      }
+
+      .search-input:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 1px #f97316;
+      }
+
+      .sort-select {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #e5e7eb;
+        font-size: 13px;
       }
 
       .grid {
@@ -236,8 +245,8 @@
       .card-desc {
         font-size: 12px;
         color: #9ca3af;
-        line-height: 1.4;
-        max-height: 4.2em;
+        line-height: 1.35;
+        max-height: 5.4em; /* ~4 lines */
         overflow: hidden;
       }
 
@@ -314,6 +323,17 @@
         main {
           padding-inline: 12px;
         }
+        .controls-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .search-sort {
+          width: 100%;
+          justify-content: space-between;
+        }
+        .search-input {
+          flex: 1;
+        }
       }
     </style>
   </head>
@@ -335,14 +355,21 @@
           <h1>Today’s hand-picked deals</h1>
           <p>Curated products with tracked links – one tap to Amazon.</p>
         </div>
+      </div>
 
-        <div class="controls">
+      <div class="controls-row">
+        <div class="pill-row" id="category-pills">
+          <!-- pills rendered by JS -->
+        </div>
+
+        <div class="search-sort">
           <input
             id="search-input"
+            class="search-input"
             type="text"
             placeholder="Search products..."
           />
-          <select id="sort-select">
+          <select id="sort-select" class="sort-select">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="clicks">Most clicks</option>
@@ -351,20 +378,6 @@
       </div>
 
       <div id="status"></div>
-
-      <div class="filters" id="filters">
-        <button class="filter-pill active" data-filter="all">All</button>
-        <button class="filter-pill" data-filter="shoes">Shoes &amp; Sneakers</button>
-        <button class="filter-pill" data-filter="clothing">Clothing</button>
-        <button class="filter-pill" data-filter="bags">Bags &amp; Backpacks</button>
-        <button class="filter-pill" data-filter="beauty">Beauty &amp; Hair</button>
-        <button class="filter-pill" data-filter="personalcare">Personal Care</button>
-        <button class="filter-pill" data-filter="electronics">
-          Electronics (Mobiles, Laptops, Audio)
-        </button>
-        <button class="filter-pill" data-filter="home">Home &amp; Living</button>
-        <button class="filter-pill" data-filter="other">Other</button>
-      </div>
 
       <div id="grid" class="grid"></div>
 
@@ -378,14 +391,9 @@
       const statusEl = document.getElementById("status");
       const gridEl = document.getElementById("grid");
       const emptyEl = document.getElementById("empty");
-      const filtersEl = document.getElementById("filters");
+      const pillsContainer = document.getElementById("category-pills");
       const searchInput = document.getElementById("search-input");
       const sortSelect = document.getElementById("sort-select");
-
-      let allLinks = [];
-      let activeCategory = "all";
-      let searchTerm = "";
-      let sortMode = "newest";
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
@@ -393,114 +401,204 @@
         if (type) statusEl.classList.add(type);
       }
 
-      function getFilterKey(link) {
-        const c = (link.category || "").toLowerCase().trim();
-        if (!c) return "other";
+      // ---- Category helpers ----
 
-        if (c.includes("shoe") || c === "shoes" || c === "sneakers") {
+      const CATEGORY_FILTERS = [
+        { key: "all", label: "All" },
+        { key: "shoes", label: "Shoes & Sneakers" },
+        { key: "clothing", label: "Clothing" },
+        { key: "bags", label: "Bags & Backpacks" },
+        { key: "beauty", label: "Beauty & Hair" },
+        { key: "personal", label: "Personal Care" },
+        { key: "electronics", label: "Electronics (Mobiles, Laptops, Audio)" },
+        { key: "home", label: "Home & Living" },
+        { key: "other", label: "Other" },
+      ];
+
+      function normalizeCategory(raw) {
+        if (!raw) return "";
+        return String(raw).trim().toLowerCase();
+      }
+
+      function mapToFilterKey(raw) {
+        const c = normalizeCategory(raw);
+
+        if (
+          c === "shoes" ||
+          c === "sneakers" ||
+          c === "footwear" ||
+          c.includes("shoe")
+        )
           return "shoes";
-        }
 
         if (
-          c.includes("bag") ||
-          c === "bags" ||
-          c === "wallets" ||
-          c.includes("backpack")
-        ) {
+          c === "tshirts" ||
+          c === "jeans" ||
+          c === "hoodies" ||
+          c === "clothing" ||
+          c.includes("shirt") ||
+          c.includes("kurta") ||
+          c.includes("trouser") ||
+          c.includes("pant") ||
+          c.includes("jogger")
+        )
+          return "clothing";
+
+        if (c === "bags" || c === "wallets" || c.includes("bag"))
           return "bags";
-        }
+
+        if (c === "beauty" || c.includes("cream") || c.includes("serum"))
+          return "beauty";
 
         if (
-          c === "beauty" ||
-          c.includes("cream") ||
-          c.includes("serum") ||
-          c.includes("shampoo")
-        ) {
-          return "beauty";
-        }
-
-        if (c === "personalcare" || c.includes("body wash") || c.includes("soap")) {
-          return "personalcare";
-        }
+          c === "personalcare" ||
+          c === "grooming" ||
+          c.includes("wash") ||
+          c.includes("soap") ||
+          c.includes("body wash")
+        )
+          return "personal";
 
         if (
           c === "mobiles" ||
           c === "laptops" ||
           c === "audio" ||
-          c === "electronics"
-        ) {
+          c === "electronics" ||
+          c.includes("headphone") ||
+          c.includes("earbud")
+        )
           return "electronics";
-        }
 
-        if (
-          c === "home" ||
-          c === "kitchen" ||
-          c.includes("sofa") ||
-          c.includes("bedsheet")
-        ) {
+        if (c === "home" || c === "kitchen" || c.includes("sofa"))
           return "home";
-        }
 
-        if (
-          c === "clothing" ||
-          c === "tshirts" ||
-          c === "hoodies" ||
-          c === "jeans"
-        ) {
-          return "clothing";
-        }
+        if (!c) return "other";
 
         return "other";
       }
 
-      function applyFilters() {
-        let filtered = allLinks.slice();
+      function categoryLabelFromRaw(raw) {
+        const key = mapToFilterKey(raw);
+        const found = CATEGORY_FILTERS.find((f) => f.key === key);
+        return found ? found.label : "Other";
+      }
 
-        if (activeCategory !== "all") {
-          filtered = filtered.filter((l) => getFilterKey(l) === activeCategory);
+      // ---- Smart Description V2 ----
+
+      function buildSmartDescription(link) {
+        const title = (link.title || "This product").trim();
+        const key = mapToFilterKey(link.category);
+        const cleanName = title.split("|")[0].split("–")[0].split("-")[0].trim();
+        const baseName = cleanName || title;
+
+        switch (key) {
+          case "shoes":
+            return (
+              baseName +
+              " designed for comfortable daily wear. A reliable pick for walks, travel or casual outings."
+            );
+          case "clothing":
+            return (
+              baseName +
+              " made to be easy to style and wear. Good for everyday use, work or going out."
+            );
+          case "bags":
+            return (
+              baseName +
+              " built to carry your daily essentials in a neat way. Suitable for work, travel or regular use."
+            );
+          case "beauty":
+            return (
+              baseName +
+              " created for simple, everyday self-care. Works well as part of a regular grooming or skincare routine."
+            );
+          case "personal":
+            return (
+              baseName +
+              " helps keep your daily routine clean and fresh. A practical choice for regular at-home use."
+            );
+          case "electronics":
+            return (
+              baseName +
+              " made for easy everyday entertainment and work. Useful for music, videos or general home use."
+            );
+          case "home":
+            return (
+              baseName +
+              " adds practical comfort to your living space. Good for daily home use and simple upgrades."
+            );
+          default:
+            return (
+              baseName +
+              " is a simple, useful pick for daily life. Easy to add into your routine or lifestyle."
+            );
+        }
+      }
+
+      // ---- State ----
+
+      let allLinks = [];
+      let currentCategory = "all";
+      let currentSearch = "";
+      let currentSort = "newest";
+
+      function renderCategoryPills() {
+        pillsContainer.innerHTML = "";
+        CATEGORY_FILTERS.forEach((f) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "pill" + (f.key === currentCategory ? " active" : "");
+          btn.textContent = f.label;
+          btn.dataset.key = f.key;
+          btn.onclick = () => {
+            currentCategory = f.key;
+            renderCategoryPills();
+            applyFiltersAndRender();
+          };
+          pillsContainer.appendChild(btn);
+        });
+      }
+
+      function applyFiltersAndRender() {
+        let links = [...allLinks];
+
+        // category
+        if (currentCategory !== "all") {
+          links = links.filter(
+            (l) => mapToFilterKey(l.category) === currentCategory
+          );
         }
 
-        if (searchTerm) {
-          const q = searchTerm;
-          filtered = filtered.filter((l) => {
+        // search
+        const q = currentSearch.trim().toLowerCase();
+        if (q) {
+          links = links.filter((l) => {
             const title = (l.title || "").toLowerCase();
             const cat = (l.category || "").toLowerCase();
-            const desc = (l.description || "").toLowerCase();
-            return (
-              title.includes(q) || cat.includes(q) || desc.includes(q)
-            );
+            return title.includes(q) || cat.includes(q);
           });
         }
 
         // sort
-        filtered.sort((a, b) => {
-          if (sortMode === "clicks") {
-            const ca = a.clicks || 0;
-            const cb = b.clicks || 0;
-            return cb - ca; // high to low
-          }
-
-          const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-
-          if (sortMode === "oldest") {
-            return da - db; // old to new
-          }
-          // newest
-          return db - da; // new to old
-        });
-
-        renderGrid(filtered);
-
-        if (!allLinks.length) {
-          // nothing loaded yet or total zero
-          return;
+        if (currentSort === "newest") {
+          links.sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+          );
+        } else if (currentSort === "oldest") {
+          links.sort(
+            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+          );
+        } else if (currentSort === "clicks") {
+          links.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
         }
 
-        if (filtered.length) {
-          setStatus(`Showing ${filtered.length} deal(s).`, "ok");
+        renderGrid(links);
+
+        const count = links.length;
+        if (count) {
+          setStatus(`Showing ${count} deal(s).`, "ok");
         } else {
-          setStatus("No deals match your filters/search.", "ok");
+          setStatus("No matching deals found.", "");
         }
       }
 
@@ -514,12 +612,12 @@
             throw new Error(data.message || "Failed to load products.");
           }
 
-          allLinks = (data.links || []).filter((l) => !!l.affiliateUrl);
-          applyFilters();
+          allLinks = data.links || [];
+          renderCategoryPills();
+          applyFiltersAndRender();
         } catch (err) {
           console.error(err);
           setStatus("Could not load products.", "error");
-          allLinks = [];
           renderGrid([]);
         }
       }
@@ -546,7 +644,7 @@
 
           const cat = document.createElement("div");
           cat.className = "badge";
-          cat.textContent = (link.category || "other").toUpperCase();
+          cat.textContent = categoryLabelFromRaw(link.category).toUpperCase();
 
           header.appendChild(source);
           header.appendChild(cat);
@@ -573,9 +671,7 @@
 
           const descDiv = document.createElement("div");
           descDiv.className = "card-desc";
-          descDiv.textContent =
-            link.description ||
-            "A useful everyday pick, easy to add into your routine or lifestyle.";
+          descDiv.textContent = buildSmartDescription(link);
 
           const meta = document.createElement("div");
           meta.className = "card-meta";
@@ -641,32 +737,16 @@
         }
       }
 
-      // Event listeners
-      filtersEl.addEventListener("click", (e) => {
-        const btn = e.target.closest(".filter-pill");
-        if (!btn) return;
+      // ---- Events ----
 
-        const key = btn.getAttribute("data-filter");
-        if (!key) return;
-
-        activeCategory = key;
-
-        document
-          .querySelectorAll(".filter-pill")
-          .forEach((el) => el.classList.remove("active"));
-        btn.classList.add("active");
-
-        applyFilters();
+      searchInput.addEventListener("input", (e) => {
+        currentSearch = e.target.value || "";
+        applyFiltersAndRender();
       });
 
-      searchInput.addEventListener("input", () => {
-        searchTerm = searchInput.value.trim().toLowerCase();
-        applyFilters();
-      });
-
-      sortSelect.addEventListener("change", () => {
-        sortMode = sortSelect.value;
-        applyFilters();
+      sortSelect.addEventListener("change", (e) => {
+        currentSort = e.target.value || "newest";
+        applyFiltersAndRender();
       });
 
       window.addEventListener("DOMContentLoaded", loadProducts);
