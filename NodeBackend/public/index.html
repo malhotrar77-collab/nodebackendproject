@@ -43,7 +43,8 @@
         flex-wrap: wrap;
       }
 
-      input[type="text"] {
+      input[type="text"],
+      textarea {
         flex: 1;
         min-width: 240px;
         padding: 8px 10px;
@@ -52,9 +53,16 @@
         background: #020617;
         color: #e5e7eb;
         outline: none;
+        font-family: inherit;
+        font-size: 13px;
       }
 
-      input[type="text"]:focus {
+      textarea {
+        resize: vertical;
+      }
+
+      input[type="text"]:focus,
+      textarea:focus {
         border-color: #f97316;
         box-shadow: 0 0 0 1px #f97316;
       }
@@ -240,6 +248,24 @@
         <button id="create-btn">Create affiliate link</button>
       </div>
 
+      <h3 style="font-size: 16px; margin-top: 28px">Bulk create (optional)</h3>
+      <div class="small">
+        Paste up to 10 Amazon URLs below, one per line. If you fill category or
+        note above, they will be applied to all links.
+      </div>
+
+      <div class="row">
+        <textarea
+          id="bulk-input"
+          rows="4"
+          placeholder="Paste multiple Amazon product URLs here, one per line"
+        ></textarea>
+      </div>
+
+      <div class="row">
+        <button id="bulk-btn" class="secondary">Create multiple links</button>
+      </div>
+
       <h2 style="font-size: 18px; margin-top: 28px">Saved links</h2>
 
       <table>
@@ -270,6 +296,9 @@
       const autoTitleEl = document.getElementById("auto-title-input");
       const tbodyEl = document.getElementById("links-tbody");
       const createBtn = document.getElementById("create-btn");
+
+      const bulkInputEl = document.getElementById("bulk-input");
+      const bulkBtn = document.getElementById("bulk-btn");
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
@@ -439,9 +468,7 @@
 
           urlEl.value = "";
           titleEl.value = "";
-          categoryEl.value = "";
-          noteEl.value = "";
-
+          // Do NOT clear category/note; they may be re-used for bulk
           setStatus("Link created.", "ok");
           await loadLinks();
         } catch (err) {
@@ -449,6 +476,64 @@
           setStatus(err.message, "error");
         } finally {
           createBtn.disabled = false;
+        }
+      }
+
+      async function bulkCreateLinks() {
+        const raw = (bulkInputEl.value || "").trim();
+        if (!raw) {
+          setStatus("Paste some URLs into the bulk box first.", "error");
+          return;
+        }
+
+        const lines = raw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        if (!lines.length) {
+          setStatus("No valid URLs found in bulk box.", "error");
+          return;
+        }
+
+        if (lines.length > 10) {
+          setStatus("Please limit to 10 URLs at once.", "error");
+          return;
+        }
+
+        const title = (titleEl.value || "").trim();
+        const category = (categoryEl.value || "").trim();
+        const note = (noteEl.value || "").trim();
+        const autoTitle = !!autoTitleEl.checked;
+
+        bulkBtn.disabled = true;
+        setStatus(`Creating ${lines.length} link(s)...`, "");
+
+        try {
+          const res = await fetch("/api/links/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              urls: lines,
+              title,
+              category,
+              note,
+              autoTitle,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Bulk create failed.");
+          }
+
+          bulkInputEl.value = "";
+          setStatus(`Created ${data.createdCount} link(s).`, "ok");
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+        } finally {
+          bulkBtn.disabled = false;
         }
       }
 
@@ -486,6 +571,8 @@
       urlEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") createLink();
       });
+
+      bulkBtn.addEventListener("click", bulkCreateLinks);
 
       window.addEventListener("DOMContentLoaded", loadLinks);
     </script>
