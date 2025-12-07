@@ -17,7 +17,6 @@
       content="Browse curated Amazon products with clean short links managed in one place."
     />
     <meta property="og:type" content="website" />
-    <!-- Optional: change this to your custom domain later -->
     <meta
       property="og:url"
       content="https://nodebackendproject-9qf7.onrender.com/store.html"
@@ -122,6 +121,37 @@
 
       #status.error {
         color: #f97373;
+      }
+
+      /* FILTER CHIPS */
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 12px;
+      }
+
+      .filter-chip {
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #9ca3af;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .filter-chip:hover {
+        background: #111827;
+      }
+
+      .filter-chip.active {
+        background: #f97316;
+        border-color: #fb923c;
+        color: #020617;
+        font-weight: 600;
       }
 
       .grid {
@@ -303,6 +333,20 @@
 
       <div id="status"></div>
 
+      <!-- FILTER BAR -->
+      <div class="filters" id="filters">
+        <div class="filter-chip active" data-filter="all">All</div>
+        <div class="filter-chip" data-filter="shoes">Shoes & Sneakers</div>
+        <div class="filter-chip" data-filter="bags">Bags & Backpacks</div>
+        <div class="filter-chip" data-filter="beauty">Beauty & Hair</div>
+        <div class="filter-chip" data-filter="personalcare">Personal Care</div>
+        <div class="filter-chip" data-filter="electronics">
+          Electronics (Mobiles, Laptops, Audio)
+        </div>
+        <div class="filter-chip" data-filter="home">Home & Living</div>
+        <div class="filter-chip" data-filter="other">Other</div>
+      </div>
+
       <div id="grid" class="grid"></div>
 
       <div id="empty" class="empty-state" style="display: none">
@@ -315,6 +359,7 @@
       const statusEl = document.getElementById("status");
       const gridEl = document.getElementById("grid");
       const emptyEl = document.getElementById("empty");
+      const filtersEl = document.getElementById("filters");
 
       const CATEGORY_LABELS = {
         shoes: "Shoes & Sneakers",
@@ -336,6 +381,12 @@
         personalcare: "Personal Care",
         other: "Other",
       };
+
+      // Some categories should all map to the "electronics" chip
+      const ELECTRONICS_SET = new Set(["mobiles", "laptops", "audio"]);
+
+      let allLinks = [];
+      let activeFilter = "all";
 
       function displayCategory(slug) {
         if (!slug) return "OTHER";
@@ -360,19 +411,46 @@
             throw new Error(data.message || "Failed to load products.");
           }
 
-          const links = (data.links || []).filter((l) => !!l.affiliateUrl);
+          allLinks = (data.links || []).filter((l) => !!l.affiliateUrl);
 
-          renderGrid(links);
-          if (links.length) {
-            setStatus(`Showing ${links.length} deal(s).`, "ok");
+          renderGrid(getFilteredLinks());
+          if (allLinks.length) {
+            setStatus(`Showing ${getFilteredLinks().length} deal(s).`, "ok");
           } else {
             setStatus("");
           }
         } catch (err) {
           console.error(err);
           setStatus("Could not load products.", "error");
+          allLinks = [];
           renderGrid([]);
         }
+      }
+
+      function getFilteredLinks() {
+        if (activeFilter === "all") return allLinks;
+
+        if (activeFilter === "electronics") {
+          return allLinks.filter((l) =>
+            ELECTRONICS_SET.has(String(l.category || "").toLowerCase())
+          );
+        }
+
+        if (activeFilter === "other") {
+          return allLinks.filter((l) => {
+            const c = String(l.category || "").toLowerCase();
+            return (
+              !c ||
+              (!ELECTRONICS_SET.has(c) && !(c in CATEGORY_LABELS)) ||
+              c === "other"
+            );
+          });
+        }
+
+        return allLinks.filter(
+          (l) =>
+            String(l.category || "").toLowerCase() === activeFilter.toLowerCase()
+        );
       }
 
       function renderGrid(links) {
@@ -395,12 +473,12 @@
           source.className = "source-pill";
           source.textContent = (link.source || "amazon").toUpperCase();
 
-          const cat = document.createElement("div");
-          cat.className = "badge";
-          cat.textContent = displayCategory(link.category || "other");
+          const catBadge = document.createElement("div");
+          catBadge.className = "badge";
+          catBadge.textContent = displayCategory(link.category || "other");
 
           header.appendChild(source);
-          header.appendChild(cat);
+          header.appendChild(catBadge);
 
           const imgWrap = document.createElement("div");
           imgWrap.className = "img-wrap";
@@ -490,7 +568,32 @@
         }
       }
 
-      window.addEventListener("DOMContentLoaded", loadProducts);
+      function setupFilters() {
+        filtersEl.addEventListener("click", (e) => {
+          const chip = e.target.closest(".filter-chip");
+          if (!chip) return;
+          const value = chip.getAttribute("data-filter");
+          if (!value) return;
+
+          activeFilter = value;
+
+          // update active style
+          Array.from(filtersEl.querySelectorAll(".filter-chip")).forEach((c) => {
+            c.classList.toggle("active", c === chip);
+          });
+
+          const filtered = getFilteredLinks();
+          renderGrid(filtered);
+          if (allLinks.length) {
+            setStatus(`Showing ${filtered.length} deal(s).`, "ok");
+          }
+        });
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        setupFilters();
+        loadProducts();
+      });
     </script>
   </body>
 </html>
