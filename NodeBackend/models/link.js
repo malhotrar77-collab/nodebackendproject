@@ -9,7 +9,9 @@ const linkSchema = new mongoose.Schema(
     title: { type: String, default: null },
     category: { type: String, default: null },
     note: { type: String, default: null },
-    description: { type: String, default: null }, // short AI-style blurb
+
+    // NEW: short marketing description for storefront cards
+    description: { type: String, default: null },
 
     originalUrl: { type: String, required: true },
     rawOriginalUrl: { type: String, default: null },
