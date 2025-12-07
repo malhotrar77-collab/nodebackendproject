@@ -211,6 +211,12 @@
         letter-spacing: 0.06em;
       }
 
+      .badge.price-drop {
+        background: #022c22;
+        border-color: #16a34a;
+        color: #bbf7d0;
+      }
+
       .img-wrap {
         border-radius: 10px;
         border: 1px solid #111827;
@@ -242,11 +248,22 @@
         overflow: hidden;
       }
 
+      .card-price-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+      }
+
+      .card-price {
+        font-weight: 600;
+      }
+
       .card-desc {
         font-size: 12px;
         color: #9ca3af;
         line-height: 1.35;
-        max-height: 5.4em; /* ~4 lines */
+        max-height: 5.4em;
         overflow: hidden;
       }
 
@@ -444,8 +461,7 @@
         )
           return "clothing";
 
-        if (c === "bags" || c === "wallets" || c.includes("bag"))
-          return "bags";
+        if (c === "bags" || c === "wallets" || c.includes("bag")) return "bags";
 
         if (c === "beauty" || c.includes("cream") || c.includes("serum"))
           return "beauty";
@@ -469,8 +485,7 @@
         )
           return "electronics";
 
-        if (c === "home" || c === "kitchen" || c.includes("sofa"))
-          return "home";
+        if (c === "home" || c === "kitchen" || c.includes("sofa")) return "home";
 
         if (!c) return "other";
 
@@ -562,6 +577,9 @@
       function applyFiltersAndRender() {
         let links = [...allLinks];
 
+        // hide inactive links from store
+        links = links.filter((l) => l.isActive !== false);
+
         // category
         if (currentCategory !== "all") {
           links = links.filter(
@@ -622,6 +640,15 @@
         }
       }
 
+      function formatPrice(link) {
+        if (link.price == null) return "";
+        const currency =
+          link.priceCurrency || (link.originalUrl || "").includes("amazon.in")
+            ? "₹"
+            : "₹";
+        return currency + " " + link.price.toLocaleString("en-IN");
+      }
+
       function renderGrid(links) {
         gridEl.innerHTML = "";
 
@@ -668,6 +695,26 @@
           const titleDiv = document.createElement("div");
           titleDiv.className = "card-title";
           titleDiv.textContent = link.title || "Product";
+
+          const priceRow = document.createElement("div");
+          priceRow.className = "card-price-row";
+
+          const priceSpan = document.createElement("span");
+          priceSpan.className = "card-price";
+          priceSpan.textContent = formatPrice(link);
+
+          const priceDrop = document.createElement("span");
+          if (
+            link.prevPrice != null &&
+            link.price != null &&
+            link.price < link.prevPrice
+          ) {
+            priceDrop.className = "badge price-drop";
+            priceDrop.textContent = "Price dropped";
+          }
+
+          priceRow.appendChild(priceSpan);
+          if (priceDrop.textContent) priceRow.appendChild(priceDrop);
 
           const descDiv = document.createElement("div");
           descDiv.className = "card-desc";
@@ -716,6 +763,7 @@
           card.appendChild(header);
           card.appendChild(imgWrap);
           card.appendChild(titleDiv);
+          if (priceSpan.textContent) card.appendChild(priceRow);
           card.appendChild(descDiv);
           card.appendChild(meta);
           card.appendChild(actions);
