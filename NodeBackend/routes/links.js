@@ -122,7 +122,7 @@ function boolFromQueryOrBody(v) {
   return s === "1" || s === "true" || s === "yes" || s === "on";
 }
 
-// ---------- AUTO-CATEGORY v2 ----------
+// ---------- AUTO-CATEGORY v2 (for now) ----------
 
 function inferCategoryFromTitle(title) {
   if (!title) return null;
@@ -199,93 +199,6 @@ function inferCategoryFromTitle(title) {
   return null;
 }
 
-// ---------- CORE CREATION HELPER (Amazon only) ----------
-
-async function createAmazonLinkDoc({
-  rawUrl,
-  manualTitle,
-  manualCategory,
-  note,
-  autoTitle,
-}) {
-  const trimmedRaw = (rawUrl || "").trim();
-  if (!trimmedRaw) {
-    throw new Error("Missing url");
-  }
-
-  let u;
-  try {
-    u = new URL(trimmedRaw);
-  } catch {
-    throw new Error("Invalid URL format.");
-  }
-
-  const host = u.hostname.toLowerCase();
-  const isAmazon =
-    host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
-
-  if (!isAmazon) {
-    throw new Error(
-      "Right now only Amazon product URLs (including amzn.to) are supported."
-    );
-  }
-
-  const canonicalUrl = normalizeAmazonUrl(trimmedRaw);
-  const joinChar = canonicalUrl.includes("?") ? "&" : "?";
-  const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
-
-  // Scrape page (for title + image)
-  let scrapedTitle = null;
-  let imageUrl = null;
-  try {
-    const scraped = await scrapeAmazonMeta(canonicalUrl);
-    scrapedTitle = scraped.title;
-    imageUrl = scraped.imageUrl;
-  } catch (_) {
-    // ignore scraping failures
-  }
-
-  // Decide final title
-  let finalTitle = (manualTitle || "").trim() || null;
-  if (!finalTitle && autoTitle && scrapedTitle) {
-    finalTitle = scrapedTitle;
-  }
-
-  // Auto-category v2
-  let finalCategory = (manualCategory || "").trim() || null;
-  if (!finalCategory) {
-    finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
-  }
-
-  const doc = await Link.create({
-    id: generateId(),
-    source: "amazon",
-    title: finalTitle,
-    category: finalCategory,
-    note: (note || "").trim() || null,
-    originalUrl: canonicalUrl,
-    rawOriginalUrl: trimmedRaw,
-    affiliateUrl,
-    tag: AMAZON_TAG,
-    imageUrl: imageUrl || null,
-    images: imageUrl ? [imageUrl] : [],
-    price: null,
-    clicks: 0,
-  });
-
-  return doc;
-}
-
-// Helper to decide if error is a "client" error we want to send as 400
-function isClientCreateError(err) {
-  if (!err || !err.message) return false;
-  return (
-    err.message.startsWith("Missing url") ||
-    err.message.startsWith("Invalid URL") ||
-    err.message.startsWith("Right now only Amazon")
-  );
-}
-
 // ---------- ROUTES ----------
 
 // DB status helper (for debugging)
@@ -322,77 +235,227 @@ router.get("/all", async (req, res) => {
 // Create (Amazon only for now, including amzn.to short links)
 router.post("/create", async (req, res) => {
   try {
-    const manualTitle = req.body.title || "";
-    const manualCategory = req.body.category || "";
-    const note = req.body.note || "";
+    const rawUrl = (req.body.url || "").trim();
+    if (!rawUrl) {
+      return res.status(400).json({ success: false, message: "Missing url" });
+    }
+
+    let u;
+    try {
+      u = new URL(rawUrl);
+    } catch {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid URL format." });
+    }
+
+    const host = u.hostname.toLowerCase();
+    const isAmazon =
+      host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
+
+    if (!isAmazon) {
+      return res.status(400).json({
+        success: false,
+        message: "Right now only Amazon product URLs (including amzn.to) are supported.",
+      });
+    }
+
+    const manualTitle = (req.body.title || "").trim();
+    const manualCategory = (req.body.category || "").trim();
+    const note = (req.body.note || "").trim();
     const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
 
-    const doc = await createAmazonLinkDoc({
-      rawUrl: req.body.url,
-      manualTitle,
-      manualCategory,
-      note,
-      autoTitle,
+    const canonicalUrl = normalizeAmazonUrl(rawUrl);
+    const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+    const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
+
+    // Scrape page (for title + image)
+    let scrapedTitle = null;
+    let imageUrl = null;
+    try {
+      const scraped = await scrapeAmazonMeta(canonicalUrl);
+      scrapedTitle = scraped.title;
+      imageUrl = scraped.imageUrl;
+    } catch (_) {
+      // ignore scraping failures
+    }
+
+    // Decide final title
+    let finalTitle = manualTitle || null;
+    if (!finalTitle && autoTitle && scrapedTitle) {
+      finalTitle = scrapedTitle;
+    }
+
+    // Auto-category v2
+    let finalCategory = manualCategory || null;
+    if (!finalCategory) {
+      finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
+    }
+
+    const doc = await Link.create({
+      id: generateId(),
+      source: "amazon",
+      title: finalTitle,
+      category: finalCategory,
+      note: note || null,
+      originalUrl: canonicalUrl,
+      rawOriginalUrl: rawUrl,
+      affiliateUrl,
+      tag: AMAZON_TAG,
+      imageUrl: imageUrl || null,
+      images: imageUrl ? [imageUrl] : [],
+      price: null,
+      clicks: 0,
     });
 
     res.json({ success: true, link: doc });
   } catch (err) {
     console.error("POST /create error:", err);
-    if (isClientCreateError(err)) {
-      return res.status(400).json({ success: false, message: err.message });
-    }
     res.status(500).json({ success: false, message: "Failed to create link" });
   }
 });
 
-// Bulk create (Amazon only, up to 10 URLs)
+// Bulk create (up to 10 URLs at once)
 router.post("/bulk", async (req, res) => {
   try {
     const urls = Array.isArray(req.body.urls) ? req.body.urls : [];
-
     if (!urls.length) {
       return res
         .status(400)
-        .json({ success: false, message: "No URLs provided for bulk create." });
+        .json({ success: false, message: "No urls array provided." });
     }
     if (urls.length > 10) {
-      return res.status(400).json({
-        success: false,
-        message: "Maximum 10 URLs allowed in one bulk request.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Max 10 URLs at a time." });
     }
 
-    const manualTitle = req.body.title || "";
-    const manualCategory = req.body.category || "";
-    const note = req.body.note || "";
+    const manualTitle = (req.body.title || "").trim(); // usually empty
+    const manualCategory = (req.body.category || "").trim();
+    const note = (req.body.note || "").trim();
     const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
 
-    const created = [];
+    const createdDocs = [];
 
     for (const raw of urls) {
+      const rawUrl = (raw || "").trim();
+      if (!rawUrl) continue;
+
+      let u;
       try {
-        const doc = await createAmazonLinkDoc({
-          rawUrl: raw,
-          manualTitle,
-          manualCategory,
-          note,
-          autoTitle,
-        });
-        created.push(doc);
-      } catch (err) {
-        // For bulk we just skip failures and continue
-        console.warn("Bulk create failed for URL:", raw, err.message);
+        u = new URL(rawUrl);
+      } catch {
+        console.warn("Skipping invalid URL in bulk:", rawUrl);
+        continue;
       }
+
+      const host = u.hostname.toLowerCase();
+      const isAmazon =
+        host === "amzn.to" ||
+        host.includes("amazon.in") ||
+        host.includes("amazon.");
+      if (!isAmazon) {
+        console.warn("Skipping non-Amazon URL in bulk:", rawUrl);
+        continue;
+      }
+
+      const canonicalUrl = normalizeAmazonUrl(rawUrl);
+      const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+      const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
+
+      let scrapedTitle = null;
+      let imageUrl = null;
+      try {
+        const scraped = await scrapeAmazonMeta(canonicalUrl);
+        scrapedTitle = scraped.title;
+        imageUrl = scraped.imageUrl;
+      } catch (_) {}
+
+      let finalTitle = manualTitle || null;
+      if (!finalTitle && autoTitle && scrapedTitle) {
+        finalTitle = scrapedTitle;
+      }
+
+      let finalCategory = manualCategory || null;
+      if (!finalCategory) {
+        finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
+      }
+
+      const doc = await Link.create({
+        id: generateId(),
+        source: "amazon",
+        title: finalTitle,
+        category: finalCategory,
+        note: note || null,
+        originalUrl: canonicalUrl,
+        rawOriginalUrl: rawUrl,
+        affiliateUrl,
+        tag: AMAZON_TAG,
+        imageUrl: imageUrl || null,
+        images: imageUrl ? [imageUrl] : [],
+        price: null,
+        clicks: 0,
+      });
+
+      createdDocs.push(doc);
     }
 
     res.json({
       success: true,
-      createdCount: created.length,
-      links: created,
+      createdCount: createdDocs.length,
+      links: createdDocs,
     });
   } catch (err) {
     console.error("POST /bulk error:", err);
     res.status(500).json({ success: false, message: "Bulk create failed" });
+  }
+});
+
+// ---------- NEW: Update title/category/note ----------
+
+router.put("/update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, category, note } = req.body || {};
+
+    const update = {};
+
+    if (typeof title === "string") {
+      const t = title.trim();
+      update.title = t || null;
+    }
+    if (typeof category === "string") {
+      const c = category.trim();
+      update.category = c || null;
+    }
+    if (typeof note === "string") {
+      const n = note.trim();
+      update.note = n || null;
+    }
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({
+        success: false,
+        message: "No fields to update (title/category/note).",
+      });
+    }
+
+    const doc = await Link.findOneAndUpdate({ id }, update, {
+      new: true,
+    });
+
+    if (!doc) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Link not found" });
+    }
+
+    res.json({ success: true, link: doc });
+  } catch (err) {
+    console.error("PUT /update/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update link" });
   }
 });
 
@@ -413,47 +476,6 @@ router.get("/go/:id", async (req, res) => {
   } catch (err) {
     console.error("GET /go/:id error:", err);
     res.status(500).json({ success: false, message: "Redirect failed" });
-  }
-});
-
-// Update (edit title / category / note)
-router.put("/update/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const update = {};
-    if (typeof req.body.title === "string") {
-      update.title = req.body.title.trim() || null;
-    }
-    if (typeof req.body.category === "string") {
-      update.category = req.body.category.trim() || null;
-    }
-    if (typeof req.body.note === "string") {
-      update.note = req.body.note.trim() || null;
-    }
-
-    if (!Object.keys(update).length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Nothing to update." });
-    }
-
-    const doc = await Link.findOneAndUpdate({ id }, update, {
-      new: true,
-    });
-
-    if (!doc) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No link with that ID" });
-    }
-
-    res.json({ success: true, link: doc });
-  } catch (err) {
-    console.error("PUT /update/:id error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to update link" });
   }
 });
 
