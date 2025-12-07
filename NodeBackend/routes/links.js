@@ -307,6 +307,55 @@ function inferCategoryFromTitle(title) {
   return null;
 }
 
+// ---------- AUTO-DESCRIPTION v1 ----------
+
+function generateDescription(title, category) {
+  const t = title || "This product";
+  const cat = (category || "").toLowerCase();
+
+  const templates = {
+    shoes:
+      "Designed for everyday comfort and long walks, with a style that works for casual outings.",
+    footwear:
+      "Comfortable daily-wear footwear that balances support and casual style.",
+    bags:
+      "Spacious and practical, suitable for daily use, office, travel or college.",
+    wallets:
+      "Compact, organised and easy to carry, helping you keep your essentials in one place.",
+    tshirts:
+      "Soft-feel fabric with a casual fit, great for daily wear or relaxed weekends.",
+    jeans:
+      "Durable denim with a comfortable fit, ideal for everyday use and casual outings.",
+    hoodies:
+      "Warm and cozy layer for cooler days, perfect over a t-shirt or shirt.",
+    clothing:
+      "Built for everyday wear with a focus on comfort and simple, easy styling.",
+    watches:
+      "Adds a clean, classic touch to your look while keeping time easy to read.",
+    smartwatches:
+      "Keeps notifications, fitness stats and time on your wrist in a simple way.",
+    mobiles:
+      "Made for smooth everyday use, calls, social apps and entertainment on the go.",
+    laptops:
+      "Good for work, browsing and streaming, with the convenience of a portable computer.",
+    audio:
+      "Lets you enjoy music, calls and videos with better sound and simple controls.",
+    kitchen:
+      "Helps with daily cooking and prep, saving you time in the kitchen.",
+    home:
+      "Adds comfort and usefulness to your home space for daily living.",
+    beauty:
+      "Helps support your regular skin or hair routine when used consistently.",
+    personalcare:
+      "Made for gentle everyday care, helping you feel fresh and clean.",
+    other:
+      "A useful everyday pick, easy to add into your routine or lifestyle.",
+  };
+
+  const extra = templates[cat] || templates.other;
+  return `${t} — ${extra}`;
+}
+
 // ---------- ROUTES ----------
 
 // DB status helper (for debugging)
@@ -401,12 +450,19 @@ router.post("/create", async (req, res) => {
       finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
     }
 
+    // Auto-description v1
+    const finalDescription = generateDescription(
+      finalTitle || scrapedTitle || null,
+      finalCategory || "other"
+    );
+
     const doc = await Link.create({
       id: generateId(),
       source: "amazon",
       title: finalTitle,
       category: finalCategory,
       note: note || null,
+      description: finalDescription || null,
       originalUrl: canonicalUrl,
       rawOriginalUrl: rawUrl,
       affiliateUrl,
