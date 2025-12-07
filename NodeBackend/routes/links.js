@@ -100,9 +100,7 @@ async function scrapeAmazonMeta(productUrl) {
 
     // Image: grab first m.media-amazon.com jpg
     let imageUrl = null;
-    const imgMatch = html.match(
-      /https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/
-    );
+    const imgMatch = html.match(/https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/);
     if (imgMatch && imgMatch[0]) {
       imageUrl = imgMatch[0];
     }
@@ -199,86 +197,72 @@ function inferCategoryFromTitle(title) {
   return null;
 }
 
-// ---------- DESCRIPTION GENERATOR ----------
+// Shared helper: create ONE Amazon link doc from a URL + options
+async function createAmazonLinkFromUrl(rawUrl, options = {}) {
+  const manualTitle = (options.title || "").trim();
+  const manualCategory = (options.category || "").trim();
+  const note = (options.note || "").trim();
+  const autoTitle = !!options.autoTitle;
 
-function generateDescription({ title, category }) {
-  if (!title) return null;
-
-  const cleanTitle = title.replace(/\s+/g, " ").trim();
-  const t = cleanTitle.toLowerCase();
-  const c = (category || "").toLowerCase();
-
-  // Shoes / footwear
-  if (c === "shoes" || c === "footwear" || t.includes("shoe") || t.includes("sneaker")) {
-    return (
-      cleanTitle +
-      " — comfortable everyday footwear designed for regular use, ideal for daily wear, commuting or casual outings."
-    );
+  let u;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    throw new Error("Invalid URL format.");
   }
 
-  // Bags & backpacks
-  if (c === "bags" || c === "wallets" || t.includes("bag") || t.includes("backpack")) {
-    return (
-      cleanTitle +
-      " — practical everyday storage with space for essentials, making it easy to carry your things for work, travel or casual use."
-    );
+  const host = u.hostname.toLowerCase();
+  const isAmazon =
+    host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
+
+  if (!isAmazon) {
+    throw new Error("Right now only Amazon product URLs (including amzn.to) are supported.");
   }
 
-  // Clothing
-  if (
-    c === "clothing" ||
-    c === "tshirts" ||
-    c === "hoodies" ||
-    c === "jeans" ||
-    t.includes("shirt") ||
-    t.includes("t-shirt") ||
-    t.includes("jeans")
-  ) {
-    return (
-      cleanTitle +
-      " — simple, wearable clothing that fits easily into your regular outfits and daily lifestyle."
-    );
+  const canonicalUrl = normalizeAmazonUrl(rawUrl);
+  const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+  const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
+
+  // Scrape page (for title + image)
+  let scrapedTitle = null;
+  let imageUrl = null;
+  try {
+    const scraped = await scrapeAmazonMeta(canonicalUrl);
+    scrapedTitle = scraped.title;
+    imageUrl = scraped.imageUrl;
+  } catch (_) {
+    // ignore scraping failures
   }
 
-  // Electronics
-  if (
-    c === "mobiles" ||
-    c === "laptops" ||
-    c === "audio" ||
-    c === "electronics" ||
-    t.includes("tv") ||
-    t.includes("smart tv") ||
-    t.includes("laptop") ||
-    t.includes("headphone") ||
-    t.includes("earbud")
-  ) {
-    return (
-      cleanTitle +
-      " — a reliable electronic device built for everyday use, suitable for work, study and entertainment."
-    );
+  // Decide final title
+  let finalTitle = manualTitle || null;
+  if (!finalTitle && autoTitle && scrapedTitle) {
+    finalTitle = scrapedTitle;
   }
 
-  // Beauty & personal care
-  if (c === "beauty" || c === "personalcare" || t.includes("cream") || t.includes("wash")) {
-    return (
-      cleanTitle +
-      " — a simple care product for regular use, meant to fit easily into your daily self-care routine."
-    );
+  // Auto-category v2
+  let finalCategory = manualCategory || null;
+  if (!finalCategory) {
+    finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
   }
 
-  // Home & kitchen
-  if (c === "home" || c === "kitchen" || t.includes("sofa") || t.includes("cooker")) {
-    return (
-      cleanTitle +
-      " — an everyday home essential designed to make regular household tasks more convenient."
-    );
-  }
+  const doc = await Link.create({
+    id: generateId(),
+    source: "amazon",
+    title: finalTitle,
+    category: finalCategory,
+    note: note || null,
+    originalUrl: canonicalUrl,
+    rawOriginalUrl: rawUrl,
+    affiliateUrl,
+    tag: AMAZON_TAG,
+    imageUrl: imageUrl || null,
+    images: imageUrl ? [imageUrl] : [],
+    price: null,
+    clicks: 0,
+  });
 
-  // Default generic description
-  return (
-    cleanTitle +
-    " — a useful everyday pick, easy to add into your routine or lifestyle."
-  );
+  return doc;
 }
 
 // ---------- ROUTES ----------
@@ -306,22 +290,7 @@ router.get("/test", (req, res) => {
 // Get all links
 router.get("/all", async (req, res) => {
   try {
-    let links = await Link.find().sort({ createdAt: -1 }).lean();
-
-    // Backfill description for old docs (in memory only)
-    links = links.map((link) => {
-      if (!link.description) {
-        const desc = generateDescription({
-          title: link.title || link.rawOriginalUrl || "",
-          category: link.category,
-        });
-        if (desc) {
-          link.description = desc;
-        }
-      }
-      return link;
-    });
-
+    const links = await Link.find().sort({ createdAt: -1 }).lean();
     res.json({ success: true, links });
   } catch (err) {
     console.error("GET /all error:", err);
@@ -329,7 +298,7 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// Create (Amazon only for now, including amzn.to short links)
+// Create (single) – Amazon only for now, including amzn.to short links
 router.post("/create", async (req, res) => {
   try {
     const rawUrl = (req.body.url || "").trim();
@@ -337,86 +306,76 @@ router.post("/create", async (req, res) => {
       return res.status(400).json({ success: false, message: "Missing url" });
     }
 
-    let u;
-    try {
-      u = new URL(rawUrl);
-    } catch {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid URL format." });
-    }
-
-    const host = u.hostname.toLowerCase();
-    const isAmazon =
-      host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
-
-    if (!isAmazon) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Right now only Amazon product URLs (including amzn.to) are supported.",
-      });
-    }
-
-    const manualTitle = (req.body.title || "").trim();
-    const manualCategory = (req.body.category || "").trim();
-    const note = (req.body.note || "").trim();
     const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
 
-    const canonicalUrl = normalizeAmazonUrl(rawUrl);
-    const joinChar = canonicalUrl.includes("?") ? "&" : "?";
-    const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
-
-    // Scrape page (for title + image)
-    let scrapedTitle = null;
-    let imageUrl = null;
-    try {
-      const scraped = await scrapeAmazonMeta(canonicalUrl);
-      scrapedTitle = scraped.title;
-      imageUrl = scraped.imageUrl;
-    } catch (_) {
-      // ignore scraping failures
-    }
-
-    // Decide final title
-    let finalTitle = manualTitle || null;
-    if (!finalTitle && autoTitle && scrapedTitle) {
-      finalTitle = scrapedTitle;
-    }
-
-    // Auto-category v2
-    let finalCategory = manualCategory || null;
-    if (!finalCategory) {
-      finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
-    }
-
-    // NEW: auto description
-    const description = generateDescription({
-      title: finalTitle || scrapedTitle || canonicalUrl,
-      category: finalCategory,
-    });
-
-    const doc = await Link.create({
-      id: generateId(),
-      source: "amazon",
-      title: finalTitle,
-      category: finalCategory,
-      note: note || null,
-      description: description || null,
-      originalUrl: canonicalUrl,
-      rawOriginalUrl: rawUrl,
-      affiliateUrl,
-      tag: AMAZON_TAG,
-      imageUrl: imageUrl || null,
-      images: imageUrl ? [imageUrl] : [],
-      price: null,
-      clicks: 0,
+    const doc = await createAmazonLinkFromUrl(rawUrl, {
+      title: req.body.title,
+      category: req.body.category,
+      note: req.body.note,
+      autoTitle,
     });
 
     res.json({ success: true, link: doc });
   } catch (err) {
-    console.error("POST /create error:", err);
-    res.status(500).json({ success: false, message: "Failed to create link" });
+    console.error("POST /create error:", err.message);
+    const message =
+      err.message === "Invalid URL format." ||
+      err.message.includes("only Amazon product URLs")
+        ? err.message
+        : "Failed to create link";
+    res.status(400).json({ success: false, message });
+  }
+});
+
+// BULK create – up to 10 URLs in one request
+router.post("/bulk", async (req, res) => {
+  try {
+    const urls = Array.isArray(req.body.urls) ? req.body.urls : [];
+    if (!urls.length) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Provide urls array in body." });
+    }
+    if (urls.length > 10) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Max 10 URLs allowed at once." });
+    }
+
+    const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
+
+    const sharedOptions = {
+      title: req.body.title,
+      category: req.body.category,
+      note: req.body.note,
+      autoTitle,
+    };
+
+    const created = [];
+    const errors = [];
+
+    for (const raw of urls) {
+      const rawUrl = (raw || "").trim();
+      if (!rawUrl) continue;
+
+      try {
+        const doc = await createAmazonLinkFromUrl(rawUrl, sharedOptions);
+        created.push(doc);
+      } catch (err) {
+        console.warn("Bulk create error for URL:", rawUrl, err.message);
+        errors.push({ url: rawUrl, error: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      createdCount: created.length,
+      created,
+      errors,
+    });
+  } catch (err) {
+    console.error("POST /bulk error:", err);
+    res.status(500).json({ success: false, message: "Bulk create failed" });
   }
 });
 
