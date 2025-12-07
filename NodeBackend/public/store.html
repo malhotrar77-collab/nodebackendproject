@@ -4,23 +4,6 @@
     <meta charset="UTF-8" />
     <title>AlwaysOnSale – Deals</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="AlwaysOnSale shows hand-picked Amazon deals with tracked short links. Shoes, gadgets, beauty, home and more."
-    />
-    <meta
-      property="og:title"
-      content="AlwaysOnSale – Hand-Picked Amazon Deals"
-    />
-    <meta
-      property="og:description"
-      content="Browse curated Amazon products with clean short links managed in one place."
-    />
-    <meta property="og:type" content="website" />
-    <meta
-      property="og:url"
-      content="https://nodebackendproject-9qf7.onrender.com/store.html"
-    />
 
     <style>
       :root {
@@ -96,6 +79,7 @@
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 10px;
+        align-items: flex-start;
       }
 
       .headline h1 {
@@ -109,9 +93,37 @@
         color: #9ca3af;
       }
 
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .controls input,
+      .controls select {
+        font-size: 13px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #4b5563;
+        background: #020617;
+        color: #e5e7eb;
+        outline: none;
+      }
+
+      .controls input:focus,
+      .controls select:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 1px #f97316;
+      }
+
+      .controls input {
+        min-width: 160px;
+      }
+
       #status {
         font-size: 13px;
-        margin: 4px 0 14px;
+        margin: 4px 0 10px;
         min-height: 16px;
       }
 
@@ -123,35 +135,28 @@
         color: #f97373;
       }
 
-      /* FILTER CHIPS */
-
       .filters {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         margin-bottom: 14px;
-        font-size: 12px;
       }
 
-      .filter-chip {
-        padding: 5px 10px;
+      .filter-pill {
+        font-size: 12px;
+        padding: 4px 10px;
         border-radius: 999px;
         border: 1px solid #1f2937;
         background: #020617;
         color: #9ca3af;
         cursor: pointer;
-        user-select: none;
+        white-space: nowrap;
       }
 
-      .filter-chip:hover {
-        background: #111827;
-      }
-
-      .filter-chip.active {
+      .filter-pill.active {
         background: #f97316;
-        border-color: #fb923c;
         color: #020617;
-        font-weight: 600;
+        border-color: #f97316;
       }
 
       .grid {
@@ -232,7 +237,8 @@
         font-size: 12px;
         color: #9ca3af;
         line-height: 1.4;
-        min-height: 2.6em;
+        max-height: 4.2em;
+        overflow: hidden;
       }
 
       .card-meta {
@@ -329,23 +335,35 @@
           <h1>Today’s hand-picked deals</h1>
           <p>Curated products with tracked links – one tap to Amazon.</p>
         </div>
+
+        <div class="controls">
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search products..."
+          />
+          <select id="sort-select">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="clicks">Most clicks</option>
+          </select>
+        </div>
       </div>
 
       <div id="status"></div>
 
-      <!-- FILTER BAR -->
       <div class="filters" id="filters">
-        <div class="filter-chip active" data-filter="all">All</div>
-        <div class="filter-chip" data-filter="shoes">Shoes & Sneakers</div>
-        <div class="filter-chip" data-filter="clothing">Clothing</div>
-        <div class="filter-chip" data-filter="bags">Bags & Backpacks</div>
-        <div class="filter-chip" data-filter="beauty">Beauty & Hair</div>
-        <div class="filter-chip" data-filter="personalcare">Personal Care</div>
-        <div class="filter-chip" data-filter="electronics">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="shoes">Shoes &amp; Sneakers</button>
+        <button class="filter-pill" data-filter="clothing">Clothing</button>
+        <button class="filter-pill" data-filter="bags">Bags &amp; Backpacks</button>
+        <button class="filter-pill" data-filter="beauty">Beauty &amp; Hair</button>
+        <button class="filter-pill" data-filter="personalcare">Personal Care</button>
+        <button class="filter-pill" data-filter="electronics">
           Electronics (Mobiles, Laptops, Audio)
-        </div>
-        <div class="filter-chip" data-filter="home">Home & Living</div>
-        <div class="filter-chip" data-filter="other">Other</div>
+        </button>
+        <button class="filter-pill" data-filter="home">Home &amp; Living</button>
+        <button class="filter-pill" data-filter="other">Other</button>
       </div>
 
       <div id="grid" class="grid"></div>
@@ -361,46 +379,129 @@
       const gridEl = document.getElementById("grid");
       const emptyEl = document.getElementById("empty");
       const filtersEl = document.getElementById("filters");
-
-      const CATEGORY_LABELS = {
-        shoes: "Shoes & Sneakers",
-        footwear: "Footwear",
-        bags: "Bags & Backpacks",
-        wallets: "Wallets",
-        tshirts: "T-Shirts",
-        jeans: "Jeans & Denims",
-        hoodies: "Hoodies & Sweatshirts",
-        clothing: "Clothing",
-        watches: "Watches",
-        smartwatches: "Smartwatches",
-        mobiles: "Mobile Phones",
-        laptops: "Laptops",
-        audio: "Headphones & Earbuds",
-        kitchen: "Kitchen Appliances",
-        home: "Home & Living",
-        beauty: "Beauty & Hair",
-        personalcare: "Personal Care",
-        other: "Other",
-      };
-
-      // Groupings
-      const ELECTRONICS_SET = new Set(["mobiles", "laptops", "audio"]);
-      const CLOTHING_SET = new Set(["clothing", "tshirts", "jeans", "hoodies"]);
+      const searchInput = document.getElementById("search-input");
+      const sortSelect = document.getElementById("sort-select");
 
       let allLinks = [];
-      let activeFilter = "all";
-
-      function displayCategory(slug) {
-        if (!slug) return "OTHER";
-        const key = String(slug).toLowerCase();
-        const label = CATEGORY_LABELS[key] || key;
-        return label.toUpperCase();
-      }
+      let activeCategory = "all";
+      let searchTerm = "";
+      let sortMode = "newest";
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
         statusEl.className = "";
         if (type) statusEl.classList.add(type);
+      }
+
+      function getFilterKey(link) {
+        const c = (link.category || "").toLowerCase().trim();
+        if (!c) return "other";
+
+        if (c.includes("shoe") || c === "shoes" || c === "sneakers") {
+          return "shoes";
+        }
+
+        if (
+          c.includes("bag") ||
+          c === "bags" ||
+          c === "wallets" ||
+          c.includes("backpack")
+        ) {
+          return "bags";
+        }
+
+        if (
+          c === "beauty" ||
+          c.includes("cream") ||
+          c.includes("serum") ||
+          c.includes("shampoo")
+        ) {
+          return "beauty";
+        }
+
+        if (c === "personalcare" || c.includes("body wash") || c.includes("soap")) {
+          return "personalcare";
+        }
+
+        if (
+          c === "mobiles" ||
+          c === "laptops" ||
+          c === "audio" ||
+          c === "electronics"
+        ) {
+          return "electronics";
+        }
+
+        if (
+          c === "home" ||
+          c === "kitchen" ||
+          c.includes("sofa") ||
+          c.includes("bedsheet")
+        ) {
+          return "home";
+        }
+
+        if (
+          c === "clothing" ||
+          c === "tshirts" ||
+          c === "hoodies" ||
+          c === "jeans"
+        ) {
+          return "clothing";
+        }
+
+        return "other";
+      }
+
+      function applyFilters() {
+        let filtered = allLinks.slice();
+
+        if (activeCategory !== "all") {
+          filtered = filtered.filter((l) => getFilterKey(l) === activeCategory);
+        }
+
+        if (searchTerm) {
+          const q = searchTerm;
+          filtered = filtered.filter((l) => {
+            const title = (l.title || "").toLowerCase();
+            const cat = (l.category || "").toLowerCase();
+            const desc = (l.description || "").toLowerCase();
+            return (
+              title.includes(q) || cat.includes(q) || desc.includes(q)
+            );
+          });
+        }
+
+        // sort
+        filtered.sort((a, b) => {
+          if (sortMode === "clicks") {
+            const ca = a.clicks || 0;
+            const cb = b.clicks || 0;
+            return cb - ca; // high to low
+          }
+
+          const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+          if (sortMode === "oldest") {
+            return da - db; // old to new
+          }
+          // newest
+          return db - da; // new to old
+        });
+
+        renderGrid(filtered);
+
+        if (!allLinks.length) {
+          // nothing loaded yet or total zero
+          return;
+        }
+
+        if (filtered.length) {
+          setStatus(`Showing ${filtered.length} deal(s).`, "ok");
+        } else {
+          setStatus("No deals match your filters/search.", "ok");
+        }
       }
 
       async function loadProducts() {
@@ -414,54 +515,13 @@
           }
 
           allLinks = (data.links || []).filter((l) => !!l.affiliateUrl);
-
-          const filtered = getFilteredLinks();
-          renderGrid(filtered);
-          if (allLinks.length) {
-            setStatus(`Showing ${filtered.length} deal(s).`, "ok");
-          } else {
-            setStatus("");
-          }
+          applyFilters();
         } catch (err) {
           console.error(err);
           setStatus("Could not load products.", "error");
           allLinks = [];
           renderGrid([]);
         }
-      }
-
-      function getFilteredLinks() {
-        if (activeFilter === "all") return allLinks;
-
-        if (activeFilter === "electronics") {
-          return allLinks.filter((l) =>
-            ELECTRONICS_SET.has(String(l.category || "").toLowerCase())
-          );
-        }
-
-        if (activeFilter === "clothing") {
-          return allLinks.filter((l) =>
-            CLOTHING_SET.has(String(l.category || "").toLowerCase())
-          );
-        }
-
-        if (activeFilter === "other") {
-          return allLinks.filter((l) => {
-            const c = String(l.category || "").toLowerCase();
-            return (
-              !c ||
-              (!ELECTRONICS_SET.has(c) &&
-                !CLOTHING_SET.has(c) &&
-                !(c in CATEGORY_LABELS)) ||
-              c === "other"
-            );
-          });
-        }
-
-        return allLinks.filter(
-          (l) =>
-            String(l.category || "").toLowerCase() === activeFilter.toLowerCase()
-        );
       }
 
       function renderGrid(links) {
@@ -484,12 +544,12 @@
           source.className = "source-pill";
           source.textContent = (link.source || "amazon").toUpperCase();
 
-          const catBadge = document.createElement("div");
-          catBadge.className = "badge";
-          catBadge.textContent = displayCategory(link.category || "other");
+          const cat = document.createElement("div");
+          cat.className = "badge";
+          cat.textContent = (link.category || "other").toUpperCase();
 
           header.appendChild(source);
-          header.appendChild(catBadge);
+          header.appendChild(cat);
 
           const imgWrap = document.createElement("div");
           imgWrap.className = "img-wrap";
@@ -513,7 +573,9 @@
 
           const descDiv = document.createElement("div");
           descDiv.className = "card-desc";
-          descDiv.textContent = link.description || "";
+          descDiv.textContent =
+            link.description ||
+            "A useful everyday pick, easy to add into your routine or lifestyle.";
 
           const meta = document.createElement("div");
           meta.className = "card-meta";
@@ -579,32 +641,35 @@
         }
       }
 
-      function setupFilters() {
-        filtersEl.addEventListener("click", (e) => {
-          const chip = e.target.closest(".filter-chip");
-          if (!chip) return;
-          const value = chip.getAttribute("data-filter");
-          if (!value) return;
+      // Event listeners
+      filtersEl.addEventListener("click", (e) => {
+        const btn = e.target.closest(".filter-pill");
+        if (!btn) return;
 
-          activeFilter = value;
+        const key = btn.getAttribute("data-filter");
+        if (!key) return;
 
-          // update active style
-          Array.from(filtersEl.querySelectorAll(".filter-chip")).forEach((c) => {
-            c.classList.toggle("active", c === chip);
-          });
+        activeCategory = key;
 
-          const filtered = getFilteredLinks();
-          renderGrid(filtered);
-          if (allLinks.length) {
-            setStatus(`Showing ${filtered.length} deal(s).`, "ok");
-          }
-        });
-      }
+        document
+          .querySelectorAll(".filter-pill")
+          .forEach((el) => el.classList.remove("active"));
+        btn.classList.add("active");
 
-      window.addEventListener("DOMContentLoaded", () => {
-        setupFilters();
-        loadProducts();
+        applyFilters();
       });
+
+      searchInput.addEventListener("input", () => {
+        searchTerm = searchInput.value.trim().toLowerCase();
+        applyFilters();
+      });
+
+      sortSelect.addEventListener("change", () => {
+        sortMode = sortSelect.value;
+        applyFilters();
+      });
+
+      window.addEventListener("DOMContentLoaded", loadProducts);
     </script>
   </body>
 </html>
