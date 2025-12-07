@@ -195,128 +195,90 @@ function inferCategoryFromTitle(title) {
   if (t.includes("cream") || t.includes("serum") || t.includes("shampoo"))
     return "beauty";
 
-  if (t.includes("body wash") || t.includes("face wash")) return "personalcare";
-
   // fallback
   return null;
 }
 
-// ---------- DESCRIPTION HELPER ----------
+// ---------- DESCRIPTION GENERATOR ----------
 
-function generateDescription(title, category) {
-  const safeTitle = title || "This product";
+function generateDescription({ title, category }) {
+  if (!title) return null;
+
+  const cleanTitle = title.replace(/\s+/g, " ").trim();
+  const t = cleanTitle.toLowerCase();
   const c = (category || "").toLowerCase();
 
-  if (["shoes", "footwear"].includes(c)) {
-    return `${safeTitle} — Comfortable everyday footwear, designed to pair easily with your regular outfits.`;
-  }
-
-  if (["bags", "wallets"].includes(c)) {
-    return `${safeTitle} — A practical carry option with enough space for your daily essentials.`;
-  }
-
-  if (["tshirts", "jeans", "hoodies", "clothing"].includes(c)) {
-    return `${safeTitle} — Simple, wearable clothing that fits easily into an everyday wardrobe.`;
-  }
-
-  if (["mobiles", "laptops", "audio"].includes(c)) {
-    return `${safeTitle} — A useful tech pick for daily work, streaming, and entertainment.`;
-  }
-
-  if (["beauty", "personalcare"].includes(c)) {
-    return `${safeTitle} — Made for simple self-care routines you can keep using every day.`;
-  }
-
-  if (["kitchen"].includes(c)) {
-    return `${safeTitle} — Handy for quick cooking and regular kitchen use.`;
-  }
-
-  if (["home"].includes(c)) {
-    return `${safeTitle} — Easy to fit into most homes and everyday setups.`;
-  }
-
-  return `${safeTitle} — A useful everyday pick, easy to add into your routine or lifestyle.`;
-}
-
-// ---------- CORE CREATION HELPER (single Amazon link) ----------
-
-async function createAmazonLink({
-  rawUrl,
-  manualTitle,
-  manualCategory,
-  note,
-  autoTitle,
-}) {
-  const trimmedUrl = (rawUrl || "").trim();
-  if (!trimmedUrl) {
-    throw new Error("Missing url");
-  }
-
-  let u;
-  try {
-    u = new URL(trimmedUrl);
-  } catch {
-    throw new Error("Invalid URL format.");
-  }
-
-  const host = u.hostname.toLowerCase();
-  const isAmazon =
-    host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
-
-  if (!isAmazon) {
-    throw new Error(
-      "Right now only Amazon product URLs (including amzn.to) are supported."
+  // Shoes / footwear
+  if (c === "shoes" || c === "footwear" || t.includes("shoe") || t.includes("sneaker")) {
+    return (
+      cleanTitle +
+      " — comfortable everyday footwear designed for regular use, ideal for daily wear, commuting or casual outings."
     );
   }
 
-  const canonicalUrl = normalizeAmazonUrl(trimmedUrl);
-  const joinChar = canonicalUrl.includes("?") ? "&" : "?";
-  const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
-
-  // Scrape page (for title + image)
-  let scrapedTitle = null;
-  let imageUrl = null;
-  try {
-    const scraped = await scrapeAmazonMeta(canonicalUrl);
-    scrapedTitle = scraped.title;
-    imageUrl = scraped.imageUrl;
-  } catch (_) {
-    // ignore scraping failures
+  // Bags & backpacks
+  if (c === "bags" || c === "wallets" || t.includes("bag") || t.includes("backpack")) {
+    return (
+      cleanTitle +
+      " — practical everyday storage with space for essentials, making it easy to carry your things for work, travel or casual use."
+    );
   }
 
-  // Decide final title
-  let finalTitle = manualTitle || null;
-  if (!finalTitle && autoTitle && scrapedTitle) {
-    finalTitle = scrapedTitle;
+  // Clothing
+  if (
+    c === "clothing" ||
+    c === "tshirts" ||
+    c === "hoodies" ||
+    c === "jeans" ||
+    t.includes("shirt") ||
+    t.includes("t-shirt") ||
+    t.includes("jeans")
+  ) {
+    return (
+      cleanTitle +
+      " — simple, wearable clothing that fits easily into your regular outfits and daily lifestyle."
+    );
   }
 
-  // Auto-category v2
-  let finalCategory = manualCategory || null;
-  if (!finalCategory) {
-    finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
+  // Electronics
+  if (
+    c === "mobiles" ||
+    c === "laptops" ||
+    c === "audio" ||
+    c === "electronics" ||
+    t.includes("tv") ||
+    t.includes("smart tv") ||
+    t.includes("laptop") ||
+    t.includes("headphone") ||
+    t.includes("earbud")
+  ) {
+    return (
+      cleanTitle +
+      " — a reliable electronic device built for everyday use, suitable for work, study and entertainment."
+    );
   }
 
-  // Description
-  const description = generateDescription(finalTitle || scrapedTitle || null, finalCategory);
+  // Beauty & personal care
+  if (c === "beauty" || c === "personalcare" || t.includes("cream") || t.includes("wash")) {
+    return (
+      cleanTitle +
+      " — a simple care product for regular use, meant to fit easily into your daily self-care routine."
+    );
+  }
 
-  const doc = await Link.create({
-    id: generateId(),
-    source: "amazon",
-    title: finalTitle,
-    category: finalCategory,
-    note: note || null,
-    description,
-    originalUrl: canonicalUrl,
-    rawOriginalUrl: trimmedUrl,
-    affiliateUrl,
-    tag: AMAZON_TAG,
-    imageUrl: imageUrl || null,
-    images: imageUrl ? [imageUrl] : [],
-    price: null,
-    clicks: 0,
-  });
+  // Home & kitchen
+  if (c === "home" || c === "kitchen" || t.includes("sofa") || t.includes("cooker")) {
+    return (
+      cleanTitle +
+      " — an everyday home essential designed to make regular household tasks more convenient."
+    );
+  }
 
-  return doc;
+  // Default generic description
+  return (
+    cleanTitle +
+    " — a useful everyday pick, easy to add into your routine or lifestyle."
+  );
 }
 
 // ---------- ROUTES ----------
@@ -344,7 +306,22 @@ router.get("/test", (req, res) => {
 // Get all links
 router.get("/all", async (req, res) => {
   try {
-    const links = await Link.find().sort({ createdAt: -1 }).lean();
+    let links = await Link.find().sort({ createdAt: -1 }).lean();
+
+    // Backfill description for old docs (in memory only)
+    links = links.map((link) => {
+      if (!link.description) {
+        const desc = generateDescription({
+          title: link.title || link.rawOriginalUrl || "",
+          category: link.category,
+        });
+        if (desc) {
+          link.description = desc;
+        }
+      }
+      return link;
+    });
+
     res.json({ success: true, links });
   } catch (err) {
     console.error("GET /all error:", err);
@@ -355,42 +332,29 @@ router.get("/all", async (req, res) => {
 // Create (Amazon only for now, including amzn.to short links)
 router.post("/create", async (req, res) => {
   try {
-    const doc = await createAmazonLink({
-      rawUrl: req.body.url,
-      manualTitle: (req.body.title || "").trim(),
-      manualCategory: (req.body.category || "").trim(),
-      note: (req.body.note || "").trim(),
-      autoTitle: boolFromQueryOrBody(req.body.autoTitle),
-    });
-
-    res.json({ success: true, link: doc });
-  } catch (err) {
-    console.error("POST /create error:", err);
-    const message = err.message || "Failed to create link";
-
-    const isBadRequest =
-      message.includes("Missing url") ||
-      message.includes("Invalid URL format") ||
-      message.includes("only Amazon product URLs");
-
-    res.status(isBadRequest ? 400 : 500).json({ success: false, message });
-  }
-});
-
-// BULK CREATE (multiple Amazon URLs in one go)
-router.post("/bulk", async (req, res) => {
-  try {
-    const urls = Array.isArray(req.body.urls) ? req.body.urls : [];
-    if (!urls.length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No urls provided." });
+    const rawUrl = (req.body.url || "").trim();
+    if (!rawUrl) {
+      return res.status(400).json({ success: false, message: "Missing url" });
     }
 
-    if (urls.length > 20) {
+    let u;
+    try {
+      u = new URL(rawUrl);
+    } catch {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid URL format." });
+    }
+
+    const host = u.hostname.toLowerCase();
+    const isAmazon =
+      host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
+
+    if (!isAmazon) {
       return res.status(400).json({
         success: false,
-        message: "Please send at most 20 URLs at once.",
+        message:
+          "Right now only Amazon product URLs (including amzn.to) are supported.",
       });
     }
 
@@ -399,38 +363,60 @@ router.post("/bulk", async (req, res) => {
     const note = (req.body.note || "").trim();
     const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
 
-    const results = [];
+    const canonicalUrl = normalizeAmazonUrl(rawUrl);
+    const joinChar = canonicalUrl.includes("?") ? "&" : "?";
+    const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
 
-    for (const rawUrl of urls) {
-      try {
-        const doc = await createAmazonLink({
-          rawUrl,
-          manualTitle,
-          manualCategory,
-          note,
-          autoTitle,
-        });
-        results.push({ ok: true, id: doc.id, url: rawUrl });
-      } catch (err) {
-        results.push({
-          ok: false,
-          url: rawUrl,
-          error: err.message || "Failed for this URL",
-        });
-      }
+    // Scrape page (for title + image)
+    let scrapedTitle = null;
+    let imageUrl = null;
+    try {
+      const scraped = await scrapeAmazonMeta(canonicalUrl);
+      scrapedTitle = scraped.title;
+      imageUrl = scraped.imageUrl;
+    } catch (_) {
+      // ignore scraping failures
     }
 
-    const createdCount = results.filter((r) => r.ok).length;
+    // Decide final title
+    let finalTitle = manualTitle || null;
+    if (!finalTitle && autoTitle && scrapedTitle) {
+      finalTitle = scrapedTitle;
+    }
 
-    res.json({
-      success: true,
-      createdCount,
-      total: urls.length,
-      results,
+    // Auto-category v2
+    let finalCategory = manualCategory || null;
+    if (!finalCategory) {
+      finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
+    }
+
+    // NEW: auto description
+    const description = generateDescription({
+      title: finalTitle || scrapedTitle || canonicalUrl,
+      category: finalCategory,
     });
+
+    const doc = await Link.create({
+      id: generateId(),
+      source: "amazon",
+      title: finalTitle,
+      category: finalCategory,
+      note: note || null,
+      description: description || null,
+      originalUrl: canonicalUrl,
+      rawOriginalUrl: rawUrl,
+      affiliateUrl,
+      tag: AMAZON_TAG,
+      imageUrl: imageUrl || null,
+      images: imageUrl ? [imageUrl] : [],
+      price: null,
+      clicks: 0,
+    });
+
+    res.json({ success: true, link: doc });
   } catch (err) {
-    console.error("POST /bulk error:", err);
-    res.status(500).json({ success: false, message: "Bulk create failed" });
+    console.error("POST /create error:", err);
+    res.status(500).json({ success: false, message: "Failed to create link" });
   }
 });
 
