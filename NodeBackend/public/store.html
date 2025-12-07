@@ -4,6 +4,27 @@
     <meta charset="UTF-8" />
     <title>AlwaysOnSale – Deals</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="AlwaysOnSale shows hand-picked Amazon deals with tracked short links. Shoes, gadgets, beauty, home and more."
+    />
+    <meta
+      property="og:title"
+      content="AlwaysOnSale – Hand-Picked Amazon Deals"
+    />
+    <meta
+      property="og:description"
+      content="Browse curated Amazon products with clean short links managed in one place."
+    />
+    <meta
+      property="og:type"
+      content="website"
+    />
+    <!-- Optional: change this to your custom domain later -->
+    <meta
+      property="og:url"
+      content="https://nodebackendproject-9qf7.onrender.com/store.html"
+    />
 
     <style>
       :root {
@@ -291,6 +312,34 @@
       const gridEl = document.getElementById("grid");
       const emptyEl = document.getElementById("empty");
 
+      const CATEGORY_LABELS = {
+        shoes: "Shoes & Sneakers",
+        footwear: "Footwear",
+        bags: "Bags & Backpacks",
+        wallets: "Wallets",
+        tshirts: "T-Shirts",
+        jeans: "Jeans & Denims",
+        hoodies: "Hoodies & Sweatshirts",
+        clothing: "Clothing",
+        watches: "Watches",
+        smartwatches: "Smartwatches",
+        mobiles: "Mobile Phones",
+        laptops: "Laptops",
+        audio: "Headphones & Earbuds",
+        kitchen: "Kitchen Appliances",
+        home: "Home & Living",
+        beauty: "Beauty & Hair",
+        personalcare: "Personal Care",
+        other: "Other",
+      };
+
+      function displayCategory(slug) {
+        if (!slug) return "OTHER";
+        const key = String(slug).toLowerCase();
+        const label = CATEGORY_LABELS[key] || key;
+        return label.toUpperCase();
+      }
+
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
         statusEl.className = "";
@@ -344,7 +393,7 @@
 
           const cat = document.createElement("div");
           cat.className = "badge";
-          cat.textContent = (link.category || "other").toUpperCase();
+          cat.textContent = displayCategory(link.category || "other");
 
           header.appendChild(source);
           header.appendChild(cat);
@@ -395,7 +444,10 @@
           buyBtn.className = "buy-btn";
           buyBtn.textContent = "Buy on Amazon";
           buyBtn.onclick = () => {
-            window.open(`/api/links/go/${encodeURIComponent(link.id)}`, "_blank");
+            window.open(
+              `/api/links/go/${encodeURIComponent(link.id)}`,
+              "_blank"
+            );
           };
 
           const copyBtn = document.createElement("button");
