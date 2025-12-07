@@ -100,7 +100,9 @@ async function scrapeAmazonMeta(productUrl) {
 
     // Image: grab first m.media-amazon.com jpg
     let imageUrl = null;
-    const imgMatch = html.match(/https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/);
+    const imgMatch = html.match(
+      /https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/
+    );
     if (imgMatch && imgMatch[0]) {
       imageUrl = imgMatch[0];
     }
@@ -197,16 +199,23 @@ function inferCategoryFromTitle(title) {
   return null;
 }
 
-// Shared helper: create ONE Amazon link doc from a URL + options
-async function createAmazonLinkFromUrl(rawUrl, options = {}) {
-  const manualTitle = (options.title || "").trim();
-  const manualCategory = (options.category || "").trim();
-  const note = (options.note || "").trim();
-  const autoTitle = !!options.autoTitle;
+// ---------- CORE CREATION HELPER (Amazon only) ----------
+
+async function createAmazonLinkDoc({
+  rawUrl,
+  manualTitle,
+  manualCategory,
+  note,
+  autoTitle,
+}) {
+  const trimmedRaw = (rawUrl || "").trim();
+  if (!trimmedRaw) {
+    throw new Error("Missing url");
+  }
 
   let u;
   try {
-    u = new URL(rawUrl);
+    u = new URL(trimmedRaw);
   } catch {
     throw new Error("Invalid URL format.");
   }
@@ -216,10 +225,12 @@ async function createAmazonLinkFromUrl(rawUrl, options = {}) {
     host === "amzn.to" || host.includes("amazon.in") || host.includes("amazon.");
 
   if (!isAmazon) {
-    throw new Error("Right now only Amazon product URLs (including amzn.to) are supported.");
+    throw new Error(
+      "Right now only Amazon product URLs (including amzn.to) are supported."
+    );
   }
 
-  const canonicalUrl = normalizeAmazonUrl(rawUrl);
+  const canonicalUrl = normalizeAmazonUrl(trimmedRaw);
   const joinChar = canonicalUrl.includes("?") ? "&" : "?";
   const affiliateUrl = `${canonicalUrl}${joinChar}tag=${AMAZON_TAG}`;
 
@@ -235,13 +246,13 @@ async function createAmazonLinkFromUrl(rawUrl, options = {}) {
   }
 
   // Decide final title
-  let finalTitle = manualTitle || null;
+  let finalTitle = (manualTitle || "").trim() || null;
   if (!finalTitle && autoTitle && scrapedTitle) {
     finalTitle = scrapedTitle;
   }
 
   // Auto-category v2
-  let finalCategory = manualCategory || null;
+  let finalCategory = (manualCategory || "").trim() || null;
   if (!finalCategory) {
     finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
   }
@@ -251,9 +262,9 @@ async function createAmazonLinkFromUrl(rawUrl, options = {}) {
     source: "amazon",
     title: finalTitle,
     category: finalCategory,
-    note: note || null,
+    note: (note || "").trim() || null,
     originalUrl: canonicalUrl,
-    rawOriginalUrl: rawUrl,
+    rawOriginalUrl: trimmedRaw,
     affiliateUrl,
     tag: AMAZON_TAG,
     imageUrl: imageUrl || null,
@@ -263,6 +274,16 @@ async function createAmazonLinkFromUrl(rawUrl, options = {}) {
   });
 
   return doc;
+}
+
+// Helper to decide if error is a "client" error we want to send as 400
+function isClientCreateError(err) {
+  if (!err || !err.message) return false;
+  return (
+    err.message.startsWith("Missing url") ||
+    err.message.startsWith("Invalid URL") ||
+    err.message.startsWith("Right now only Amazon")
+  );
 }
 
 // ---------- ROUTES ----------
@@ -298,80 +319,76 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// Create (single) – Amazon only for now, including amzn.to short links
+// Create (Amazon only for now, including amzn.to short links)
 router.post("/create", async (req, res) => {
   try {
-    const rawUrl = (req.body.url || "").trim();
-    if (!rawUrl) {
-      return res.status(400).json({ success: false, message: "Missing url" });
-    }
-
+    const manualTitle = req.body.title || "";
+    const manualCategory = req.body.category || "";
+    const note = req.body.note || "";
     const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
 
-    const doc = await createAmazonLinkFromUrl(rawUrl, {
-      title: req.body.title,
-      category: req.body.category,
-      note: req.body.note,
+    const doc = await createAmazonLinkDoc({
+      rawUrl: req.body.url,
+      manualTitle,
+      manualCategory,
+      note,
       autoTitle,
     });
 
     res.json({ success: true, link: doc });
   } catch (err) {
-    console.error("POST /create error:", err.message);
-    const message =
-      err.message === "Invalid URL format." ||
-      err.message.includes("only Amazon product URLs")
-        ? err.message
-        : "Failed to create link";
-    res.status(400).json({ success: false, message });
+    console.error("POST /create error:", err);
+    if (isClientCreateError(err)) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    res.status(500).json({ success: false, message: "Failed to create link" });
   }
 });
 
-// BULK create – up to 10 URLs in one request
+// Bulk create (Amazon only, up to 10 URLs)
 router.post("/bulk", async (req, res) => {
   try {
     const urls = Array.isArray(req.body.urls) ? req.body.urls : [];
+
     if (!urls.length) {
       return res
         .status(400)
-        .json({ success: false, message: "Provide urls array in body." });
+        .json({ success: false, message: "No URLs provided for bulk create." });
     }
     if (urls.length > 10) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Max 10 URLs allowed at once." });
+      return res.status(400).json({
+        success: false,
+        message: "Maximum 10 URLs allowed in one bulk request.",
+      });
     }
 
+    const manualTitle = req.body.title || "";
+    const manualCategory = req.body.category || "";
+    const note = req.body.note || "";
     const autoTitle = boolFromQueryOrBody(req.body.autoTitle);
 
-    const sharedOptions = {
-      title: req.body.title,
-      category: req.body.category,
-      note: req.body.note,
-      autoTitle,
-    };
-
     const created = [];
-    const errors = [];
 
     for (const raw of urls) {
-      const rawUrl = (raw || "").trim();
-      if (!rawUrl) continue;
-
       try {
-        const doc = await createAmazonLinkFromUrl(rawUrl, sharedOptions);
+        const doc = await createAmazonLinkDoc({
+          rawUrl: raw,
+          manualTitle,
+          manualCategory,
+          note,
+          autoTitle,
+        });
         created.push(doc);
       } catch (err) {
-        console.warn("Bulk create error for URL:", rawUrl, err.message);
-        errors.push({ url: rawUrl, error: err.message });
+        // For bulk we just skip failures and continue
+        console.warn("Bulk create failed for URL:", raw, err.message);
       }
     }
 
     res.json({
       success: true,
       createdCount: created.length,
-      created,
-      errors,
+      links: created,
     });
   } catch (err) {
     console.error("POST /bulk error:", err);
@@ -396,6 +413,47 @@ router.get("/go/:id", async (req, res) => {
   } catch (err) {
     console.error("GET /go/:id error:", err);
     res.status(500).json({ success: false, message: "Redirect failed" });
+  }
+});
+
+// Update (edit title / category / note)
+router.put("/update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const update = {};
+    if (typeof req.body.title === "string") {
+      update.title = req.body.title.trim() || null;
+    }
+    if (typeof req.body.category === "string") {
+      update.category = req.body.category.trim() || null;
+    }
+    if (typeof req.body.note === "string") {
+      update.note = req.body.note.trim() || null;
+    }
+
+    if (!Object.keys(update).length) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Nothing to update." });
+    }
+
+    const doc = await Link.findOneAndUpdate({ id }, update, {
+      new: true,
+    });
+
+    if (!doc) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No link with that ID" });
+    }
+
+    res.json({ success: true, link: doc });
+  } catch (err) {
+    console.error("PUT /update/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update link" });
   }
 });
 
