@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AlwaysOnSale – Deals</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #020617;
+        color: #e5e7eb;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(12px);
+        background: rgba(2, 6, 23, 0.9);
+        border-bottom: 1px solid #111827;
+      }
+
+      .nav-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .logo {
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        font-size: 18px;
+      }
+
+      .logo span {
+        color: #f97316;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 13px;
+      }
+
+      .nav-links a {
+        color: #9ca3af;
+        text-decoration: none;
+      }
+
+      .nav-links a:hover {
+        color: #e5e7eb;
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px 16px 40px;
+      }
+
+      .headline {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .headline h1 {
+        font-size: 22px;
+        margin: 0;
+      }
+
+      .headline p {
+        margin: 0;
+        font-size: 13px;
+        color: #9ca3af;
+      }
+
+      #status {
+        font-size: 13px;
+        margin: 4px 0 14px;
+        min-height: 16px;
+      }
+
+      #status.ok {
+        color: #4ade80;
+      }
+
+      #status.error {
+        color: #f97373;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        border-radius: 14px;
+        background: #020617;
+        border: 1px solid #111827;
+        padding: 10px 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .source-pill {
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #111827;
+        color: #9ca3af;
+      }
+
+      .badge {
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #0f172a;
+        border: 1px solid #1f2937;
+        color: #e5e7eb;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .img-wrap {
+        border-radius: 10px;
+        border: 1px solid #111827;
+        background: #020617;
+        overflow: hidden;
+        aspect-ratio: 4 / 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .img-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .img-placeholder {
+        font-size: 11px;
+        color: #4b5563;
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.3;
+        max-height: 3.6em;
+        overflow: hidden;
+      }
+
+      .card-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        font-size: 11px;
+        color: #6b7280;
+      }
+
+      .clicks-pill {
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #111827;
+      }
+
+      .actions {
+        margin-top: 4px;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      button.buy-btn {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        background: #f97316;
+        color: #020617;
+      }
+
+      button.buy-btn:hover {
+        filter: brightness(1.1);
+      }
+
+      button.copy-btn {
+        padding: 6px 8px;
+        border-radius: 999px;
+        border: 1px solid #4b5563;
+        background: #020617;
+        color: #e5e7eb;
+        font-size: 11px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      button.copy-btn:hover {
+        background: #111827;
+      }
+
+      .empty-state {
+        text-align: center;
+        margin-top: 40px;
+        font-size: 14px;
+        color: #9ca3af;
+      }
+
+      .empty-state a {
+        color: #f97316;
+        text-decoration: none;
+      }
+
+      @media (max-width: 640px) {
+        .nav-inner {
+          padding-inline: 12px;
+        }
+        main {
+          padding-inline: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="nav-inner">
+        <div class="logo"><span>ALWAYS</span>ONSALE</div>
+        <div class="nav-links">
+          <a href="/store.html">Store</a>
+          <span>·</span>
+          <a href="/">Dashboard (admin)</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="headline">
+        <div>
+          <h1>Today’s hand-picked deals</h1>
+          <p>Curated products with tracked links – one tap to Amazon.</p>
+        </div>
+      </div>
+
+      <div id="status"></div>
+
+      <div id="grid" class="grid"></div>
+
+      <div id="empty" class="empty-state" style="display: none">
+        No products yet. Add links from the
+        <a href="/">Affiliate Links Dashboard</a>.
+      </div>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const gridEl = document.getElementById("grid");
+      const emptyEl = document.getElementById("empty");
+
+      function setStatus(msg, type = "") {
+        statusEl.textContent = msg || "";
+        statusEl.className = "";
+        if (type) statusEl.classList.add(type);
+      }
+
+      async function loadProducts() {
+        try {
+          setStatus("Loading deals...");
+          const res = await fetch("/api/links/all");
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Failed to load products.");
+          }
+
+          const links = (data.links || []).filter((l) => !!l.affiliateUrl);
+
+          renderGrid(links);
+          if (links.length) {
+            setStatus(`Showing ${links.length} deal(s).`, "ok");
+          } else {
+            setStatus("");
+          }
+        } catch (err) {
+          console.error(err);
+          setStatus("Could not load products.", "error");
+          renderGrid([]);
+        }
+      }
+
+      function renderGrid(links) {
+        gridEl.innerHTML = "";
+
+        if (!links.length) {
+          emptyEl.style.display = "block";
+          return;
+        }
+        emptyEl.style.display = "none";
+
+        for (const link of links) {
+          const card = document.createElement("article");
+          card.className = "card";
+
+          const header = document.createElement("div");
+          header.className = "card-header";
+
+          const source = document.createElement("div");
+          source.className = "source-pill";
+          source.textContent = (link.source || "amazon").toUpperCase();
+
+          const cat = document.createElement("div");
+          cat.className = "badge";
+          cat.textContent = (link.category || "other").toUpperCase();
+
+          header.appendChild(source);
+          header.appendChild(cat);
+
+          const imgWrap = document.createElement("div");
+          imgWrap.className = "img-wrap";
+
+          if (link.imageUrl) {
+            const img = document.createElement("img");
+            img.src = link.imageUrl;
+            img.alt = link.title || "product";
+            img.loading = "lazy";
+            imgWrap.appendChild(img);
+          } else {
+            const ph = document.createElement("div");
+            ph.className = "img-placeholder";
+            ph.textContent = "No image";
+            imgWrap.appendChild(ph);
+          }
+
+          const titleDiv = document.createElement("div");
+          titleDiv.className = "card-title";
+          titleDiv.textContent = link.title || "Product";
+
+          const meta = document.createElement("div");
+          meta.className = "card-meta";
+
+          const created = document.createElement("span");
+          if (link.createdAt) {
+            const d = new Date(link.createdAt);
+            created.textContent = d.toLocaleDateString();
+          } else {
+            created.textContent = "";
+          }
+
+          const clicks = document.createElement("span");
+          const c = link.clicks || 0;
+          clicks.className = "clicks-pill";
+          clicks.textContent = c === 1 ? "1 click" : `${c} clicks`;
+
+          meta.appendChild(created);
+          meta.appendChild(clicks);
+
+          const actions = document.createElement("div");
+          actions.className = "actions";
+
+          const buyBtn = document.createElement("button");
+          buyBtn.className = "buy-btn";
+          buyBtn.textContent = "Buy on Amazon";
+          buyBtn.onclick = () => {
+            window.open(`/api/links/go/${encodeURIComponent(link.id)}`, "_blank");
+          };
+
+          const copyBtn = document.createElement("button");
+          copyBtn.className = "copy-btn";
+          copyBtn.textContent = "Copy link";
+          copyBtn.onclick = () => copyShort(link.id);
+
+          actions.appendChild(buyBtn);
+          actions.appendChild(copyBtn);
+
+          card.appendChild(header);
+          card.appendChild(imgWrap);
+          card.appendChild(titleDiv);
+          card.appendChild(meta);
+          card.appendChild(actions);
+
+          gridEl.appendChild(card);
+        }
+      }
+
+      async function copyShort(id) {
+        try {
+          const shortUrl = `${location.origin}/api/links/go/${encodeURIComponent(
+            id
+          )}`;
+          await navigator.clipboard.writeText(shortUrl);
+          setStatus("Short link copied.", "ok");
+        } catch (err) {
+          console.error(err);
+          setStatus("Could not copy link.", "error");
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", loadProducts);
+    </script>
+  </body>
+</html>
