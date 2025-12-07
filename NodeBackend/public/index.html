@@ -276,6 +276,7 @@
             <th>Image</th>
             <th>Title</th>
             <th>Category</th>
+            <th>Note</th>
             <th>Original URL</th>
             <th>Affiliate URL</th>
             <th>Clicks</th>
@@ -330,7 +331,7 @@
         if (!links.length) {
           const tr = document.createElement("tr");
           const td = document.createElement("td");
-          td.colSpan = 10;
+          td.colSpan = 11;
           td.textContent = "No links yet. Create one above.";
           tr.appendChild(td);
           tbodyEl.appendChild(tr);
@@ -375,6 +376,11 @@
           const tdCat = document.createElement("td");
           tdCat.textContent = link.category || "-";
           tr.appendChild(tdCat);
+
+          // Note
+          const tdNote = document.createElement("td");
+          tdNote.textContent = link.note || "-";
+          tr.appendChild(tdNote);
 
           // Original URL
           const tdOriginal = document.createElement("td");
@@ -424,6 +430,11 @@
           openBtn.onclick = () =>
             window.open(`/api/links/go/${link.id}`, "_blank");
 
+          const editBtn = document.createElement("button");
+          editBtn.className = "secondary";
+          editBtn.textContent = "Edit";
+          editBtn.onclick = () => editLink(link);
+
           const delBtn = document.createElement("button");
           delBtn.className = "danger";
           delBtn.textContent = "Delete";
@@ -432,6 +443,7 @@
           tdActions.appendChild(copyAffBtn);
           tdActions.appendChild(shortBtn);
           tdActions.appendChild(openBtn);
+          tdActions.appendChild(editBtn);
           tdActions.appendChild(delBtn);
 
           tr.appendChild(tdActions);
@@ -468,7 +480,7 @@
 
           urlEl.value = "";
           titleEl.value = "";
-          // Do NOT clear category/note; they may be re-used for bulk
+          // keep category/note so they can be used for bulk
           setStatus("Link created.", "ok");
           await loadLinks();
         } catch (err) {
@@ -534,6 +546,54 @@
           setStatus(err.message, "error");
         } finally {
           bulkBtn.disabled = false;
+        }
+      }
+
+      async function editLink(link) {
+        try {
+          const newTitle = prompt(
+            "Edit title:",
+            link.title || ""
+          );
+          if (newTitle === null) return; // cancel
+
+          const newCategory = prompt(
+            "Edit category (e.g., shoes, bags, clothing):",
+            link.category || ""
+          );
+          if (newCategory === null) return;
+
+          const newNote = prompt(
+            "Edit note (optional, e.g., Instagram reel, group A):",
+            link.note || ""
+          );
+          if (newNote === null) return;
+
+          setStatus("Updating link...", "");
+
+          const res = await fetch(
+            `/api/links/update/${encodeURIComponent(link.id)}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: newTitle,
+                category: newCategory,
+                note: newNote,
+              }),
+            }
+          );
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Failed to update link.");
+          }
+
+          setStatus("Link updated.", "ok");
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
         }
       }
 
