@@ -186,6 +186,46 @@
         font-size: 10px;
         color: #4b5563;
       }
+
+      /* Analytics box */
+
+      .analytics-card {
+        margin-top: 24px;
+        margin-bottom: 8px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid #111827;
+        background: #020617;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+      }
+
+      .analytics-block-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .analytics-metric {
+        font-size: 13px;
+      }
+
+      .analytics-metric span.value {
+        font-weight: 600;
+      }
+
+      .top-list {
+        list-style: none;
+        padding-left: 0;
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+
+      .top-list li {
+        margin-bottom: 2px;
+      }
     </style>
   </head>
 
@@ -266,7 +306,27 @@
         <button id="bulk-btn" class="secondary">Create multiple links</button>
       </div>
 
-      <h2 style="font-size: 18px; margin-top: 28px">Saved links</h2>
+      <!-- Analytics panel -->
+      <h2 style="font-size: 18px; margin-top: 28px">Analytics (overview)</h2>
+      <div class="analytics-card">
+        <div>
+          <div class="analytics-block-title">Summary</div>
+          <div class="analytics-metric">
+            Links: <span id="metric-links" class="value">0</span>
+          </div>
+          <div class="analytics-metric">
+            Total clicks: <span id="metric-clicks" class="value">0</span>
+          </div>
+        </div>
+        <div>
+          <div class="analytics-block-title">Top products by clicks</div>
+          <ul id="metric-top-list" class="top-list">
+            <!-- filled by JS -->
+          </ul>
+        </div>
+      </div>
+
+      <h2 style="font-size: 18px; margin-top: 20px">Saved links</h2>
 
       <table>
         <thead>
@@ -301,6 +361,14 @@
       const bulkInputEl = document.getElementById("bulk-input");
       const bulkBtn = document.getElementById("bulk-btn");
 
+      // analytics elements
+      const metricLinksEl = document.getElementById("metric-links");
+      const metricClicksEl = document.getElementById("metric-clicks");
+      const metricTopListEl = document.getElementById("metric-top-list");
+
+      // keep last loaded links
+      let currentLinks = [];
+
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
         statusEl.className = "";
@@ -316,13 +384,53 @@
             throw new Error(data.message || "Failed to load links.");
           }
           const links = data.links || [];
+          currentLinks = links;
           renderLinks(links);
+          updateAnalytics(links);
           setStatus(`Loaded ${links.length} link(s).`, "ok");
         } catch (err) {
           console.error(err);
           setStatus("Failed to load links.", "error");
+          currentLinks = [];
           renderLinks([]);
+          updateAnalytics([]);
         }
+      }
+
+      function updateAnalytics(links) {
+        const totalLinks = links.length;
+        const totalClicks = links.reduce(
+          (sum, l) => sum + (l.clicks || 0),
+          0
+        );
+
+        metricLinksEl.textContent = totalLinks;
+        metricClicksEl.textContent = totalClicks;
+
+        metricTopListEl.innerHTML = "";
+
+        if (!links.length) {
+          const li = document.createElement("li");
+          li.textContent = "No data yet. Create some links above.";
+          metricTopListEl.appendChild(li);
+          return;
+        }
+
+        const sorted = [...links].sort(
+          (a, b) => (b.clicks || 0) - (a.clicks || 0)
+        );
+        const top3 = sorted.slice(0, 3);
+
+        top3.forEach((link, index) => {
+          const li = document.createElement("li");
+          const clicks = link.clicks || 0;
+          const rank = index + 1;
+          const title = link.title || "Untitled product";
+          li.textContent = `${rank}. ${title} — ${clicks} click${
+            clicks === 1 ? "" : "s"
+          }`;
+          metricTopListEl.appendChild(li);
+        });
       }
 
       function renderLinks(links) {
