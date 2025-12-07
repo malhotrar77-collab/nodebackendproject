@@ -211,12 +211,6 @@
         letter-spacing: 0.06em;
       }
 
-      .badge.price-drop {
-        background: #022c22;
-        border-color: #16a34a;
-        color: #bbf7d0;
-      }
-
       .img-wrap {
         border-radius: 10px;
         border: 1px solid #111827;
@@ -248,23 +242,18 @@
         overflow: hidden;
       }
 
-      .card-price-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 13px;
-      }
-
-      .card-price {
-        font-weight: 600;
-      }
-
       .card-desc {
         font-size: 12px;
         color: #9ca3af;
         line-height: 1.35;
         max-height: 5.4em;
         overflow: hidden;
+      }
+
+      .card-price {
+        font-size: 13px;
+        font-weight: 600;
+        color: #f97316;
       }
 
       .card-meta {
@@ -375,9 +364,7 @@
       </div>
 
       <div class="controls-row">
-        <div class="pill-row" id="category-pills">
-          <!-- pills rendered by JS -->
-        </div>
+        <div class="pill-row" id="category-pills"></div>
 
         <div class="search-sort">
           <input
@@ -417,8 +404,6 @@
         statusEl.className = "";
         if (type) statusEl.classList.add(type);
       }
-
-      // ---- Category helpers ----
 
       const CATEGORY_FILTERS = [
         { key: "all", label: "All" },
@@ -461,7 +446,8 @@
         )
           return "clothing";
 
-        if (c === "bags" || c === "wallets" || c.includes("bag")) return "bags";
+        if (c === "bags" || c === "wallets" || c.includes("bag"))
+          return "bags";
 
         if (c === "beauty" || c.includes("cream") || c.includes("serum"))
           return "beauty";
@@ -485,7 +471,8 @@
         )
           return "electronics";
 
-        if (c === "home" || c === "kitchen" || c.includes("sofa")) return "home";
+        if (c === "home" || c === "kitchen" || c.includes("sofa"))
+          return "home";
 
         if (!c) return "other";
 
@@ -498,7 +485,16 @@
         return found ? found.label : "Other";
       }
 
-      // ---- Smart Description V2 ----
+      function formatPrice(price) {
+        if (price === null || price === undefined) return "";
+        if (typeof price === "number") {
+          return "₹" + price.toLocaleString("en-IN");
+        }
+        const s = String(price).trim();
+        if (!s) return "";
+        if (s.startsWith("₹")) return s;
+        return "₹" + s;
+      }
 
       function buildSmartDescription(link) {
         const title = (link.title || "This product").trim();
@@ -550,8 +546,6 @@
         }
       }
 
-      // ---- State ----
-
       let allLinks = [];
       let currentCategory = "all";
       let currentSearch = "";
@@ -577,17 +571,12 @@
       function applyFiltersAndRender() {
         let links = [...allLinks];
 
-        // hide inactive links from store
-        links = links.filter((l) => l.isActive !== false);
-
-        // category
         if (currentCategory !== "all") {
           links = links.filter(
             (l) => mapToFilterKey(l.category) === currentCategory
           );
         }
 
-        // search
         const q = currentSearch.trim().toLowerCase();
         if (q) {
           links = links.filter((l) => {
@@ -597,7 +586,6 @@
           });
         }
 
-        // sort
         if (currentSort === "newest") {
           links.sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -638,15 +626,6 @@
           setStatus("Could not load products.", "error");
           renderGrid([]);
         }
-      }
-
-      function formatPrice(link) {
-        if (link.price == null) return "";
-        const currency =
-          link.priceCurrency || (link.originalUrl || "").includes("amazon.in")
-            ? "₹"
-            : "₹";
-        return currency + " " + link.price.toLocaleString("en-IN");
       }
 
       function renderGrid(links) {
@@ -696,29 +675,17 @@
           titleDiv.className = "card-title";
           titleDiv.textContent = link.title || "Product";
 
-          const priceRow = document.createElement("div");
-          priceRow.className = "card-price-row";
-
-          const priceSpan = document.createElement("span");
-          priceSpan.className = "card-price";
-          priceSpan.textContent = formatPrice(link);
-
-          const priceDrop = document.createElement("span");
-          if (
-            link.prevPrice != null &&
-            link.price != null &&
-            link.price < link.prevPrice
-          ) {
-            priceDrop.className = "badge price-drop";
-            priceDrop.textContent = "Price dropped";
-          }
-
-          priceRow.appendChild(priceSpan);
-          if (priceDrop.textContent) priceRow.appendChild(priceDrop);
-
           const descDiv = document.createElement("div");
           descDiv.className = "card-desc";
           descDiv.textContent = buildSmartDescription(link);
+
+          const priceText = formatPrice(link.price);
+          let priceDiv = null;
+          if (priceText) {
+            priceDiv = document.createElement("div");
+            priceDiv.className = "card-price";
+            priceDiv.textContent = priceText;
+          }
 
           const meta = document.createElement("div");
           meta.className = "card-meta";
@@ -763,8 +730,8 @@
           card.appendChild(header);
           card.appendChild(imgWrap);
           card.appendChild(titleDiv);
-          if (priceSpan.textContent) card.appendChild(priceRow);
           card.appendChild(descDiv);
+          if (priceDiv) card.appendChild(priceDiv);
           card.appendChild(meta);
           card.appendChild(actions);
 
@@ -784,8 +751,6 @@
           setStatus("Could not copy link.", "error");
         }
       }
-
-      // ---- Events ----
 
       searchInput.addEventListener("input", (e) => {
         currentSearch = e.target.value || "";
