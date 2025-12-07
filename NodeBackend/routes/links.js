@@ -100,7 +100,9 @@ async function scrapeAmazonMeta(productUrl) {
 
     // Image: grab first m.media-amazon.com jpg
     let imageUrl = null;
-    const imgMatch = html.match(/https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/);
+    const imgMatch = html.match(
+      /https:\/\/m\.media-amazon\.com\/images\/[^"]+\.jpg/
+    );
     if (imgMatch && imgMatch[0]) {
       imageUrl = imgMatch[0];
     }
@@ -120,40 +122,107 @@ function boolFromQueryOrBody(v) {
   return s === "1" || s === "true" || s === "yes" || s === "on";
 }
 
-// ---------- AUTO-CATEGORY v2 ----------
+// ---------- AUTO-CATEGORY v3 ----------
 
 function inferCategoryFromTitle(title) {
   if (!title) return null;
   const t = title.toLowerCase();
 
-  // More specific first
-  if (t.includes("sneaker") || t.includes("running shoe") || t.includes("sports shoe"))
+  // ---- brand-based hints (do these early) ----
+  const shoeBrands = [
+    "skechers",
+    "nike",
+    "adidas",
+    "puma",
+    "reebok",
+    "asics",
+    "new balance",
+    "bata",
+    "sparx",
+    "campus",
+  ];
+  if (shoeBrands.some((b) => t.includes(b))) return "shoes";
+
+  const beautyBrands = [
+    "l'oreal",
+    "loreal",
+    "nivea",
+    "dove",
+    "ponds",
+    "pond's",
+    "mamaearth",
+    "wow skin",
+    "wow skin science",
+    "himalaya",
+    "nykaa",
+    "lakme",
+    "minimalist",
+    "dermatica",
+    "mcaffeine",
+    "biotique",
+  ];
+  if (beautyBrands.some((b) => t.includes(b))) return "beauty";
+
+  // ---- footwear & fashion ----
+  if (
+    t.includes("sneaker") ||
+    t.includes("running shoe") ||
+    t.includes("sports shoe") ||
+    t.includes("walking shoe") ||
+    t.includes("go walk")
+  )
     return "shoes";
-  if (t.includes("loafer") || t.includes("sandal") || t.includes("flip flop"))
+
+  if (
+    t.includes("loafer") ||
+    t.includes("sandal") ||
+    t.includes("flip flop") ||
+    t.includes("slipper")
+  )
     return "footwear";
-  if (t.includes("tote bag") || t.includes("handbag") || t.includes("backpack"))
+
+  if (
+    t.includes("tote bag") ||
+    t.includes("handbag") ||
+    t.includes("backpack") ||
+    t.includes("duffle bag") ||
+    t.includes("laptop bag")
+  )
     return "bags";
-  if (t.includes("wallet")) return "wallets";
+
+  if (t.includes("wallet") || t.includes("card holder")) return "wallets";
 
   if (t.includes("t-shirt") || t.includes("t shirt") || t.includes("tee"))
     return "tshirts";
+
   if (t.includes("jeans") || t.includes("denim")) return "jeans";
+
   if (t.includes("hoodie") || t.includes("sweatshirt")) return "hoodies";
+
   if (
     t.includes("shirt") ||
     t.includes("kurta") ||
     t.includes("trouser") ||
     t.includes("pants") ||
     t.includes("shorts") ||
-    t.includes("jogger")
+    t.includes("jogger") ||
+    t.includes("track pant") ||
+    t.includes("chinos")
   )
     return "clothing";
 
-  if (t.includes("watch") && !t.includes("smartwatch") && !t.includes("smart watch"))
+  // ---- watches / wearables ----
+  if (
+    t.includes("watch") &&
+    !t.includes("smartwatch") &&
+    !t.includes("smart watch")
+  )
     return "watches";
 
-  if (t.includes("smartwatch") || t.includes("smart watch")) return "smartwatches";
+  if (t.includes("smartwatch") || t.includes("smart watch"))
+    return "smartwatches";
 
+  // ---- electronics ----
   if (
     t.includes("phone") ||
     t.includes("iphone") ||
@@ -168,29 +237,70 @@ function inferCategoryFromTitle(title) {
     t.includes("headphone") ||
     t.includes("earbud") ||
     t.includes("ear buds") ||
-    t.includes("earphone")
+    t.includes("earphone") ||
+    t.includes("ear phones") ||
+    t.includes("neckband")
   )
     return "audio";
 
+  // ---- kitchen / home ----
   if (
     t.includes("mixer") ||
     t.includes("blender") ||
+    t.includes("juicer") ||
     t.includes("cooker") ||
+    t.includes("air fryer") ||
     t.includes("fryer") ||
-    t.includes("microwave")
+    t.includes("microwave") ||
+    t.includes("toaster") ||
+    t.includes("kettle")
   )
     return "kitchen";
 
   if (
     t.includes("sofa") ||
-    t.includes("bed sheet") ||
     t.includes("bedsheet") ||
+    t.includes("bed sheet") ||
     t.includes("pillow") ||
-    t.includes("cushion")
+    t.includes("cushion") ||
+    t.includes("curtain") ||
+    t.includes("carpet") ||
+    t.includes("doormat")
   )
     return "home";
 
-  if (t.includes("cream") || t.includes("serum") || t.includes("shampoo"))
+  // ---- beauty / personal care ----
+  if (
+    t.includes("body wash") ||
+    t.includes("face wash") ||
+    t.includes("shower gel") ||
+    t.includes("body lotion") ||
+    t.includes("deodorant") ||
+    t.includes("deo") ||
+    t.includes("roll on") ||
+    t.includes("body spray")
+  )
+    return "personalcare";
+
+  if (
+    t.includes("cream") ||
+    t.includes("serum") ||
+    t.includes("moisturizer") ||
+    t.includes("moisturiser") ||
+    t.includes("sunscreen") ||
+    t.includes("toner") ||
+    t.includes("face mask") ||
+    t.includes("sheet mask")
+  )
+    return "beauty";
+
+  if (
+    t.includes("shampoo") ||
+    t.includes("conditioner") ||
+    t.includes("hair oil") ||
+    t.includes("hair serum") ||
+    t.includes("hair spray")
+  )
     return "beauty";
 
   // fallback
@@ -254,7 +364,8 @@ router.post("/create", async (req, res) => {
     if (!isAmazon) {
       return res.status(400).json({
         success: false,
-        message: "Right now only Amazon product URLs (including amzn.to) are supported.",
+        message:
+          "Right now only Amazon product URLs (including amzn.to) are supported.",
       });
     }
 
@@ -284,7 +395,7 @@ router.post("/create", async (req, res) => {
       finalTitle = scrapedTitle;
     }
 
-    // Auto-category v2
+    // Auto-category v3
     let finalCategory = manualCategory || null;
     if (!finalCategory) {
       finalCategory = inferCategoryFromTitle(finalTitle || scrapedTitle);
