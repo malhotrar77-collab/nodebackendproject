@@ -1,7 +1,7 @@
 {
   "name": "nodebackendproject",
   "version": "1.0.0",
-  "description": "Affiliate links backend (Amazon short links, tracking, AlwaysOnSale)",
+  "description": "Affiliate links backend (Amazon scraping + redirects)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,6 +11,7 @@
     "cors": "^2.8.5",
     "express": "^4.19.0",
     "mongoose": "^8.6.0",
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0-rc.12",
+    "cheerio-httpcli": "^0.8.0"
   }
 }
