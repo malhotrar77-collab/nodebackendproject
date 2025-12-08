@@ -1,888 +1,956 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>AlwaysOnSale – Deals</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+<head>
+  <meta charset="UTF-8" />
+  <title>AlwaysOnSale — Deals</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
 
-    <style>
-      :root {
-        color-scheme: dark;
-      }
+  <!-- Google Font (similar to Instagram feel) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      * {
-        box-sizing: border-box;
-      }
+  <style>
+    :root {
+      --bg: #050816;
+      --bg-elevated: #070b1a;
+      --bg-card: #0b1021;
+      --bg-chip: #111629;
+      --bg-chip-active: #f4755e;
+      --border-subtle: rgba(255, 255, 255, 0.04);
+      --accent: #f4755e;
+      --accent-soft: rgba(244, 117, 94, 0.18);
+      --accent-strong: #ff5b3e;
+      --text-main: #f9fbff;
+      --text-muted: #9da8c2;
+      --text-soft: #6b748b;
+      --text-bad: #ff7b7b;
+      --pill-bg: #10182a;
+      --badge-amazon: #222f3e;
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --shadow-soft: 0 18px 50px rgba(0, 0, 0, 0.7);
+      --shadow-subtle: 0 0 0 1px rgba(255, 255, 255, 0.02);
+      --transition-fast: 0.18s ease-out;
+    }
 
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
-        background: radial-gradient(circle at top, #020617 0, #020617 40%, #000 100%);
-        color: #e5e7eb;
-      }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-      header {
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        backdrop-filter: blur(18px);
-        background: rgba(3, 6, 23, 0.94);
-        border-bottom: 1px solid #111827;
-      }
+    body {
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      background: radial-gradient(circle at top, #141c3b 0, #050816 48%, #02030a 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
 
-      .nav-inner {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 10px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-      }
+    .page {
+      width: 100%;
+      max-width: 1280px;
+      padding: 16px 16px 40px;
+    }
 
-      .logo {
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        font-size: 18px;
-      }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 18px;
+    }
 
-      .logo span {
-        color: #f97316;
-      }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      font-size: 14px;
+    }
 
-      .nav-links {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        font-size: 13px;
-      }
+    .brand-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #ffd2aa, #ff5b3e 55%, #a51454);
+      box-shadow: 0 0 18px rgba(255, 130, 90, 0.75);
+    }
 
-      .nav-links a {
-        color: #9ca3af;
-        text-decoration: none;
-      }
+    .nav-links {
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text-soft);
+      align-items: center;
+    }
 
-      .nav-links a:hover {
-        color: #e5e7eb;
-      }
+    .nav-links a {
+      text-decoration: none;
+      color: inherit;
+      padding: 4px 9px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      transition: background var(--transition-fast), color var(--transition-fast),
+        border-color var(--transition-fast), transform var(--transition-fast);
+    }
 
+    .nav-links a:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      transform: translateY(-1px);
+    }
+
+    .nav-links a.active {
+      background: rgba(244, 117, 94, 0.15);
+      border-color: var(--accent-soft);
+      color: #ffeae3;
+    }
+
+    main {
+      background: linear-gradient(145deg, rgba(9, 15, 35, 0.98), rgba(5, 11, 26, 0.98));
+      border-radius: 32px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 22px 20px 26px;
+    }
+
+    @media (max-width: 720px) {
       main {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 20px 16px 40px;
+        padding: 18px 14px 22px;
+        border-radius: 24px;
+      }
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .hero-title-block h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .hero-title-block p {
+      font-size: 13px;
+      color: var(--text-soft);
+      margin-top: 2px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(86, 201, 137, 0.5);
+      background: radial-gradient(circle at 0 50%, rgba(34, 197, 94, 0.25), #071214);
+      color: #b9ffd6;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 600;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .status-and-count {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    #statusMessage {
+      color: var(--text-soft);
+    }
+
+    #statusMessage.error {
+      color: var(--text-bad);
+    }
+
+    #dealCount {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(8, 14, 33, 0.95);
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .category-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: var(--bg-chip);
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast),
+        border-color var(--transition-fast), transform var(--transition-fast),
+        box-shadow var(--transition-fast);
+    }
+
+    .chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .chip.active {
+      background: var(--bg-chip-active);
+      border-color: transparent;
+      cursor: default;
+      color: #fffaf7;
+      box-shadow: 0 10px 24px rgba(244, 117, 94, 0.55);
+    }
+
+    .chip.active .chip-dot {
+      background: #fff5eb;
+    }
+
+    .chip:hover:not(.active) {
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .search-sort-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 180px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 10px 14px 10px 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(9, 14, 32, 0.96);
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition-fast),
+        box-shadow var(--transition-fast), background var(--transition-fast);
+    }
+
+    .search-box input::placeholder {
+      color: var(--text-soft);
+    }
+
+    .search-box input:focus {
+      border-color: rgba(244, 117, 94, 0.6);
+      box-shadow: 0 0 0 1px rgba(244, 117, 94, 0.48);
+      background: rgba(10, 17, 40, 0.96);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      color: var(--text-soft);
+      pointer-events: none;
+    }
+
+    .sort-box {
+      flex-shrink: 0;
+      min-width: 160px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .sort-box label {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .sort-box select {
+      border-radius: 999px;
+      padding: 8px 11px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(9, 14, 32, 0.96);
+      color: var(--text-main);
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    @media (max-width: 720px) {
+      .hero-title-block h1 {
+        font-size: 20px;
       }
 
-      .headline {
-        display: flex;
+      .search-sort-row {
         flex-direction: column;
-        gap: 8px;
-        margin-bottom: 8px;
+        align-items: stretch;
       }
 
-      .headline-top {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        flex-wrap: wrap;
+      .sort-box {
+        justify-content: flex-start;
       }
+    }
 
-      .headline h1 {
-        font-size: 24px;
-        margin: 0;
-      }
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 10px;
+    }
 
-      .headline p {
-        margin: 0;
-        font-size: 13px;
-        color: #9ca3af;
+    @media (max-width: 1100px) {
+      .products-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
+    }
 
-      .live-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        padding: 4px 10px;
-        font-size: 11px;
-        background: radial-gradient(circle at left, #22c55e33, #020617);
+    @media (max-width: 820px) {
+      .products-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+    }
 
-      .live-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: #22c55e;
-        box-shadow: 0 0 0 4px #22c55e33;
+    @media (max-width: 540px) {
+      .products-grid {
+        grid-template-columns: minmax(0, 1fr);
       }
+    }
 
-      .controls-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-        justify-content: space-between;
-        margin: 14px 0 10px;
-      }
+    .product-card {
+      background: radial-gradient(circle at top left, rgba(244, 117, 94, 0.13), transparent 40%),
+        radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.08), transparent 48%),
+        var(--bg-card);
+      border-radius: var(--radius-xl);
+      padding: 10px 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: var(--shadow-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+        border-color var(--transition-fast), background var(--transition-fast);
+    }
 
-      .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
+    .product-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 22px 40px rgba(0, 0, 0, 0.9);
+      border-color: rgba(244, 117, 94, 0.4);
+    }
 
-      .pill {
-        font-size: 11px;
-        padding: 4px 11px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #9ca3af;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
+    .product-badges {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: center;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+    }
 
-      .pill-dot {
-        width: 5px;
-        height: 5px;
-        border-radius: 999px;
-        background: #4b5563;
-      }
+    .source-pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--badge-amazon);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-weight: 600;
+      color: #f3f5ff;
+    }
 
-      .pill.active {
-        background: radial-gradient(circle at top left, #f97316, #be123c);
-        color: #020617;
-        border-color: transparent;
-      }
+    .category-pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-weight: 500;
+      color: var(--text-muted);
+    }
 
-      .pill.active .pill-dot {
-        background: #020617;
-      }
+    .product-media {
+      border-radius: 22px;
+      background: radial-gradient(circle at top, #1e263f, #090f24 60%);
+      overflow: hidden;
+      margin-top: 4px;
+      min-height: 190px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-      .search-sort {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
+    .product-media img {
+      width: 100%;
+      height: 230px;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.25s ease-out;
+    }
 
-      .search-input-wrap {
-        position: relative;
-        flex: 1;
-        min-width: 170px;
-      }
+    .product-card:hover .product-media img {
+      transform: scale(1.035);
+    }
 
-      .search-input {
-        width: 100%;
-        padding: 7px 32px 7px 11px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #e5e7eb;
-        font-size: 13px;
-        outline: none;
-      }
+    .image-placeholder {
+      width: 100%;
+      height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--text-soft);
+      background: repeating-linear-gradient(
+        135deg,
+        #0b1020,
+        #0b1020 6px,
+        #0f1630 6px,
+        #0f1630 12px
+      );
+    }
 
-      .search-input:focus {
-        border-color: #f97316;
-        box-shadow: 0 0 0 1px #f97316;
-      }
+    .product-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
 
-      .search-icon {
-        position: absolute;
-        right: 9px;
-        top: 50%;
-        transform: translateY(-50%);
-        font-size: 12px;
-        color: #6b7280;
-      }
+    .product-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
 
-      .sort-select {
-        padding: 7px 10px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #e5e7eb;
-        font-size: 13px;
-      }
+    .product-description {
+      font-size: 11px;
+      color: var(--text-soft);
+      line-height: 1.45;
+      max-height: 3.8em;
+      overflow: hidden;
+    }
 
-      #status {
-        font-size: 13px;
-        margin: 4px 0 10px;
-        min-height: 16px;
-      }
+    .product-meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
 
-      #status.ok {
-        color: #4ade80;
-      }
+    .price-label {
+      font-weight: 600;
+      color: #ffe1cf;
+      font-size: 12px;
+    }
 
-      #status.error {
-        color: #f97373;
-      }
+    .price-note {
+      font-size: 10px;
+      color: var(--text-soft);
+    }
 
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-        gap: 16px;
-      }
+    .clicks-pill {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 10px;
+    }
 
-      .card {
-        border-radius: 18px;
-        background: radial-gradient(circle at top left, #020617, #020617 55%, #000 100%);
-        border: 1px solid #111827;
-        padding: 11px 11px 13px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        box-shadow: 0 16px 35px rgba(0, 0, 0, 0.85);
-      }
+    .clicks-pill strong {
+      color: #e0ecff;
+      font-weight: 600;
+    }
 
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 6px;
-      }
+    .product-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
 
-      .source-pill {
-        font-size: 11px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: #111827;
-        color: #9ca3af;
-      }
+    .cta-primary {
+      flex: 1;
+      border-radius: 999px;
+      padding: 9px 12px;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #fff;
+      transition: transform var(--transition-fast),
+        box-shadow var(--transition-fast), filter var(--transition-fast);
+      box-shadow: 0 14px 26px rgba(244, 117, 94, 0.7);
+    }
 
-      .badge {
-        font-size: 10px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid #1f2937;
-        color: #e5e7eb;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
+    .cta-primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+      box-shadow: 0 16px 30px rgba(244, 117, 94, 0.85);
+    }
 
-      .img-wrap {
-        border-radius: 14px;
-        border: 1px solid #111827;
-        background: #020617;
-        overflow: hidden;
-        aspect-ratio: 4 / 5;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+    .cta-secondary {
+      flex-shrink: 0;
+      border-radius: 999px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(5, 10, 22, 0.9);
+      color: var(--text-main);
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color var(--transition-fast),
+        background var(--transition-fast), transform var(--transition-fast);
+    }
 
-      .img-wrap img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-      }
+    .cta-secondary:hover {
+      border-color: rgba(255, 255, 255, 0.28);
+      background: rgba(9, 16, 32, 0.96);
+      transform: translateY(-1px);
+    }
 
-      .img-placeholder {
-        font-size: 11px;
-        color: #4b5563;
-      }
+    footer {
+      margin-top: 10px;
+      padding: 0 4px;
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
 
-      .card-title {
-        font-size: 14px;
-        font-weight: 600;
-        line-height: 1.35;
-        max-height: 3.8em;
-        overflow: hidden;
-      }
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
 
-      .card-desc {
-        font-size: 12px;
-        color: #9ca3af;
-        line-height: 1.35;
-        max-height: 5.4em;
-        overflow: hidden;
-      }
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
 
-      .price-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 8px;
-        font-size: 11px;
-        margin-top: 2px;
-      }
-
-      .price-main {
-        font-weight: 600;
-        color: #f97316;
-      }
-
-      .price-note {
-        color: #6b7280;
-        text-align: right;
-      }
-
-      .card-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-        font-size: 11px;
-        color: #6b7280;
-      }
-
-      .clicks-pill {
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: #111827;
-      }
-
-      .actions {
-        margin-top: 4px;
-        display: flex;
-        gap: 8px;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      button.buy-btn {
-        flex: 1;
-        padding: 8px 10px;
-        border-radius: 999px;
-        border: none;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 600;
-        background: radial-gradient(circle at top left, #f97316, #e11d48);
-        color: #020617;
-      }
-
-      button.buy-btn:hover {
-        filter: brightness(1.07);
-      }
-
-      button.copy-btn {
-        padding: 6px 8px;
-        border-radius: 999px;
-        border: 1px solid #4b5563;
-        background: #020617;
-        color: #e5e7eb;
-        font-size: 11px;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      button.copy-btn:hover {
-        background: #111827;
-      }
-
-      .empty-state {
-        text-align: center;
-        margin-top: 40px;
-        font-size: 14px;
-        color: #9ca3af;
-      }
-
-      .empty-state a {
-        color: #f97316;
-        text-decoration: none;
-      }
-
-      @media (max-width: 640px) {
-        .nav-inner {
-          padding-inline: 12px;
-        }
-        main {
-          padding-inline: 12px;
-        }
-        .controls-row {
-          flex-direction: column;
-          align-items: stretch;
-        }
-        .search-sort {
-          width: 100%;
-          flex-direction: column;
-          align-items: stretch;
-        }
-        .search-input-wrap {
-          width: 100%;
-        }
-        .sort-select {
-          width: 100%;
-        }
-      }
-    </style>
-  </head>
-  <body>
+<body>
+  <div class="page">
     <header>
-      <div class="nav-inner">
-        <div class="logo"><span>ALWAYS</span>ONSALE</div>
-        <div class="nav-links">
-          <a href="/store.html">Store</a>
-          <span>·</span>
-          <a href="/">Dashboard (admin)</a>
-        </div>
+      <div class="brand">
+        <div class="brand-dot"></div>
+        ALWAYS<span style="color:#f4755e;">ON</span>SALE
       </div>
+      <nav class="nav-links">
+        <a href="/AlwaysOnSale" class="active">Store</a>
+        <a href="/" title="Admin dashboard">Dashboard (admin)</a>
+      </nav>
     </header>
 
     <main>
-      <section class="headline">
-        <div class="headline-top">
-          <div>
+      <section class="hero">
+        <div class="hero-top">
+          <div class="hero-title-block">
             <h1>Today’s hand-picked deals</h1>
             <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
           </div>
-          <div class="live-pill">
+          <span class="live-badge">
             <span class="live-dot"></span>
-            <span>Live from AlwaysOnSale</span>
+            Live from AlwaysOnSale
+          </span>
+        </div>
+        <div class="meta-row">
+          <div class="status-and-count">
+            <span id="statusMessage">Loading deals…</span>
+            <span id="dealCount"></span>
           </div>
         </div>
       </section>
 
-      <div class="controls-row">
-        <div class="pill-row" id="category-pills"></div>
-
-        <div class="search-sort">
-          <div class="search-input-wrap">
-            <input
-              id="search-input"
-              class="search-input"
-              type="text"
-              placeholder="Search products or category..."
-            />
-            <span class="search-icon">🔍</span>
-          </div>
-          <select id="sort-select" class="sort-select">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="clicks">Most clicks</option>
-          </select>
+      <section class="controls">
+        <div class="category-chips" id="categoryChips">
+          <button class="chip active" data-category="all">
+            <span class="chip-dot"></span> All
+          </button>
+          <button class="chip" data-category="shoes">
+            <span class="chip-dot"></span> Shoes & Sneakers
+          </button>
+          <button class="chip" data-category="clothing">
+            <span class="chip-dot"></span> Clothing
+          </button>
+          <button class="chip" data-category="bags">
+            <span class="chip-dot"></span> Bags & Backpacks
+          </button>
+          <button class="chip" data-category="beauty">
+            <span class="chip-dot"></span> Beauty & Hair
+          </button>
+          <button class="chip" data-category="personal care">
+            <span class="chip-dot"></span> Personal Care
+          </button>
+          <button class="chip" data-category="electronics">
+            <span class="chip-dot"></span> Electronics (Mobiles, Laptops, Audio)
+          </button>
+          <button class="chip" data-category="home">
+            <span class="chip-dot"></span> Home & Living
+          </button>
+          <button class="chip" data-category="other">
+            <span class="chip-dot"></span> Other
+          </button>
         </div>
-      </div>
 
-      <div id="status"></div>
+        <div class="search-sort-row">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Search products or category…" />
+          </div>
 
-      <div id="grid" class="grid"></div>
+          <div class="sort-box">
+            <label for="sortSelect">Sort</label>
+            <select id="sortSelect">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="priceLowHigh">Price: Low to High</option>
+              <option value="priceHighLow">Price: High to Low</option>
+              <option value="clicksHighLow">Most clicked</option>
+            </select>
+          </div>
+        </div>
+      </section>
 
-      <div id="empty" class="empty-state" style="display: none">
-        No products yet. Add links from the
-        <a href="/">Affiliate Links Dashboard</a>.
-      </div>
+      <section id="productsGrid" class="products-grid"></section>
     </main>
 
-    <script>
-      const statusEl = document.getElementById("status");
-      const gridEl = document.getElementById("grid");
-      const emptyEl = document.getElementById("empty");
-      const pillsContainer = document.getElementById("category-pills");
-      const searchInput = document.getElementById("search-input");
-      const sortSelect = document.getElementById("sort-select");
+    <footer>
+      <span>Tracked links powered by AlwaysOnSale.</span>
+      <span>Prices & availability may change on Amazon.</span>
+    </footer>
+  </div>
 
-      function setStatus(msg, type = "") {
-        statusEl.textContent = msg || "";
-        statusEl.className = "";
-        if (type) statusEl.classList.add(type);
-      }
+  <script>
+    let allLinks = [];
+    const statusEl = document.getElementById("statusMessage");
+    const countEl = document.getElementById("dealCount");
+    const gridEl = document.getElementById("productsGrid");
+    const searchInput = document.getElementById("searchInput");
+    const sortSelect = document.getElementById("sortSelect");
 
-      // ---------- CATEGORY HELPERS ----------
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
-      const CATEGORY_FILTERS = [
-        { key: "all", label: "All" },
-        { key: "shoes", label: "Shoes & Sneakers" },
-        { key: "clothing", label: "Clothing" },
-        { key: "bags", label: "Bags & Backpacks" },
-        { key: "beauty", label: "Beauty & Hair" },
-        { key: "personal", label: "Personal Care" },
-        { key: "electronics", label: "Electronics (Mobiles, Laptops, Audio)" },
-        { key: "home", label: "Home & Living" },
-        { key: "other", label: "Other" },
-      ];
-
-      function normalizeCategory(raw) {
-        if (!raw) return "";
-        return String(raw).trim().toLowerCase();
-      }
-
-      function mapToFilterKey(raw) {
-        const c = normalizeCategory(raw);
-
-        if (
-          c === "shoes" ||
-          c === "sneakers" ||
-          c === "footwear" ||
-          c.includes("shoe")
-        ) {
-          return "shoes";
+    async function loadProducts() {
+      try {
+        statusEl.textContent = "Loading deals…";
+        statusEl.classList.remove("error");
+        const res = await fetch("/api/links/all");
+        if (!res.ok) {
+          throw new Error("Failed to load products");
         }
+        const data = await res.json();
+        allLinks = Array.isArray(data) ? data : data.links || [];
 
-        if (
-          c === "tshirts" ||
-          c === "t-shirts" ||
-          c === "jeans" ||
-          c === "hoodies" ||
-          c === "clothing" ||
-          c.includes("shirt") ||
-          c.includes("kurta") ||
-          c.includes("trouser") ||
-          c.includes("pant") ||
-          c.includes("jogger")
-        ) {
-          return "clothing";
-        }
-
-        if (c === "bags" || c === "wallets" || c.includes("bag")) {
-          return "bags";
-        }
-
-        if (c === "beauty" || c.includes("cream") || c.includes("serum")) {
-          return "beauty";
-        }
-
-        if (
-          c === "personalcare" ||
-          c === "grooming" ||
-          c.includes("wash") ||
-          c.includes("soap") ||
-          c.includes("body wash")
-        ) {
-          return "personal";
-        }
-
-        if (
-          c === "mobiles" ||
-          c === "laptops" ||
-          c === "audio" ||
-          c === "electronics" ||
-          c.includes("headphone") ||
-          c.includes("earbud") ||
-          c.includes("soundbar")
-        ) {
-          return "electronics";
-        }
-
-        if (c === "home" || c === "kitchen" || c.includes("sofa")) {
-          return "home";
-        }
-
-        if (!c) return "other";
-
-        return "other";
-      }
-
-      function categoryLabelFromRaw(raw) {
-        const key = mapToFilterKey(raw);
-        const found = CATEGORY_FILTERS.find((item) => item.key === key);
-        return found ? found.label : "Other";
-      }
-
-      // ---------- SMART DESCRIPTION ----------
-
-      function buildSmartDescription(link) {
-        const title = (link.title || "This product").trim();
-        const key = mapToFilterKey(link.category);
-        const cleanName = title.split("|")[0].split("–")[0].split("-")[0].trim();
-        const baseName = cleanName || title;
-
-        switch (key) {
-          case "shoes":
-            return (
-              baseName +
-              " designed for comfortable daily wear. A reliable pick for walks, travel or casual outings."
-            );
-          case "clothing":
-            return (
-              baseName +
-              " made to be easy to style and wear. Good for everyday use, work or going out."
-            );
-          case "bags":
-            return (
-              baseName +
-              " built to carry your daily essentials neatly. Suitable for work, travel or regular use."
-            );
-          case "beauty":
-            return (
-              baseName +
-              " created for simple, everyday self-care. Works well as part of a regular routine."
-            );
-          case "personal":
-            return (
-              baseName +
-              " helps keep your daily routine clean and fresh. A practical choice for regular at-home use."
-            );
-          case "electronics":
-            return (
-              baseName +
-              " made for easy everyday entertainment and work. Useful for music, videos or general home use."
-            );
-          case "home":
-            return (
-              baseName +
-              " adds practical comfort to your living space. Good for daily home use and simple upgrades."
-            );
-          default:
-            return (
-              baseName +
-              " is a simple, useful pick for daily life. Easy to add into your routine or lifestyle."
-            );
-        }
-      }
-
-      // ---------- STATE ----------
-
-      let allLinks = [];
-      let currentCategory = "all";
-      let currentSearch = "";
-      let currentSort = "newest";
-
-      function renderCategoryPills() {
-        pillsContainer.innerHTML = "";
-
-        CATEGORY_FILTERS.forEach((filter) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className =
-            "pill" + (filter.key === currentCategory ? " active" : "");
-          btn.dataset.key = filter.key;
-
-          const dot = document.createElement("span");
-          dot.className = "pill-dot";
-
-          const label = document.createElement("span");
-          label.textContent = filter.label;
-
-          btn.appendChild(dot);
-          btn.appendChild(label);
-
-          btn.onclick = () => {
-            currentCategory = filter.key;
-            renderCategoryPills();
-            applyFiltersAndRender();
-          };
-
-          pillsContainer.appendChild(btn);
+        // Default sort: newest first
+        allLinks.sort((a, b) => {
+          const aDate = new Date(a.createdAt || 0).getTime();
+          const bDate = new Date(b.createdAt || 0).getTime();
+          return bDate - aDate;
         });
-      }
 
-      function applyFiltersAndRender() {
-        let links = [...allLinks];
-
-        if (currentCategory !== "all") {
-          links = links.filter(
-            (l) => mapToFilterKey(l.category) === currentCategory
-          );
-        }
-
-        const q = currentSearch.trim().toLowerCase();
-        if (q) {
-          links = links.filter((l) => {
-            const title = (l.title || "").toLowerCase();
-            const cat = (l.category || "").toLowerCase();
-            const note = (l.note || "").toLowerCase();
-            return (
-              title.includes(q) ||
-              cat.includes(q) ||
-              note.includes(q) ||
-              (l.price && String(l.price).toLowerCase().includes(q))
-            );
-          });
-        }
-
-        if (currentSort === "newest") {
-          links.sort(
-            (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-          );
-        } else if (currentSort === "oldest") {
-          links.sort(
-            (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
-          );
-        } else if (currentSort === "clicks") {
-          links.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
-        }
-
-        renderGrid(links);
-
-        const count = links.length;
-        if (count) {
-          setStatus(`Showing ${count} deal(s).`, "ok");
-        } else {
-          setStatus("No matching deals found.", "");
-        }
-      }
-
-      async function loadProducts() {
-        try {
-          setStatus("Loading deals...");
-          const res = await fetch("/api/links/all");
-          const data = await res.json();
-
-          if (!res.ok || !data.success) {
-            throw new Error(data.message || "Failed to load products.");
-          }
-
-          allLinks = data.links || [];
-          renderCategoryPills();
-          applyFiltersAndRender();
-        } catch (err) {
-          console.error(err);
-          setStatus("Could not load products.", "error");
-          renderGrid([]);
-        }
-      }
-
-      function renderGrid(links) {
+        applyFiltersAndRender();
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Could not load products.";
+        statusEl.classList.add("error");
+        countEl.textContent = "";
         gridEl.innerHTML = "";
-
-        if (!links.length) {
-          emptyEl.style.display = "block";
-          return;
-        }
-
-        emptyEl.style.display = "none";
-
-        for (const link of links) {
-          const card = document.createElement("article");
-          card.className = "card";
-
-          const header = document.createElement("div");
-          header.className = "card-header";
-
-          const source = document.createElement("div");
-          source.className = "source-pill";
-          source.textContent = (link.source || "amazon").toUpperCase();
-
-          const cat = document.createElement("div");
-          cat.className = "badge";
-          cat.textContent = categoryLabelFromRaw(
-            link.category || "other"
-          ).toUpperCase();
-
-          header.appendChild(source);
-          header.appendChild(cat);
-
-          const imgWrap = document.createElement("div");
-          imgWrap.className = "img-wrap";
-
-          if (link.imageUrl) {
-            const img = document.createElement("img");
-            img.src = link.imageUrl;
-            img.alt = link.title || "product";
-            img.loading = "lazy";
-            imgWrap.appendChild(img);
-          } else {
-            const ph = document.createElement("div");
-            ph.className = "img-placeholder";
-            ph.textContent = "No image";
-            imgWrap.appendChild(ph);
-          }
-
-          const titleDiv = document.createElement("div");
-          titleDiv.className = "card-title";
-          titleDiv.textContent = link.title || "Product";
-
-          const descDiv = document.createElement("div");
-          descDiv.className = "card-desc";
-          descDiv.textContent = buildSmartDescription(link);
-
-          const priceRow = document.createElement("div");
-          priceRow.className = "price-row";
-
-          const priceMain = document.createElement("span");
-          priceMain.className = "price-main";
-
-          if (link.price) {
-            priceMain.textContent = String(link.price);
-          } else {
-            priceMain.textContent = "";
-          }
-
-          const priceNote = document.createElement("span");
-          priceNote.className = "price-note";
-          priceNote.textContent = link.price
-            ? "Final price shown on Amazon page"
-            : "";
-
-          priceRow.appendChild(priceMain);
-          priceRow.appendChild(priceNote);
-
-          const meta = document.createElement("div");
-          meta.className = "card-meta";
-
-          const created = document.createElement("span");
-          if (link.createdAt) {
-            const d = new Date(link.createdAt);
-            created.textContent = d.toLocaleDateString();
-          } else {
-            created.textContent = "";
-          }
-
-          const clicks = document.createElement("span");
-          const c = link.clicks || 0;
-          clicks.className = "clicks-pill";
-          clicks.textContent = c === 1 ? "1 click" : `${c} clicks`;
-
-          meta.appendChild(created);
-          meta.appendChild(clicks);
-
-          const actions = document.createElement("div");
-          actions.className = "actions";
-
-          const buyBtn = document.createElement("button");
-          buyBtn.className = "buy-btn";
-          buyBtn.textContent = "Buy on Amazon";
-          buyBtn.onclick = () => {
-            window.open(
-              `/api/links/go/${encodeURIComponent(link.id)}`,
-              "_blank"
-            );
-          };
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "copy-btn";
-          copyBtn.textContent = "Copy link";
-          copyBtn.onclick = () => copyShort(link.id);
-
-          actions.appendChild(buyBtn);
-          actions.appendChild(copyBtn);
-
-          card.appendChild(header);
-          card.appendChild(imgWrap);
-          card.appendChild(titleDiv);
-          card.appendChild(descDiv);
-          card.appendChild(priceRow);
-          card.appendChild(meta);
-          card.appendChild(actions);
-
-          gridEl.appendChild(card);
-        }
       }
+    }
 
-      async function copyShort(id) {
-        try {
-          const shortUrl = `${location.origin}/api/links/go/${encodeURIComponent(
-            id
-          )}`;
-          await navigator.clipboard.writeText(shortUrl);
-          setStatus("Short link copied.", "ok");
-        } catch (err) {
-          console.error(err);
-          setStatus("Could not copy link.", "error");
-        }
-      }
+    function getActiveCategory() {
+      const activeChip = document.querySelector(".chip.active");
+      return activeChip ? activeChip.dataset.category : "all";
+    }
 
-      // ---------- EVENTS ----------
+    function applyFiltersAndRender() {
+      const category = getActiveCategory();
+      const term = searchInput.value.trim().toLowerCase();
+      const sortMode = sortSelect.value;
 
-      searchInput.addEventListener("input", (e) => {
-        currentSearch = e.target.value || "";
-        applyFiltersAndRender();
+      let filtered = allLinks.filter((link) => {
+        const cat = (link.category || "other").toLowerCase();
+        const inCategory =
+          category === "all" ||
+          cat === category ||
+          cat.includes(category);
+
+        const haystack = (
+          (link.title || "Product") +
+          " " +
+          (link.note || "") +
+          " " +
+          (link.category || "")
+        ).toLowerCase();
+
+        const inSearch = !term || haystack.includes(term);
+        return inCategory && inSearch;
       });
 
-      sortSelect.addEventListener("change", (e) => {
-        currentSort = e.target.value || "newest";
-        applyFiltersAndRender();
+      // Sorting
+      filtered.sort((a, b) => {
+        const priceA = typeof a.price === "number" ? a.price : null;
+        const priceB = typeof b.price === "number" ? b.price : null;
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        const clicksA = typeof a.clicks === "number" ? a.clicks : 0;
+        const clicksB = typeof b.clicks === "number" ? b.clicks : 0;
+
+        switch (sortMode) {
+          case "oldest":
+            return dateA - dateB;
+          case "priceLowHigh":
+            if (priceA == null && priceB == null) return 0;
+            if (priceA == null) return 1;
+            if (priceB == null) return -1;
+            return priceA - priceB;
+          case "priceHighLow":
+            if (priceA == null && priceB == null) return 0;
+            if (priceA == null) return 1;
+            if (priceB == null) return -1;
+            return priceB - priceA;
+          case "clicksHighLow":
+            return clicksB - clicksA;
+          case "newest":
+          default:
+            return dateB - dateA;
+        }
       });
 
-      window.addEventListener("DOMContentLoaded", loadProducts);
-    </script>
-  </body>
+      renderGrid(filtered);
+    }
+
+    function renderGrid(links) {
+      gridEl.innerHTML = "";
+
+      const count = links.length;
+      if (count === 0) {
+        statusEl.textContent = "No products yet. Add links from the Affiliate Links dashboard.";
+        statusEl.classList.remove("error");
+        countEl.textContent = "";
+        return;
+      }
+
+      statusEl.textContent = "Showing curated deals.";
+      statusEl.classList.remove("error");
+      countEl.textContent = `Showing ${count} deal${count === 1 ? "" : "s"}.`;
+
+      links.forEach((link) => {
+        const card = document.createElement("article");
+        card.className = "product-card";
+
+        const title = link.title && link.title !== "Product"
+          ? link.title
+          : "Product";
+
+        const note =
+          link.note && link.note.trim().length > 0
+            ? link.note
+            : (link.description || "");
+
+        const sourceLabel = (link.source || "amazon").toUpperCase();
+        const categoryLabel =
+          (link.category && link.category.length > 0
+            ? link.category
+            : "other").toUpperCase();
+
+        const imgHtml = link.imageUrl
+          ? `<img src="${escapeHtml(link.imageUrl)}" alt="${escapeHtml(title)}" loading="lazy" />`
+          : `<div class="image-placeholder">No image</div>`;
+
+        let priceHtml;
+        if (typeof link.price === "number") {
+          const formatted = link.price.toLocaleString("en-IN");
+          priceHtml = `<div class="price-label">₹${formatted}</div>`;
+        } else {
+          priceHtml = `<div class="price-label">Best price on Amazon</div>`;
+        }
+
+        const created = link.createdAt
+          ? new Date(link.createdAt)
+          : null;
+        const dateStr = created
+          ? created.toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })
+          : "";
+
+        const clicks = typeof link.clicks === "number" ? link.clicks : 0;
+
+        const affiliateUrl = link.affiliateUrl || `/api/links/go/${link.id}`;
+
+        card.innerHTML = `
+          <div class="product-badges">
+            <span class="source-pill">${escapeHtml(sourceLabel)}</span>
+            <span class="category-pill">${escapeHtml(categoryLabel)}</span>
+          </div>
+
+          <div class="product-media">
+            ${imgHtml}
+          </div>
+
+          <div class="product-text">
+            <div class="product-title">${escapeHtml(title)}</div>
+            ${
+              note
+                ? `<div class="product-description">${escapeHtml(note)}</div>`
+                : ""
+            }
+          </div>
+
+          <div class="product-meta-row">
+            <div>
+              ${priceHtml}
+              <div class="price-note">Final price shown on Amazon page</div>
+            </div>
+            <div style="text-align:right;">
+              ${
+                dateStr
+                  ? `<div style="font-size:10px;">${dateStr}</div>`
+                  : ""
+              }
+              <div class="clicks-pill">
+                <strong>${clicks}</strong> click${clicks === 1 ? "" : "s"}
+              </div>
+            </div>
+          </div>
+
+          <div class="product-footer">
+            <button class="cta-primary" data-href="${escapeHtml(
+              affiliateUrl
+            )}">Buy on Amazon</button>
+            <button class="cta-secondary" data-copy="${escapeHtml(
+              affiliateUrl
+            )}">Copy link</button>
+          </div>
+        `;
+
+        const buyBtn = card.querySelector(".cta-primary");
+        const copyBtn = card.querySelector(".cta-secondary");
+
+        buyBtn.addEventListener("click", () => {
+          window.open(buyBtn.dataset.href, "_blank");
+        });
+
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(copyBtn.dataset.copy);
+            copyBtn.textContent = "Copied!";
+            setTimeout(() => {
+              copyBtn.textContent = "Copy link";
+            }, 1200);
+          } catch (err) {
+            console.error("Clipboard failed", err);
+          }
+        });
+
+        gridEl.appendChild(card);
+      });
+    }
+
+    // Category chip events
+    document.querySelectorAll(".chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        if (chip.classList.contains("active")) return;
+        document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        applyFiltersAndRender();
+      });
+    });
+
+    searchInput.addEventListener("input", () => {
+      applyFiltersAndRender();
+    });
+
+    sortSelect.addEventListener("change", () => {
+      applyFiltersAndRender();
+    });
+
+    document.addEventListener("DOMContentLoaded", loadProducts);
+  </script>
+</body>
 </html>
