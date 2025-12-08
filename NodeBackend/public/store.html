@@ -1,770 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
-    <title>AlwaysOnSale — Deals</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      :root {
-        --bg: #050816;
-        --bg-card: #0b1020;
-        --bg-card-alt: #11182b;
-        --accent: #ff4b6e;
-        --accent-soft: #ffb3c3;
-        --text-main: #f9fbff;
-        --text-muted: #9aa4c6;
-        --pill-bg: #151b2e;
-        --pill-active: #ff4b6e;
-        --pill-active-text: #fff;
-        --border-subtle: #1f2940;
-        --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.6);
-        --radius-xl: 22px;
-        --radius-pill: 999px;
-      }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlwaysOnSale – Deals</title>
+    <link rel="stylesheet" href="store.css" />
+</head>
 
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-
-      body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-          "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, #111428 0, #050816 55%);
-        color: var(--text-main);
-        min-height: 100vh;
-      }
-
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .page {
-        max-width: 1180px;
-        margin: 0 auto;
-        padding: 18px 18px 40px;
-      }
-
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 14px;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .dot-live {
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
-        background: radial-gradient(circle, #ffebef 0, #ff4b6e 45%, #a7193b 90%);
-        box-shadow: 0 0 0 4px rgba(255, 75, 110, 0.25);
-      }
-
-      .brand-title {
-        letter-spacing: 0.16em;
-        font-size: 11px;
-        text-transform: uppercase;
-        color: var(--text-muted);
-      }
-
-      .brand-title span {
-        color: #ffffff;
-      }
-
-      nav {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-      }
-
-      .nav-pill {
-        padding: 6px 14px;
-        border-radius: 24px;
-        background: rgba(12, 18, 36, 0.85);
-        border: 1px solid rgba(68, 82, 122, 0.5);
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .nav-pill.primary {
-        background: #fff;
-        color: #111827;
-        font-weight: 600;
-      }
-
-      main {
-        background: radial-gradient(circle at top left, #192035 0, #050816 52%);
-        border-radius: 32px;
-        padding: 22px 22px 28px;
-        box-shadow: var(--shadow-soft);
-        border: 1px solid rgba(60, 72, 118, 0.65);
-      }
-
-      .hero-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 10px;
-      }
-
-      h1 {
-        font-size: 24px;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        margin-bottom: 4px;
-      }
-
-      .subtitle {
-        font-size: 12px;
-        color: var(--text-muted);
-      }
-
-      .live-pill {
-        margin-top: 6px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 12px;
-        border-radius: var(--radius-pill);
-        background: linear-gradient(135deg, #16a34a, #22c55e);
-        color: #ecfdf5;
-        font-size: 11px;
-        font-weight: 600;
-        box-shadow: 0 10px 30px rgba(34, 197, 94, 0.35);
-      }
-
-      .live-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: #bbf7d0;
-      }
-
-      .filters-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 12px;
-        margin-bottom: 14px;
-      }
-
-      .filter-pill {
-        padding: 6px 11px;
-        border-radius: var(--radius-pill);
-        border: 1px solid var(--border-subtle);
-        background: rgba(14, 21, 40, 0.96);
-        color: var(--text-muted);
-        font-size: 11px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .filter-pill.active {
-        background: #ffffff;
-        color: #000;
-        border-color: transparent;
-        font-weight: 600;
-      }
-
-      .filter-pill.active::before {
-        content: "";
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: radial-gradient(circle, #ff4b6e 0, #a7193b 80%);
-      }
-
-      .toolbar-row {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-      }
-
-      .search-box {
-        flex: 1;
-        min-width: 220px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: var(--radius-pill);
-        background: rgba(12, 17, 36, 0.98);
-        border: 1px solid rgba(57, 71, 115, 0.9);
-      }
-
-      .search-input {
-        flex: 1;
-        border: none;
-        outline: none;
-        background: transparent;
-        color: var(--text-main);
-        font-size: 12px;
-      }
-
-      .search-input::placeholder {
-        color: var(--text-muted);
-      }
-
-      .sort-select {
-        min-width: 120px;
-        padding: 8px 12px;
-        border-radius: var(--radius-pill);
-        border: 1px solid rgba(57, 71, 115, 0.9);
-        background: rgba(10, 16, 34, 0.98);
-        color: var(--text-main);
-        font-size: 12px;
-      }
-
-      .status-text {
-        font-size: 11px;
-        color: #4ade80;
-        margin-bottom: 8px;
-      }
-
-      .status-text.error {
-        color: #fb7185;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-        margin-top: 10px;
-      }
-
-      .card {
-        position: relative;
-        border-radius: var(--radius-xl);
-        background: radial-gradient(
-          circle at 15% 0,
-          rgba(255, 255, 255, 0.05),
-          transparent 55%
-        );
-        background-color: var(--bg-card);
-        border: 1px solid rgba(39, 51, 89, 0.85);
-        padding: 12px 12px 14px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .card-source-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 10px;
-      }
-
-      .pill {
-        padding: 4px 9px;
-        border-radius: var(--radius-pill);
-        background: var(--pill-bg);
-        border: 1px solid rgba(71, 85, 126, 0.7);
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        font-size: 9px;
-        font-weight: 600;
-      }
-
-      .pill.category {
-        text-transform: uppercase;
-      }
-
-      .pill-source {
-        background: linear-gradient(135deg, #020617, #0f172a);
-      }
-
-      .image-wrap {
-        margin-top: 6px;
-        border-radius: 16px;
-        background: radial-gradient(circle at 0 0, #222b45, #050816 65%);
-        border: 1px solid rgba(45, 55, 90, 0.9);
-        overflow: hidden;
-        min-height: 210px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .image-wrap img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        display: block;
-      }
-
-      .image-wrap.placeholder {
-        color: var(--text-muted);
-        font-size: 11px;
-      }
-
-      .title {
-        font-size: 13px;
-        font-weight: 600;
-        margin-top: 6px;
-      }
-
-      .description {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 2px;
-        line-height: 1.4;
-      }
-
-      .price-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        margin-top: 6px;
-        font-size: 11px;
-      }
-
-      .price-value {
-        font-size: 15px;
-        font-weight: 700;
-        color: #f97316;
-      }
-
-      .price-note {
-        color: var(--text-muted);
-      }
-
-      .meta-row {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 4px;
-        font-size: 10px;
-        color: var(--text-muted);
-      }
-
-      .chip {
-        padding: 4px 8px;
-        border-radius: var(--radius-pill);
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(51, 65, 85, 0.8);
-      }
-
-      .card-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-        margin-top: 10px;
-      }
-
-      .btn-primary {
-        flex: 1;
-        padding: 9px 0;
-        border-radius: var(--radius-pill);
-        border: none;
-        cursor: pointer;
-        background: linear-gradient(135deg, #ff4b6e, #fb923c);
-        color: #111827;
-        font-size: 12px;
-        font-weight: 700;
-        box-shadow: 0 18px 30px rgba(248, 113, 113, 0.45);
-      }
-
-      .btn-secondary {
-        padding: 8px 10px;
-        border-radius: var(--radius-pill);
-        border: 1px solid rgba(55, 65, 81, 0.9);
-        background: rgba(15, 23, 42, 0.98);
-        color: var(--text-muted);
-        font-size: 11px;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .empty-state {
-        padding: 40px 16px 18px;
-        text-align: center;
-        color: var(--text-muted);
-        font-size: 12px;
-      }
-
-      .empty-state strong {
-        color: #e5e7eb;
-      }
-
-      @media (max-width: 720px) {
-        main {
-          padding: 16px 14px 20px;
-        }
-        h1 {
-          font-size: 20px;
-        }
-        .grid {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="page">
-      <header>
-        <div class="brand">
-          <div class="dot-live"></div>
-          <div class="brand-title">
-            ALWAYS <span>ON</span> SALE
-          </div>
-        </div>
+<body>
+    <header class="topbar">
+        <div class="logo">🔴 ALWAYS <span>ON</span> SALE</div>
         <nav>
-          <a href="/AlwaysOnSale" class="nav-pill primary">Store</a>
-          <a href="/" class="nav-pill">Dashboard (admin)</a>
+            <a href="/AlwaysOnSale" class="active">Store</a>
+            <a href="/index.html">Dashboard (admin)</a>
         </nav>
-      </header>
+    </header>
 
-      <main>
-        <div class="hero-header">
-          <div>
-            <h1>Today’s hand-picked deals</h1>
-            <div class="subtitle">
-              Amazon engine, Instagram skin. Curated products with tracked
-              links.
-            </div>
-          </div>
-          <div class="live-pill">
-            <span class="live-dot"></span>
-            LIVE FROM ALWAYSOnSALE
-          </div>
-        </div>
+    <main class="container">
+        <section class="hero">
+            <h1>Today's hand-picked deals</h1>
+            <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
+            <span class="liveBadge">🟢 LIVE FROM ALWAYSonsale</span>
+        </section>
 
-        <div class="filters-row" id="categoryFilters"></div>
+        <section class="filters">
+            <button class="filter active" data-category="all">All</button>
+            <button class="filter" data-category="clothing">Clothing</button>
+            <button class="filter" data-category="tshirts">Tshirts</button>
+            <button class="filter" data-category="shoes">Shoes</button>
+            <button class="filter" data-category="bags">Bags</button>
+            <button class="filter" data-category="electronics">Electronics</button>
+            <button class="filter" data-category="jeans">Jeans</button>
+            <button class="filter" data-category="laptops">Laptops</button>
+        </section>
 
-        <div class="toolbar-row">
-          <div class="search-box">
-            <span style="font-size: 13px; opacity: 0.75;">🔍</span>
-            <input
-              id="searchInput"
-              class="search-input"
-              placeholder="Search products or category..."
-            />
-          </div>
-          <select id="sortSelect" class="sort-select">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="clicks">Most clicks</option>
-            <option value="priceLowHigh">Price: Low → High</option>
-            <option value="priceHighLow">Price: High → Low</option>
-          </select>
-        </div>
+        <section class="searchSort">
+            <input id="searchBox" type="text" placeholder="Search products or category..." />
+            <select id="sortSelect">
+                <option value="new">Newest first</option>
+                <option value="old">Oldest first</option>
+                <option value="priceHigh">Price high → low</option>
+                <option value="priceLow">Price low → high</option>
+            </select>
+        </section>
 
-        <div id="statusText" class="status-text">Loading deals…</div>
+        <p id="statusMessage">Loading deals...</p>
 
         <div id="grid" class="grid"></div>
-
-        <div id="emptyState" class="empty-state" style="display: none;">
-          No products yet. Add links from the
-          <strong>Affiliate Links Dashboard</strong>.
-        </div>
-      </main>
-    </div>
+    </main>
 
     <script>
-      const state = {
-        allLinks: [],
-        filteredLinks: [],
-        categories: [],
-        activeCategory: "all",
-        searchTerm: "",
-        sortMode: "newest",
-      };
-
-      function normaliseCategory(category) {
-        if (!category) return "other";
-        return String(category).trim().toLowerCase();
-      }
-
-      function prettifyCategory(cat) {
-        cat = normaliseCategory(cat);
-        if (cat === "other") return "Other";
-        return cat
-          .split(/[_\s-]+/)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ");
-      }
-
-      function formatPrice(link) {
-        if (link.price && Number.isFinite(link.price)) {
-          const symbol = link.priceCurrency === "INR" ? "₹" : "";
-          return symbol + link.price.toLocaleString("en-IN");
-        }
-        if (link.rawPrice || link.prevPrice) {
-          return link.rawPrice || link.prevPrice;
-        }
-        return null;
-      }
-
-      function buildCategoryFilters() {
-        const container = document.getElementById("categoryFilters");
-        container.innerHTML = "";
-
-        const allBtn = document.createElement("button");
-        allBtn.className = "filter-pill active";
-        allBtn.dataset.cat = "all";
-        allBtn.textContent = "All";
-        container.appendChild(allBtn);
-
-        state.categories.forEach((cat) => {
-          const btn = document.createElement("button");
-          btn.className = "filter-pill";
-          btn.dataset.cat = cat;
-          btn.textContent = prettifyCategory(cat);
-          container.appendChild(btn);
-        });
-
-        container.addEventListener("click", (e) => {
-          const btn = e.target.closest(".filter-pill");
-          if (!btn) return;
-          const cat = btn.dataset.cat;
-          state.activeCategory = cat;
-          document
-            .querySelectorAll(".filter-pill")
-            .forEach((el) => el.classList.remove("active"));
-          btn.classList.add("active");
-          applyFiltersAndRender();
-        });
-      }
-
-      function applyFiltersAndRender() {
-        const { allLinks, activeCategory, searchTerm, sortMode } = state;
-        const statusEl = document.getElementById("statusText");
-        let links = [...allLinks];
-
-        if (activeCategory !== "all") {
-          links = links.filter(
-            (l) => normaliseCategory(l.category) === activeCategory
-          );
-        }
-
-        if (searchTerm.trim()) {
-          const term = searchTerm.toLowerCase();
-          links = links.filter((l) => {
-            const haystack =
-              (l.title || "") +
-              " " +
-              (l.category || "") +
-              " " +
-              (l.description || "");
-            return haystack.toLowerCase().includes(term);
-          });
-        }
-
-        links.sort((a, b) => {
-          if (sortMode === "newest") {
-            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-          }
-          if (sortMode === "oldest") {
-            return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-          }
-          if (sortMode === "clicks") {
-            return (b.clicks || 0) - (a.clicks || 0);
-          }
-          if (sortMode === "priceLowHigh") {
-            return (a.price || Infinity) - (b.price || Infinity);
-          }
-          if (sortMode === "priceHighLow") {
-            return (b.price || 0) - (a.price || 0);
-          }
-          return 0;
-        });
-
-        state.filteredLinks = links;
-
-        if (links.length === 0) {
-          document.getElementById("grid").innerHTML = "";
-          document.getElementById("emptyState").style.display = "block";
-          statusEl.textContent =
-            "No matching deals yet. Try a different filter or add new products from the dashboard.";
-          statusEl.className = "status-text";
-        } else {
-          document.getElementById("emptyState").style.display = "none";
-          statusEl.textContent = `Showing ${links.length} deal(s).`;
-          statusEl.className = "status-text";
-          renderGrid(links);
-        }
-      }
-
-      function renderGrid(links) {
         const grid = document.getElementById("grid");
-        grid.innerHTML = "";
+        const statusMessage = document.getElementById("statusMessage");
 
-        links.forEach((link) => {
-          const card = document.createElement("article");
-          card.className = "card";
-
-          const catNorm = normaliseCategory(link.category);
-          const catLabel = prettifyCategory(catNorm);
-
-          const sourceRow = document.createElement("div");
-          sourceRow.className = "card-source-row";
-          sourceRow.innerHTML = `
-            <span class="pill pill-source">${(link.source || "amazon").toUpperCase()}</span>
-            <span class="pill category">${catLabel}</span>
-          `;
-          card.appendChild(sourceRow);
-
-          const imgWrap = document.createElement("div");
-          imgWrap.className = "image-wrap";
-
-          const mainImage =
-            link.imageUrl ||
-            (Array.isArray(link.images) && link.images.length > 0
-              ? link.images[0]
-              : null);
-
-          if (mainImage) {
-            const img = document.createElement("img");
-            img.src = mainImage;
-            img.alt = link.title || "Product image";
-            imgWrap.appendChild(img);
-          } else {
-            imgWrap.classList.add("placeholder");
-            imgWrap.textContent = "No image";
-          }
-
-          card.appendChild(imgWrap);
-
-          const title = document.createElement("div");
-          title.className = "title";
-          title.textContent = link.title || "Product";
-          card.appendChild(title);
-
-          const desc = document.createElement("div");
-          desc.className = "description";
-          desc.textContent =
-            link.description ||
-            "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.";
-          card.appendChild(desc);
-
-          const priceRow = document.createElement("div");
-          priceRow.className = "price-row";
-          const priceText = formatPrice(link);
-          if (priceText) {
-            priceRow.innerHTML = `
-              <span class="price-value">${priceText}</span>
-              <span class="price-note">Final price shown on Amazon page</span>
-            `;
-          } else {
-            priceRow.innerHTML = `
-              <span class="price-note">Best price on Amazon</span>
-              <span class="price-note">Final price shown on Amazon page</span>
-            `;
-          }
-          card.appendChild(priceRow);
-
-          const metaRow = document.createElement("div");
-          metaRow.className = "meta-row";
-          const created = link.createdAt
-            ? new Date(link.createdAt).toLocaleDateString("en-IN")
-            : "";
-          metaRow.innerHTML = `
-            <span class="chip">${catLabel}</span>
-            <span>${created} &nbsp;•&nbsp; ${(link.clicks || 0)} click(s)</span>
-          `;
-          card.appendChild(metaRow);
-
-          const footer = document.createElement("div");
-          footer.className = "card-footer";
-
-          const buyBtn = document.createElement("button");
-          buyBtn.className = "btn-primary";
-          buyBtn.textContent = "Buy on Amazon";
-          buyBtn.onclick = () => {
-            window.open(`/api/links/go/${link.id}`, "_blank");
-          };
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "btn-secondary";
-          copyBtn.textContent = "Copy link";
-          copyBtn.onclick = async () => {
-            const shortUrl = `${window.location.origin}/api/links/go/${link.id}`;
+        async function fetchLinks() {
             try {
-              await navigator.clipboard.writeText(shortUrl);
-              copyBtn.textContent = "Copied!";
-              setTimeout(() => (copyBtn.textContent = "Copy link"), 1400);
-            } catch {
-              alert("Could not copy link");
+                const r = await fetch("/api/links/all");
+                const data = await r.json();
+
+                if (!data.success) throw new Error("Invalid API response");
+
+                statusMessage.textContent = `Showing ${data.links.length} deals.`;
+
+                renderCards(data.links);
+
+            } catch (e) {
+                statusMessage.textContent = "Could not load products. Try again in a bit.";
+                console.error("Error:", e);
             }
-          };
-
-          footer.appendChild(buyBtn);
-          footer.appendChild(copyBtn);
-
-          card.appendChild(footer);
-
-          grid.appendChild(card);
-        });
-      }
-
-      async function fetchLinks() {
-        const res = await fetch("/api/links/all");
-        if (!res.ok) {
-          throw new Error(`API error ${res.status}`);
         }
-        const data = await res.json();
 
-        // ✅ Accept BOTH: [ ... ] or { success, links: [ ... ] }
-        let links = Array.isArray(data) ? data : data && data.links;
-        if (!Array.isArray(links)) {
-          console.error("Unexpected API response shape:", data);
-          throw new Error("Unexpected API response");
+        function renderCards(items) {
+            grid.innerHTML = "";
+
+            items.forEach(item => {
+                const card = document.createElement("div");
+                card.className = "card";
+
+                const imgContainer = document.createElement("div");
+                imgContainer.className = "imgContainer";
+
+                const img = document.createElement("img");
+                img.src = (item.imageUrl && item.imageUrl.includes("http")) ? item.imageUrl : "";
+
+                img.onload = () => {
+                    const ratio = img.naturalWidth / img.naturalHeight;
+                    if (ratio < 0.9) img.style.objectFit = "contain";
+                    else img.style.objectFit = "cover";
+                };
+
+                img.onerror = () => {
+                    imgContainer.classList.add("noImg");
+                    img.remove();
+                };
+
+                imgContainer.appendChild(img);
+                card.appendChild(imgContainer);
+
+                card.innerHTML += `
+                    <div class="sourceTag">${item.source.toUpperCase()}</div>
+                    <h2 class="title">${item.title || "Product"}</h2>
+                    <p class="descr">This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.</p>
+
+                    <div class="priceArea">
+                        ${
+                            item.price
+                                ? `<strong>₹${item.price}</strong>`
+                                : `<span class="noPrice">Best price on Amazon</span>`
+                        }
+                        <span class="date">${new Date(item.createdAt).toLocaleDateString()}</span>
+                    </div>
+
+                    <div class="actions">
+                        <a href="/api/links/go/${item.id}" target="_blank" class="buyBtn">Buy on Amazon</a>
+                        <button class="copyBtn" onclick="copy('${item.affiliateUrl}')">Copy link</button>
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
         }
-        return links;
-      }
 
-      async function init() {
-        const statusEl = document.getElementById("statusText");
-        try {
-          const links = await fetchLinks();
-          state.allLinks = links;
-          state.categories = Array.from(
-            new Set(
-              links
-                .map((l) => normaliseCategory(l.category))
-                .filter((c) => c && c !== "all")
-            )
-          );
-          buildCategoryFilters();
-          applyFiltersAndRender();
-        } catch (err) {
-          console.error(err);
-          statusEl.textContent =
-            "Could not load products. Please try again in a bit.";
-          statusEl.className = "status-text error";
+        function copy(text) {
+            navigator.clipboard.writeText(text);
+            alert("Copied!");
         }
-      }
 
-      document
-        .getElementById("searchInput")
-        .addEventListener("input", (e) => {
-          state.searchTerm = e.target.value;
-          applyFiltersAndRender();
-        });
-
-      document
-        .getElementById("sortSelect")
-        .addEventListener("change", (e) => {
-          state.sortMode = e.target.value;
-          applyFiltersAndRender();
-        });
-
-      init();
+        fetchLinks();
     </script>
-  </body>
+</body>
 </html>
