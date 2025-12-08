@@ -23,7 +23,7 @@ function firstNonEmpty(...vals) {
   return null;
 }
 
-// ---------- Amazon scraping (V2 – free, no external API) ---------- //
+// ---------- Amazon scraping (V2.1 – free, no external API) ---------- //
 
 const AMAZON_HEADERS = {
   "User-Agent":
@@ -32,6 +32,18 @@ const AMAZON_HEADERS = {
   Accept:
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 };
+
+/**
+ * tiny helper to read <meta ... property="xxx" content="...">
+ */
+function extractMetaContent(html, key) {
+  const re = new RegExp(
+    `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']`,
+    "i"
+  );
+  const m = html.match(re);
+  return m && m[1] ? m[1].trim() : null;
+}
 
 /**
  * Extract <title>…</title> and clean the noisy Amazon suffix.
@@ -105,7 +117,15 @@ function extractPriceFromHtml(html) {
   let m = html.match(/"price"\s*:\s*"([^"]+)"/i);
   if (m && m[1]) {
     let p = m[1].trim();
-    if (!p.includes("₹")) p = "₹" + p;
+    if (!/[₹$]/.test(p)) p = "₹" + p;
+    return p.replace(/\.00$/, "").trim();
+  }
+
+  // some pages use "priceAmount":1234 or "priceValue"
+  m = html.match(/"price(?:Amount|Value)"\s*:\s*"?(₹?[\d,\.]+)"?/i);
+  if (m && m[1]) {
+    let p = m[1].trim();
+    if (!/[₹$]/.test(p)) p = "₹" + p;
     return p.replace(/\.00$/, "").trim();
   }
 
@@ -121,10 +141,18 @@ function extractPriceFromHtml(html) {
 }
 
 /**
- * Fallback: hunt for an image URL in Amazon's image JSON.
+ * Fallback: hunt for an image URL in Amazon's image JSON / OG tags.
  */
 function extractImageFromHtml(html) {
+  // OG first (often most stable)
   let m =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+name=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+
+  if (m && m[1]) return m[1].trim();
+
+  // hiRes / large / data-old-hires / mainImageUrl patterns
+  m =
     html.match(/"hiRes"\s*:\s*"([^"]+)"/i) ||
     html.match(/"large"\s*:\s*"([^"]+)"/i) ||
     html.match(/data-old-hires="([^"]+)"/i) ||
@@ -148,10 +176,27 @@ async function scrapeAmazonMetadata(url) {
     });
 
     const html = res.data || "";
+
+    // If Amazon sent us a bot/robot page, just bail
+    if (/To discuss automated access to Amazon data/i.test(html)) {
+      console.warn("Amazon bot page detected for URL", url);
+      return {};
+    }
+
     const ld = extractFromLdJson(html);
 
-    const title = firstNonEmpty(ld.title, extractTitleFromHtml(html));
-    const imageUrl = firstNonEmpty(ld.imageUrl, extractImageFromHtml(html));
+    const title = firstNonEmpty(
+      ld.title,
+      extractMetaContent(html, "og:title"),
+      extractTitleFromHtml(html)
+    );
+
+    const imageUrl = firstNonEmpty(
+      ld.imageUrl,
+      extractMetaContent(html, "og:image"),
+      extractImageFromHtml(html)
+    );
+
     const price = firstNonEmpty(ld.price, extractPriceFromHtml(html));
 
     return { title, imageUrl, price };
@@ -279,8 +324,7 @@ router.post("/create", async (req, res) => {
 
     const finalTitle = firstNonEmpty(
       title,
-      autoTitle ? scraped.title : null,
-      extractTitleFromHtml(scraped.rawHtml || "") // usually null; kept as extra safety
+      autoTitle ? scraped.title : null
     );
 
     let finalCategory = (category || "").trim().toLowerCase();
@@ -339,8 +383,7 @@ router.post("/bulk", async (req, res) => {
 
         const finalTitle = firstNonEmpty(
           title,
-          autoTitle ? scraped.title : null,
-          extractTitleFromHtml(scraped.rawHtml || "")
+          autoTitle ? scraped.title : null
         );
 
         let finalCategory = (category || "").trim().toLowerCase();
