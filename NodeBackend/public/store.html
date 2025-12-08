@@ -8,26 +8,6 @@
     <style>
       :root {
         color-scheme: dark;
-
-        /* THEME TOKENS */
-        --bg: #020617;
-        --bg-gradient: radial-gradient(circle at top left, #0b1220, #020617);
-        --card-bg: #050816;
-        --card-bg-soft: rgba(15, 23, 42, 0.96);
-        --card-border: rgba(148, 163, 184, 0.24);
-        --accent1: #f97316; /* orange */
-        --accent2: #ec4899; /* pink */
-        --accent3: #6366f1; /* indigo */
-        --accent-soft: rgba(236, 72, 153, 0.14);
-        --accent-strong: #f97316;
-        --text: #e5e7eb;
-        --muted: #9ca3af;
-        --muted-soft: #6b7280;
-        --pill-bg: rgba(15, 23, 42, 0.96);
-        --pill-border: rgba(55, 65, 81, 0.8);
-        --radius-card: 22px;
-        --radius-pill: 999px;
-        --shadow-soft: 0 20px 45px rgba(15, 23, 42, 0.9);
       }
 
       * {
@@ -38,21 +18,17 @@
         margin: 0;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
-        background: var(--bg-gradient);
-        color: var(--text);
+        background: radial-gradient(circle at top, #020617 0, #020617 40%, #000 100%);
+        color: #e5e7eb;
       }
 
       header {
         position: sticky;
         top: 0;
-        z-index: 10;
+        z-index: 20;
         backdrop-filter: blur(18px);
-        background: linear-gradient(
-          to right,
-          rgba(2, 6, 23, 0.98),
-          rgba(15, 23, 42, 0.98)
-        );
-        border-bottom: 1px solid rgba(15, 23, 42, 1);
+        background: rgba(3, 6, 23, 0.94);
+        border-bottom: 1px solid #111827;
       }
 
       .nav-inner {
@@ -67,22 +43,12 @@
 
       .logo {
         font-weight: 800;
-        letter-spacing: 0.18em;
-        font-size: 16px;
-        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 18px;
       }
 
       .logo span {
-        background: conic-gradient(
-          from 210deg,
-          var(--accent1),
-          var(--accent2),
-          var(--accent3),
-          var(--accent1)
-        );
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        color: #f97316;
       }
 
       .nav-links {
@@ -93,12 +59,12 @@
       }
 
       .nav-links a {
-        color: var(--muted);
+        color: #9ca3af;
         text-decoration: none;
       }
 
       .nav-links a:hover {
-        color: var(--text);
+        color: #e5e7eb;
       }
 
       main {
@@ -109,62 +75,142 @@
 
       .headline {
         display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        gap: 12px;
+        flex-direction: column;
+        gap: 8px;
         margin-bottom: 8px;
       }
 
-      .headline-left h1 {
-        font-size: 24px;
-        margin: 0 0 4px;
+      .headline-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
-      .headline-left p {
+      .headline h1 {
+        font-size: 24px;
+        margin: 0;
+      }
+
+      .headline p {
         margin: 0;
         font-size: 13px;
-        color: var(--muted);
+        color: #9ca3af;
       }
 
-      .headline-right {
-        font-size: 11px;
-        color: var(--muted);
-        text-align: right;
-      }
-
-      .headline-right span {
+      .live-pill {
         display: inline-flex;
         align-items: center;
         gap: 6px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
         padding: 4px 10px;
-        border-radius: var(--radius-pill);
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        background: radial-gradient(
-          circle at top left,
-          rgba(236, 72, 153, 0.24),
-          rgba(15, 23, 42, 0.95)
-        );
+        font-size: 11px;
+        background: radial-gradient(circle at left, #22c55e33, #020617);
       }
 
-      .headline-right-dot {
-        width: 8px;
-        height: 8px;
+      .live-dot {
+        width: 7px;
+        height: 7px;
         border-radius: 999px;
         background: #22c55e;
+        box-shadow: 0 0 0 4px #22c55e33;
       }
 
       .controls-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
         justify-content: space-between;
-        margin: 14px 0 16px;
+        margin: 14px 0 10px;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .pill {
+        font-size: 11px;
+        padding: 4px 11px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #9ca3af;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .pill-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: #4b5563;
+      }
+
+      .pill.active {
+        background: radial-gradient(circle at top left, #f97316, #be123c);
+        color: #020617;
+        border-color: transparent;
+      }
+
+      .pill.active .pill-dot {
+        background: #020617;
+      }
+
+      .search-sort {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .search-input-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 170px;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 7px 32px 7px 11px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #e5e7eb;
+        font-size: 13px;
+        outline: none;
+      }
+
+      .search-input:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 1px #f97316;
+      }
+
+      .search-icon {
+        position: absolute;
+        right: 9px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .sort-select {
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #e5e7eb;
+        font-size: 13px;
       }
 
       #status {
         font-size: 13px;
-        margin: 0 0 14px;
+        margin: 4px 0 10px;
         min-height: 16px;
       }
 
@@ -176,143 +222,21 @@
         color: #f97373;
       }
 
-      .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-
-      .pill {
-        font-size: 11px;
-        padding: 6px 13px;
-        border-radius: var(--radius-pill);
-        border: 1px solid var(--pill-border);
-        background: var(--pill-bg);
-        color: var(--muted);
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .pill-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: var(--muted-soft);
-      }
-
-      .pill.active {
-        border-image: conic-gradient(
-            from 210deg,
-            var(--accent1),
-            var(--accent2),
-            var(--accent3),
-            var(--accent1)
-          )
-          1;
-        background: radial-gradient(
-          circle at top left,
-          rgba(236, 72, 153, 0.24),
-          rgba(15, 23, 42, 0.98)
-        );
-        color: var(--text);
-      }
-
-      .pill.active .pill-dot {
-        background: var(--accent2);
-      }
-
-      .search-sort {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .search-input {
-        padding: 8px 14px;
-        border-radius: 999px;
-        border: 1px solid var(--pill-border);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text);
-        font-size: 13px;
-        min-width: 190px;
-        outline: none;
-      }
-
-      .search-input::placeholder {
-        color: var(--muted-soft);
-      }
-
-      .search-input:focus {
-        border-color: transparent;
-        box-shadow: 0 0 0 1px var(--accent-soft);
-        background: rgba(15, 23, 42, 1);
-      }
-
-      .sort-select {
-        padding: 8px 12px;
-        border-radius: 999px;
-        border: 1px solid var(--pill-border);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text);
-        font-size: 13px;
-      }
-
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-        gap: 18px;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 16px;
       }
 
       .card {
-        border-radius: var(--radius-card);
-        background: radial-gradient(
-            circle at top left,
-            rgba(236, 72, 153, 0.16),
-            transparent 55%
-          ),
-          var(--card-bg-soft);
-        border: 1px solid var(--card-border);
-        padding: 12px 12px 14px;
+        border-radius: 18px;
+        background: radial-gradient(circle at top left, #020617, #020617 55%, #000 100%);
+        border: 1px solid #111827;
+        padding: 11px 11px 13px;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        box-shadow: var(--shadow-soft);
-        position: relative;
-        overflow: hidden;
-        transition: transform 0.18s ease-out, box-shadow 0.18s ease-out,
-          border-color 0.18s ease-out, background 0.18s ease-out;
-      }
-
-      .card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(
-          circle at top left,
-          rgba(249, 115, 22, 0.25),
-          transparent 55%
-        );
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.18s ease-out;
-      }
-
-      .card:hover {
-        transform: translateY(-6px) scale(1.01);
-        border-color: rgba(236, 72, 153, 0.6);
-        box-shadow: 0 24px 55px rgba(15, 23, 42, 0.95);
-        background: radial-gradient(
-            circle at top left,
-            rgba(236, 72, 153, 0.22),
-            transparent 60%
-          ),
-          var(--card-bg-soft);
-      }
-
-      .card:hover::before {
-        opacity: 0.8;
+        box-shadow: 0 16px 35px rgba(0, 0, 0, 0.85);
       }
 
       .card-header {
@@ -324,28 +248,26 @@
 
       .source-pill {
         font-size: 11px;
-        padding: 3px 9px;
-        border-radius: var(--radius-pill);
-        background: rgba(15, 23, 42, 0.96);
-        color: var(--muted);
-        border: 1px solid rgba(55, 65, 81, 0.9);
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #111827;
+        color: #9ca3af;
       }
 
       .badge {
-        font-size: 11px;
-        padding: 3px 9px;
-        border-radius: var(--radius-pill);
-        background: rgba(15, 23, 42, 0.96);
-        border: 1px solid rgba(75, 85, 99, 0.9);
-        color: var(--text);
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid #1f2937;
+        color: #e5e7eb;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        white-space: nowrap;
+        letter-spacing: 0.08em;
       }
 
       .img-wrap {
-        border-radius: 18px;
-        border: 1px solid rgba(31, 41, 55, 0.9);
+        border-radius: 14px;
+        border: 1px solid #111827;
         background: #020617;
         overflow: hidden;
         aspect-ratio: 4 / 5;
@@ -363,50 +285,41 @@
 
       .img-placeholder {
         font-size: 11px;
-        color: var(--muted-soft);
+        color: #4b5563;
       }
 
       .card-title {
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 600;
         line-height: 1.35;
-        max-height: 3.7em; /* ~2.5 lines */
+        max-height: 3.8em;
         overflow: hidden;
       }
 
       .card-desc {
-        font-size: 12.5px;
-        color: var(--muted);
+        font-size: 12px;
+        color: #9ca3af;
         line-height: 1.35;
-        max-height: 4.1em; /* ~3 lines */
+        max-height: 5.4em;
         overflow: hidden;
       }
 
       .price-row {
         display: flex;
-        align-items: baseline;
         justify-content: space-between;
+        align-items: baseline;
         gap: 8px;
+        font-size: 11px;
         margin-top: 2px;
       }
 
       .price-main {
-        font-size: 16px;
-        font-weight: 700;
-        background: linear-gradient(
-          135deg,
-          var(--accent1),
-          var(--accent2),
-          var(--accent3)
-        );
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        font-weight: 600;
+        color: #f97316;
       }
 
       .price-note {
-        font-size: 11px;
-        color: var(--muted-soft);
+        color: #6b7280;
         text-align: right;
       }
 
@@ -416,51 +329,17 @@
         justify-content: space-between;
         gap: 6px;
         font-size: 11px;
-        color: var(--muted-soft);
-        margin-top: 2px;
-      }
-
-      .meta-left {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .meta-badge {
-        padding: 2px 7px;
-        border-radius: var(--radius-pill);
-        border: 1px solid rgba(55, 65, 81, 0.9);
-        background: rgba(15, 23, 42, 0.96);
+        color: #6b7280;
       }
 
       .clicks-pill {
         padding: 2px 7px;
-        border-radius: var(--radius-pill);
-        background: rgba(15, 23, 42, 0.96);
-      }
-
-      .note-pill {
-        margin-top: 4px;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 11px;
-        padding: 3px 8px;
-        border-radius: var(--radius-pill);
-        border: 1px dashed rgba(148, 163, 184, 0.7);
-        color: var(--muted);
-        background: rgba(15, 23, 42, 0.96);
-      }
-
-      .note-dot {
-        width: 6px;
-        height: 6px;
         border-radius: 999px;
-        background: var(--accent2);
+        background: #111827;
       }
 
       .actions {
-        margin-top: 8px;
+        margin-top: 4px;
         display: flex;
         gap: 8px;
         justify-content: space-between;
@@ -469,38 +348,33 @@
 
       button.buy-btn {
         flex: 1;
-        padding: 9px 10px;
-        border-radius: var(--radius-pill);
+        padding: 8px 10px;
+        border-radius: 999px;
         border: none;
         cursor: pointer;
         font-size: 13px;
         font-weight: 600;
-        background: linear-gradient(
-          135deg,
-          var(--accent1),
-          var(--accent2),
-          var(--accent3)
-        );
+        background: radial-gradient(circle at top left, #f97316, #e11d48);
         color: #020617;
       }
 
       button.buy-btn:hover {
-        filter: brightness(1.06);
+        filter: brightness(1.07);
       }
 
       button.copy-btn {
-        padding: 7px 10px;
-        border-radius: var(--radius-pill);
-        border: 1px solid rgba(75, 85, 99, 0.9);
-        background: rgba(15, 23, 42, 0.96);
-        color: var(--text);
+        padding: 6px 8px;
+        border-radius: 999px;
+        border: 1px solid #4b5563;
+        background: #020617;
+        color: #e5e7eb;
         font-size: 11px;
         cursor: pointer;
         white-space: nowrap;
       }
 
       button.copy-btn:hover {
-        background: rgba(15, 23, 42, 1);
+        background: #111827;
       }
 
       .empty-state {
@@ -511,7 +385,7 @@
       }
 
       .empty-state a {
-        color: var(--accent1);
+        color: #f97316;
         text-decoration: none;
       }
 
@@ -524,15 +398,18 @@
         }
         .controls-row {
           flex-direction: column;
-          align-items: flex-start;
-          gap: 12px;
+          align-items: stretch;
         }
         .search-sort {
           width: 100%;
-          justify-content: space-between;
+          flex-direction: column;
+          align-items: stretch;
         }
-        .search-input {
-          flex: 1;
+        .search-input-wrap {
+          width: 100%;
+        }
+        .sort-select {
+          width: 100%;
         }
       }
     </style>
@@ -550,31 +427,32 @@
     </header>
 
     <main>
-      <div class="headline">
-        <div class="headline-left">
-          <h1>Today’s hand-picked deals</h1>
-          <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
+      <section class="headline">
+        <div class="headline-top">
+          <div>
+            <h1>Today’s hand-picked deals</h1>
+            <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
+          </div>
+          <div class="live-pill">
+            <span class="live-dot"></span>
+            <span>Live from AlwaysOnSale</span>
+          </div>
         </div>
-        <div class="headline-right">
-          <span>
-            <span class="headline-right-dot"></span>
-            Live from AlwaysOnSale
-          </span>
-        </div>
-      </div>
+      </section>
 
       <div class="controls-row">
-        <div class="pill-row" id="category-pills">
-          <!-- pills rendered by JS -->
-        </div>
+        <div class="pill-row" id="category-pills"></div>
 
         <div class="search-sort">
-          <input
-            id="search-input"
-            class="search-input"
-            type="text"
-            placeholder="Search products or category..."
-          />
+          <div class="search-input-wrap">
+            <input
+              id="search-input"
+              class="search-input"
+              type="text"
+              placeholder="Search products or category..."
+            />
+            <span class="search-icon">🔍</span>
+          </div>
           <select id="sort-select" class="sort-select">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
@@ -607,7 +485,7 @@
         if (type) statusEl.classList.add(type);
       }
 
-      // ---- Category helpers ----
+      // ---------- CATEGORY HELPERS ----------
 
       const CATEGORY_FILTERS = [
         { key: "all", label: "All" },
@@ -634,11 +512,13 @@
           c === "sneakers" ||
           c === "footwear" ||
           c.includes("shoe")
-        )
+        ) {
           return "shoes";
+        }
 
         if (
           c === "tshirts" ||
+          c === "t-shirts" ||
           c === "jeans" ||
           c === "hoodies" ||
           c === "clothing" ||
@@ -647,14 +527,17 @@
           c.includes("trouser") ||
           c.includes("pant") ||
           c.includes("jogger")
-        )
+        ) {
           return "clothing";
+        }
 
-        if (c === "bags" || c === "wallets" || c.includes("bag"))
+        if (c === "bags" || c === "wallets" || c.includes("bag")) {
           return "bags";
+        }
 
-        if (c === "beauty" || c.includes("cream") || c.includes("serum"))
+        if (c === "beauty" || c.includes("cream") || c.includes("serum")) {
           return "beauty";
+        }
 
         if (
           c === "personalcare" ||
@@ -662,8 +545,9 @@
           c.includes("wash") ||
           c.includes("soap") ||
           c.includes("body wash")
-        )
+        ) {
           return "personal";
+        }
 
         if (
           c === "mobiles" ||
@@ -671,12 +555,15 @@
           c === "audio" ||
           c === "electronics" ||
           c.includes("headphone") ||
-          c.includes("earbud")
-        )
+          c.includes("earbud") ||
+          c.includes("soundbar")
+        ) {
           return "electronics";
+        }
 
-        if (c === "home" || c === "kitchen" || c.includes("sofa"))
+        if (c === "home" || c === "kitchen" || c.includes("sofa")) {
           return "home";
+        }
 
         if (!c) return "other";
 
@@ -685,20 +572,16 @@
 
       function categoryLabelFromRaw(raw) {
         const key = mapToFilterKey(raw);
-        const found = CATEGORY_FILTERS.find((f) => f.key === key);
-        return found ? f.label : "Other";
+        const found = CATEGORY_FILTERS.find((item) => item.key === key);
+        return found ? found.label : "Other";
       }
 
-      // ---- Smart Description ----
+      // ---------- SMART DESCRIPTION ----------
 
       function buildSmartDescription(link) {
         const title = (link.title || "This product").trim();
         const key = mapToFilterKey(link.category);
-        const cleanName = title
-          .split("|")[0]
-          .split("–")[0]
-          .split("-")[0]
-          .trim();
+        const cleanName = title.split("|")[0].split("–")[0].split("-")[0].trim();
         const baseName = cleanName || title;
 
         switch (key) {
@@ -715,12 +598,12 @@
           case "bags":
             return (
               baseName +
-              " built to carry your daily essentials in a neat way. Suitable for work, travel or regular use."
+              " built to carry your daily essentials neatly. Suitable for work, travel or regular use."
             );
           case "beauty":
             return (
               baseName +
-              " created for simple, everyday self-care. Works well as part of a regular grooming or skincare routine."
+              " created for simple, everyday self-care. Works well as part of a regular routine."
             );
           case "personal":
             return (
@@ -745,7 +628,7 @@
         }
       }
 
-      // ---- State ----
+      // ---------- STATE ----------
 
       let allLinks = [];
       let currentCategory = "all";
@@ -754,26 +637,29 @@
 
       function renderCategoryPills() {
         pillsContainer.innerHTML = "";
-        CATEGORY_FILTERS.forEach((f) => {
+
+        CATEGORY_FILTERS.forEach((filter) => {
           const btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "pill" + (f.key === currentCategory ? " active" : "");
-          btn.dataset.key = f.key;
+          btn.className =
+            "pill" + (filter.key === currentCategory ? " active" : "");
+          btn.dataset.key = filter.key;
 
           const dot = document.createElement("span");
           dot.className = "pill-dot";
 
           const label = document.createElement("span");
-          label.textContent = f.label;
+          label.textContent = filter.label;
 
           btn.appendChild(dot);
           btn.appendChild(label);
 
           btn.onclick = () => {
-            currentCategory = f.key;
+            currentCategory = filter.key;
             renderCategoryPills();
             applyFiltersAndRender();
           };
+
           pillsContainer.appendChild(btn);
         });
       }
@@ -792,17 +678,23 @@
           links = links.filter((l) => {
             const title = (l.title || "").toLowerCase();
             const cat = (l.category || "").toLowerCase();
-            return title.includes(q) || cat.includes(q);
+            const note = (l.note || "").toLowerCase();
+            return (
+              title.includes(q) ||
+              cat.includes(q) ||
+              note.includes(q) ||
+              (l.price && String(l.price).toLowerCase().includes(q))
+            );
           });
         }
 
         if (currentSort === "newest") {
           links.sort(
-            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+            (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
           );
         } else if (currentSort === "oldest") {
           links.sort(
-            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+            (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
           );
         } else if (currentSort === "clicks") {
           links.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
@@ -845,6 +737,7 @@
           emptyEl.style.display = "block";
           return;
         }
+
         emptyEl.style.display = "none";
 
         for (const link of links) {
@@ -860,7 +753,9 @@
 
           const cat = document.createElement("div");
           cat.className = "badge";
-          cat.textContent = categoryLabelFromRaw(link.category).toUpperCase();
+          cat.textContent = categoryLabelFromRaw(
+            link.category || "other"
+          ).toUpperCase();
 
           header.appendChild(source);
           header.appendChild(cat);
@@ -892,26 +787,26 @@
           const priceRow = document.createElement("div");
           priceRow.className = "price-row";
 
-          const priceMain = document.createElement("div");
+          const priceMain = document.createElement("span");
           priceMain.className = "price-main";
+
           if (link.price) {
-            priceMain.textContent = link.price;
+            priceMain.textContent = String(link.price);
           } else {
-            priceMain.textContent = "Best price on Amazon";
+            priceMain.textContent = "";
           }
 
-          const priceNote = document.createElement("div");
+          const priceNote = document.createElement("span");
           priceNote.className = "price-note";
-          priceNote.textContent = "Final price shown on Amazon page";
+          priceNote.textContent = link.price
+            ? "Final price shown on Amazon page"
+            : "";
 
           priceRow.appendChild(priceMain);
           priceRow.appendChild(priceNote);
 
           const meta = document.createElement("div");
           meta.className = "card-meta";
-
-          const metaLeft = document.createElement("div");
-          metaLeft.className = "meta-left";
 
           const created = document.createElement("span");
           if (link.createdAt) {
@@ -921,35 +816,13 @@
             created.textContent = "";
           }
 
-          const metaBadge = document.createElement("span");
-          metaBadge.className = "meta-badge";
-          metaBadge.textContent = mapToFilterKey(link.category).toUpperCase();
-
-          metaLeft.appendChild(metaBadge);
-          if (created.textContent) metaLeft.appendChild(created);
-
           const clicks = document.createElement("span");
           const c = link.clicks || 0;
           clicks.className = "clicks-pill";
           clicks.textContent = c === 1 ? "1 click" : `${c} clicks`;
 
-          meta.appendChild(metaLeft);
+          meta.appendChild(created);
           meta.appendChild(clicks);
-
-          const notePill =
-            link.note && link.note.trim()
-              ? (() => {
-                  const np = document.createElement("div");
-                  np.className = "note-pill";
-                  const dot = document.createElement("span");
-                  dot.className = "note-dot";
-                  const text = document.createElement("span");
-                  text.textContent = link.note.trim();
-                  np.appendChild(dot);
-                  np.appendChild(text);
-                  return np;
-                })()
-              : null;
 
           const actions = document.createElement("div");
           actions.className = "actions";
@@ -978,7 +851,6 @@
           card.appendChild(descDiv);
           card.appendChild(priceRow);
           card.appendChild(meta);
-          if (notePill) card.appendChild(notePill);
           card.appendChild(actions);
 
           gridEl.appendChild(card);
@@ -997,6 +869,8 @@
           setStatus("Could not copy link.", "error");
         }
       }
+
+      // ---------- EVENTS ----------
 
       searchInput.addEventListener("input", (e) => {
         currentSearch = e.target.value || "";
