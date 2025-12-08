@@ -9,25 +9,25 @@
       :root {
         color-scheme: dark;
 
-        /* THEME TOKENS – keep these same for all future pages */
+        /* THEME TOKENS */
         --bg: #020617;
-        --bg-soft: #020617;
-        --card-bg: #020617;
-        --card-border: #111827;
-        --card-glow: rgba(249, 115, 22, 0.22);
-        --accent: #f97316;
-        --accent-soft: rgba(249, 115, 22, 0.12);
-        --accent-strong: #fb923c;
+        --bg-gradient: radial-gradient(circle at top left, #0b1220, #020617);
+        --card-bg: #050816;
+        --card-bg-soft: rgba(15, 23, 42, 0.96);
+        --card-border: rgba(148, 163, 184, 0.24);
+        --accent1: #f97316; /* orange */
+        --accent2: #ec4899; /* pink */
+        --accent3: #6366f1; /* indigo */
+        --accent-soft: rgba(236, 72, 153, 0.14);
+        --accent-strong: #f97316;
         --text: #e5e7eb;
         --muted: #9ca3af;
-        --muted-soft: #4b5563;
-        --line-subtle: #111827;
-        --pill-bg: #0f172a;
-        --pill-border: #1f2937;
-        --danger: #ef4444;
-        --radius-card: 18px;
+        --muted-soft: #6b7280;
+        --pill-bg: rgba(15, 23, 42, 0.96);
+        --pill-border: rgba(55, 65, 81, 0.8);
+        --radius-card: 22px;
         --radius-pill: 999px;
-        --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.65);
+        --shadow-soft: 0 20px 45px rgba(15, 23, 42, 0.9);
       }
 
       * {
@@ -38,7 +38,7 @@
         margin: 0;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
-        background: var(--bg);
+        background: var(--bg-gradient);
         color: var(--text);
       }
 
@@ -46,13 +46,13 @@
         position: sticky;
         top: 0;
         z-index: 10;
-        backdrop-filter: blur(14px);
+        backdrop-filter: blur(18px);
         background: linear-gradient(
           to right,
-          rgba(2, 6, 23, 0.96),
-          rgba(15, 23, 42, 0.96)
+          rgba(2, 6, 23, 0.98),
+          rgba(15, 23, 42, 0.98)
         );
-        border-bottom: 1px solid var(--line-subtle);
+        border-bottom: 1px solid rgba(15, 23, 42, 1);
       }
 
       .nav-inner {
@@ -67,13 +67,19 @@
 
       .logo {
         font-weight: 800;
-        letter-spacing: 0.12em;
-        font-size: 17px;
+        letter-spacing: 0.18em;
+        font-size: 16px;
         text-transform: uppercase;
       }
 
       .logo span {
-        background: linear-gradient(135deg, #f97316, #fb923c);
+        background: conic-gradient(
+          from 210deg,
+          var(--accent1),
+          var(--accent2),
+          var(--accent3),
+          var(--accent1)
+        );
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
@@ -106,7 +112,7 @@
         flex-wrap: wrap;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
       }
 
       .headline-left h1 {
@@ -129,11 +135,22 @@
       .headline-right span {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 3px 9px;
+        gap: 6px;
+        padding: 4px 10px;
         border-radius: var(--radius-pill);
-        border: 1px solid var(--accent-soft);
-        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: radial-gradient(
+          circle at top left,
+          rgba(236, 72, 153, 0.24),
+          rgba(15, 23, 42, 0.95)
+        );
+      }
+
+      .headline-right-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #22c55e;
       }
 
       .controls-row {
@@ -142,7 +159,7 @@
         gap: 10px;
         align-items: center;
         justify-content: space-between;
-        margin: 14px 0 18px;
+        margin: 14px 0 16px;
       }
 
       #status {
@@ -167,10 +184,10 @@
 
       .pill {
         font-size: 11px;
-        padding: 5px 12px;
+        padding: 6px 13px;
         border-radius: var(--radius-pill);
         border: 1px solid var(--pill-border);
-        background: rgba(15, 23, 42, 0.95);
+        background: var(--pill-bg);
         color: var(--muted);
         cursor: pointer;
         display: inline-flex;
@@ -186,17 +203,24 @@
       }
 
       .pill.active {
-        border-color: var(--accent);
+        border-image: conic-gradient(
+            from 210deg,
+            var(--accent1),
+            var(--accent2),
+            var(--accent3),
+            var(--accent1)
+          )
+          1;
         background: radial-gradient(
           circle at top left,
-          var(--accent-soft),
+          rgba(236, 72, 153, 0.24),
           rgba(15, 23, 42, 0.98)
         );
         color: var(--text);
       }
 
       .pill.active .pill-dot {
-        background: var(--accent);
+        background: var(--accent2);
       }
 
       .search-sort {
@@ -206,13 +230,13 @@
       }
 
       .search-input {
-        padding: 7px 12px;
-        border-radius: var(--radius-pill);
+        padding: 8px 14px;
+        border-radius: 999px;
         border: 1px solid var(--pill-border);
-        background: rgba(2, 6, 23, 0.9);
+        background: rgba(15, 23, 42, 0.9);
         color: var(--text);
         font-size: 13px;
-        min-width: 180px;
+        min-width: 190px;
         outline: none;
       }
 
@@ -221,43 +245,44 @@
       }
 
       .search-input:focus {
-        border-color: var(--accent);
+        border-color: transparent;
         box-shadow: 0 0 0 1px var(--accent-soft);
+        background: rgba(15, 23, 42, 1);
       }
 
       .sort-select {
-        padding: 7px 12px;
-        border-radius: var(--radius-pill);
+        padding: 8px 12px;
+        border-radius: 999px;
         border: 1px solid var(--pill-border);
-        background: rgba(2, 6, 23, 0.9);
+        background: rgba(15, 23, 42, 0.9);
         color: var(--text);
         font-size: 13px;
       }
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
         gap: 18px;
       }
 
       .card {
         border-radius: var(--radius-card);
         background: radial-gradient(
-            circle at top,
-            rgba(249, 115, 22, 0.06),
-            transparent 58%
+            circle at top left,
+            rgba(236, 72, 153, 0.16),
+            transparent 55%
           ),
-          var(--card-bg);
+          var(--card-bg-soft);
         border: 1px solid var(--card-border);
-        padding: 10px 10px 12px;
+        padding: 12px 12px 14px;
         display: flex;
         flex-direction: column;
         gap: 8px;
         box-shadow: var(--shadow-soft);
         position: relative;
         overflow: hidden;
-        transition: transform 0.16s ease-out, box-shadow 0.16s ease-out,
-          border-color 0.16s ease-out, background 0.16s ease-out;
+        transition: transform 0.18s ease-out, box-shadow 0.18s ease-out,
+          border-color 0.18s ease-out, background 0.18s ease-out;
       }
 
       .card::before {
@@ -266,7 +291,7 @@
         inset: 0;
         background: radial-gradient(
           circle at top left,
-          rgba(249, 115, 22, 0.24),
+          rgba(249, 115, 22, 0.25),
           transparent 55%
         );
         opacity: 0;
@@ -275,19 +300,19 @@
       }
 
       .card:hover {
-        transform: translateY(-4px) scale(1.01);
-        border-color: var(--accent-soft);
-        box-shadow: 0 20px 45px var(--card-glow);
+        transform: translateY(-6px) scale(1.01);
+        border-color: rgba(236, 72, 153, 0.6);
+        box-shadow: 0 24px 55px rgba(15, 23, 42, 0.95);
         background: radial-gradient(
-            circle at top,
-            rgba(249, 115, 22, 0.1),
+            circle at top left,
+            rgba(236, 72, 153, 0.22),
             transparent 60%
           ),
-          var(--card-bg);
+          var(--card-bg-soft);
       }
 
       .card:hover::before {
-        opacity: 0.7;
+        opacity: 0.8;
       }
 
       .card-header {
@@ -299,19 +324,19 @@
 
       .source-pill {
         font-size: 11px;
-        padding: 3px 8px;
+        padding: 3px 9px;
         border-radius: var(--radius-pill);
-        background: rgba(15, 23, 42, 0.95);
+        background: rgba(15, 23, 42, 0.96);
         color: var(--muted);
-        border: 1px solid var(--pill-border);
+        border: 1px solid rgba(55, 65, 81, 0.9);
       }
 
       .badge {
         font-size: 11px;
-        padding: 3px 8px;
+        padding: 3px 9px;
         border-radius: var(--radius-pill);
-        background: var(--pill-bg);
-        border: 1px solid var(--pill-border);
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid rgba(75, 85, 99, 0.9);
         color: var(--text);
         text-transform: uppercase;
         letter-spacing: 0.06em;
@@ -319,8 +344,8 @@
       }
 
       .img-wrap {
-        border-radius: 12px;
-        border: 1px solid var(--card-border);
+        border-radius: 18px;
+        border: 1px solid rgba(31, 41, 55, 0.9);
         background: #020617;
         overflow: hidden;
         aspect-ratio: 4 / 5;
@@ -342,18 +367,18 @@
       }
 
       .card-title {
-        font-size: 14px;
-        font-weight: 500;
-        line-height: 1.3;
-        max-height: 3.6em;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.35;
+        max-height: 3.7em; /* ~2.5 lines */
         overflow: hidden;
       }
 
       .card-desc {
-        font-size: 12px;
+        font-size: 12.5px;
         color: var(--muted);
         line-height: 1.35;
-        max-height: 5.4em; /* ~4 lines */
+        max-height: 4.1em; /* ~3 lines */
         overflow: hidden;
       }
 
@@ -366,14 +391,23 @@
       }
 
       .price-main {
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--accent-strong);
+        font-size: 16px;
+        font-weight: 700;
+        background: linear-gradient(
+          135deg,
+          var(--accent1),
+          var(--accent2),
+          var(--accent3)
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
 
       .price-note {
         font-size: 11px;
         color: var(--muted-soft);
+        text-align: right;
       }
 
       .card-meta {
@@ -382,7 +416,7 @@
         justify-content: space-between;
         gap: 6px;
         font-size: 11px;
-        color: #6b7280;
+        color: var(--muted-soft);
         margin-top: 2px;
       }
 
@@ -395,37 +429,38 @@
       .meta-badge {
         padding: 2px 7px;
         border-radius: var(--radius-pill);
-        border: 1px solid var(--pill-border);
-        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(55, 65, 81, 0.9);
+        background: rgba(15, 23, 42, 0.96);
       }
 
       .clicks-pill {
         padding: 2px 7px;
         border-radius: var(--radius-pill);
-        background: rgba(15, 23, 42, 0.9);
+        background: rgba(15, 23, 42, 0.96);
       }
 
       .note-pill {
-        margin-top: 2px;
+        margin-top: 4px;
         display: inline-flex;
         align-items: center;
         gap: 5px;
         font-size: 11px;
-        padding: 2px 7px;
+        padding: 3px 8px;
         border-radius: var(--radius-pill);
-        border: 1px dashed rgba(148, 163, 184, 0.6);
+        border: 1px dashed rgba(148, 163, 184, 0.7);
         color: var(--muted);
+        background: rgba(15, 23, 42, 0.96);
       }
 
       .note-dot {
         width: 6px;
         height: 6px;
         border-radius: 999px;
-        background: var(--accent);
+        background: var(--accent2);
       }
 
       .actions {
-        margin-top: 6px;
+        margin-top: 8px;
         display: flex;
         gap: 8px;
         justify-content: space-between;
@@ -434,25 +469,30 @@
 
       button.buy-btn {
         flex: 1;
-        padding: 8px 10px;
+        padding: 9px 10px;
         border-radius: var(--radius-pill);
         border: none;
         cursor: pointer;
         font-size: 13px;
         font-weight: 600;
-        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        background: linear-gradient(
+          135deg,
+          var(--accent1),
+          var(--accent2),
+          var(--accent3)
+        );
         color: #020617;
       }
 
       button.buy-btn:hover {
-        filter: brightness(1.05);
+        filter: brightness(1.06);
       }
 
       button.copy-btn {
-        padding: 6px 9px;
+        padding: 7px 10px;
         border-radius: var(--radius-pill);
-        border: 1px solid var(--pill-border);
-        background: rgba(2, 6, 23, 0.95);
+        border: 1px solid rgba(75, 85, 99, 0.9);
+        background: rgba(15, 23, 42, 0.96);
         color: var(--text);
         font-size: 11px;
         cursor: pointer;
@@ -471,7 +511,7 @@
       }
 
       .empty-state a {
-        color: #f97316;
+        color: var(--accent1);
         text-decoration: none;
       }
 
@@ -485,6 +525,7 @@
         .controls-row {
           flex-direction: column;
           align-items: flex-start;
+          gap: 12px;
         }
         .search-sort {
           width: 100%;
@@ -512,12 +553,12 @@
       <div class="headline">
         <div class="headline-left">
           <h1>Today’s hand-picked deals</h1>
-          <p>Amazon-powered products with Instagram-style cards and tracked links.</p>
+          <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
         </div>
         <div class="headline-right">
           <span>
-            <span style="width: 8px; height: 8px; border-radius: 999px; background: #22c55e;"></span>
-            Live deals powered by AlwaysOnSale
+            <span class="headline-right-dot"></span>
+            Live from AlwaysOnSale
           </span>
         </div>
       </div>
@@ -532,7 +573,7 @@
             id="search-input"
             class="search-input"
             type="text"
-            placeholder="Search products or categories..."
+            placeholder="Search products or category..."
           />
           <select id="sort-select" class="sort-select">
             <option value="newest">Newest first</option>
@@ -645,10 +686,10 @@
       function categoryLabelFromRaw(raw) {
         const key = mapToFilterKey(raw);
         const found = CATEGORY_FILTERS.find((f) => f.key === key);
-        return found ? found.label : "Other";
+        return found ? f.label : "Other";
       }
 
-      // ---- Smart Description V2 ----
+      // ---- Smart Description ----
 
       function buildSmartDescription(link) {
         const title = (link.title || "This product").trim();
@@ -740,14 +781,12 @@
       function applyFiltersAndRender() {
         let links = [...allLinks];
 
-        // category
         if (currentCategory !== "all") {
           links = links.filter(
             (l) => mapToFilterKey(l.category) === currentCategory
           );
         }
 
-        // search
         const q = currentSearch.trim().toLowerCase();
         if (q) {
           links = links.filter((l) => {
@@ -757,7 +796,6 @@
           });
         }
 
-        // sort
         if (currentSort === "newest") {
           links.sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -959,8 +997,6 @@
           setStatus("Could not copy link.", "error");
         }
       }
-
-      // ---- Events ----
 
       searchInput.addEventListener("input", (e) => {
         currentSearch = e.target.value || "";
