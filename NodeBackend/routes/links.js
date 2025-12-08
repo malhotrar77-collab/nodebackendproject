@@ -1,321 +1,388 @@
 // NodeBackend/routes/links.js
 
 const express = require("express");
-const router = express.Router();
 const axios = require("axios");
+const cheerio = require("cheerio");
 const Link = require("../models/link");
 
-// ----------------- Helpers -----------------
+const router = express.Router();
 
+// ---------- Helpers ----------
+
+// Generate short-ish random id (not Mongo _id)
 function generateId() {
-  // 6-character short id, good enough for our use
-  return Math.random().toString(36).slice(2, 8);
+  return Math.random().toString(16).slice(2, 8);
 }
 
+// Very simple Amazon URL check
 function isAmazonUrl(url) {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  return u.includes("amazon.") || u.includes("amzn.to");
+}
+
+// Follow amzn.to short links etc. to get final URL
+async function resolveRedirect(url) {
+  try {
+    const resp = await axios.get(url, {
+      maxRedirects: 5,
+      validateStatus: () => true,
+    });
+
+    if (resp.request && resp.request.res && resp.request.res.responseUrl) {
+      return resp.request.res.responseUrl;
+    }
+    return url;
+  } catch (err) {
+    console.error("resolveRedirect error:", err.message);
+    return url;
+  }
+}
+
+// Extract ASIN from full Amazon URL
+function extractAsin(url) {
+  if (!url) return null;
+  const m =
+    url.match(/\/dp\/([A-Z0-9]{8,12})/) ||
+    url.match(/\/gp\/product\/([A-Z0-9]{8,12})/);
+  return m ? m[1] : null;
+}
+
+// Build a clean canonical Amazon product URL (without tag)
+function buildCanonicalAmazonUrl(url) {
+  const asin = extractAsin(url);
+  if (!asin) return url;
+  // You can change .in to .com if needed later
+  return `https://www.amazon.in/dp/${asin}`;
+}
+
+// Add our associate tag to URL
+function addAffiliateTag(url) {
+  const tag = "alwaysonsale0-21"; // change if you want a different tag
   try {
     const u = new URL(url);
-    return (
-      u.hostname.includes("amazon.") ||
-      u.hostname === "amzn.to"
-    );
-  } catch {
-    return false;
-  }
-}
-
-// Follow amzn.to short links → real amazon product URL
-async function resolveAmazonUrl(rawUrl) {
-  if (!rawUrl) return null;
-
-  let url = rawUrl.trim();
-  if (!/^https?:\/\//i.test(url)) {
-    url = "https://" + url;
-  }
-
-  if (!isAmazonUrl(url)) {
-    return url;
-  }
-
-  try {
-    const res = await axios.get(url, {
-      maxRedirects: 5,
-      timeout: 8000,
-      validateStatus: (s) => s >= 200 && s < 400,
-    });
-    return res.request?.res?.responseUrl || url;
-  } catch {
-    // If redirect fails, just return original
+    u.searchParams.set("tag", tag);
+    return u.toString();
+  } catch (e) {
     return url;
   }
 }
 
-// Basic Amazon bot-page detection
-function looksLikeBotPage(html) {
-  if (!html) return true;
-  const lower = html.toLowerCase();
-  if (lower.includes("automated access") || lower.includes("unusual traffic")) {
-    return true;
-  }
-  if (lower.includes("to discuss automated access") || lower.includes("bot detection")) {
-    return true;
-  }
-  return false;
-}
-
-// Extract <meta> tag content
-function extractMeta(html, nameOrProperty) {
-  const re = new RegExp(
-    `<meta[^>]+(?:name|property)=[\\"']${nameOrProperty}[\\"'][^>]*content=[\\"']([^\\"]+)[\\"'][^>]*>`,
-    "i"
-  );
-  const m = html.match(re);
-  return m ? m[1].trim() : null;
-}
-
-// Simple price finder: first “₹1234” or “$12.34” in the page
-function extractPrice(html) {
-  if (!html) return null;
-
-  // Prefer INR style
-  let re = /(₹|Rs\.?\s?)[\s]*([0-9,]+(?:\.[0-9]+)?)/i;
-  let m = html.match(re);
-  if (m) {
-    return `${m[1].replace(/\s+/g, "")}${m[2]}`;
-  }
-
-  // Fallback: USD style
-  re = /(\$)[\s]*([0-9,]+(?:\.[0-9]+)?)/;
-  m = html.match(re);
-  if (m) {
-    return `${m[1]}${m[2]}`;
-  }
-
-  return null;
-}
-
-// Clean up crazy long titles a bit
-function cleanTitle(raw) {
+// Convert a raw scraped price string into Number or null
+// Examples:
+//  "₹2,149" -> 2149
+//  "Rs. 349" -> 349
+//  "rs," or "₹ " -> null
+function extractNumericPrice(raw) {
   if (!raw) return null;
-  let t = raw.replace(/\s+/g, " ").trim();
-
-  // Remove trailing “: Buy Online at Amazon”
-  t = t.replace(/:\s*buy.*amazon\.?$/i, "").trim();
-  t = t.replace(/\|\s*amazon\.in.*$/i, "").trim();
-  return t;
+  const cleaned = String(raw).replace(/[^\d]/g, "");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 }
 
-// Build a safe description from title + price if we couldn't
-// get a real description from Amazon
-function buildFallbackDescription(title, category, price) {
-  const baseName = (title || "This product").trim();
-  const cat = (category || "other").toLowerCase();
+// Auto-category V3: map title text -> category key
+function autoCategoryFromTitle(title) {
+  if (!title) return "";
 
-  const pricePart = price ? ` Priced around ${price} (final price on Amazon page).` : "";
-  if (cat.includes("shoe")) {
-    return `${baseName} is made for easy, everyday wear – good for walks, travel or casual outings.${pricePart}`;
-  }
-  if (cat.includes("bag")) {
-    return `${baseName} is built to carry your daily essentials in a neat way – useful for work or travel.${pricePart}`;
-  }
-  if (cat.includes("clothing")) {
-    return `${baseName} is designed to be easy to style and wear for daily use, work or going out.${pricePart}`;
-  }
-  if (cat.includes("electronics")) {
-    return `${baseName} is a simple gadget for everyday entertainment or work at home.${pricePart}`;
+  const t = title.toLowerCase();
+
+  // Shoes / sneakers
+  if (
+    t.includes("shoe") ||
+    t.includes("sneaker") ||
+    t.includes("running shoes") ||
+    t.includes("loafers") ||
+    t.includes("sandals") ||
+    t.includes("flip flops")
+  ) {
+    return "shoes";
   }
 
-  return `${baseName} is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.${pricePart}`;
+  // Clothing
+  if (
+    t.includes("t-shirt") ||
+    t.includes("t shirt") ||
+    t.includes("shirt") ||
+    t.includes("jeans") ||
+    t.includes("trouser") ||
+    t.includes("pant") ||
+    t.includes("jogger") ||
+    t.includes("kurta") ||
+    t.includes("saree") ||
+    t.includes("hoodie") ||
+    t.includes("jacket")
+  ) {
+    return "clothing";
+  }
+
+  // Bags / backpacks / wallets
+  if (
+    t.includes("bag") ||
+    t.includes("backpack") ||
+    t.includes("tote") ||
+    t.includes("duffel") ||
+    t.includes("sling") ||
+    t.includes("wallet")
+  ) {
+    return "bags";
+  }
+
+  // Beauty & hair
+  if (
+    t.includes("shampoo") ||
+    t.includes("conditioner") ||
+    t.includes("hair oil") ||
+    t.includes("face wash") ||
+    t.includes("serum") ||
+    t.includes("cream") ||
+    t.includes("lotion") ||
+    t.includes("spf") ||
+    t.includes("sunscreen")
+  ) {
+    return "beauty";
+  }
+
+  // Personal care
+  if (
+    t.includes("body wash") ||
+    t.includes("soap") ||
+    t.includes("face gel") ||
+    t.includes("deodorant") ||
+    t.includes("trimmer") ||
+    t.includes("grooming kit")
+  ) {
+    return "personal";
+  }
+
+  // Electronics
+  if (
+    t.includes("laptop") ||
+    t.includes("mobile") ||
+    t.includes("smartphone") ||
+    t.includes("earbuds") ||
+    t.includes("headphone") ||
+    t.includes("soundbar") ||
+    t.includes("speaker") ||
+    t.includes("tv ") ||
+    t.includes("smart tv") ||
+    t.includes("monitor")
+  ) {
+    return "electronics";
+  }
+
+  // Home & living
+  if (
+    t.includes("bedsheet") ||
+    t.includes("pillow") ||
+    t.includes("blanket") ||
+    t.includes("curtain") ||
+    t.includes("sofa") ||
+    t.includes("decor") ||
+    t.includes("kitchen")
+  ) {
+    return "home";
+  }
+
+  return "other";
 }
 
-// Main Amazon scraper V2 – metadata first
-async function scrapeAmazon(url) {
-  const result = {
-    title: null,
-    imageUrl: null,
-    price: null,
-    description: null,
-  };
+// Scrape Amazon product page: title, image URL, price string
+async function scrapeAmazonProduct(url) {
+  if (!url) throw new Error("No URL provided to scraper");
 
-  if (!url || !isAmazonUrl(url)) {
-    return result;
-  }
-
-  let finalUrl = await resolveAmazonUrl(url);
+  const resolved = await resolveRedirect(url);
+  const canonical = buildCanonicalAmazonUrl(resolved);
 
   try {
-    const res = await axios.get(finalUrl, {
-      timeout: 10000,
-      maxRedirects: 5,
+    const resp = await axios.get(canonical, {
       headers: {
+        // Very lightweight headers (we already hit bot wall sometimes)
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-          "(KHTML, like Gecko) Chrome/122.0 Safari/537.36",
-        "Accept-Language": "en-IN,en;q=0.9",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
       },
     });
 
-    const html = res.data || "";
-    if (looksLikeBotPage(html)) {
-      console.log("Amazon bot page detected for URL", finalUrl);
-      return result;
+    const html = resp.data || "";
+    if (html.includes("To discuss automated access to Amazon data")) {
+      console.warn("Amazon bot page detected for URL", canonical);
+      return {
+        title: null,
+        imageUrl: null,
+        priceText: null,
+        canonicalUrl: canonical,
+      };
     }
+
+    const $ = cheerio.load(html);
 
     // Title
-    const ogTitle = extractMeta(html, "og:title");
-    const metaTitle = extractMeta(html, "title");
-    result.title = cleanTitle(ogTitle || metaTitle);
+    let title =
+      $("#productTitle").text().trim() ||
+      $("h1 span#title").text().trim() ||
+      null;
 
-    // Image
-    const ogImage = extractMeta(html, "og:image");
-    if (ogImage && ogImage.startsWith("http")) {
-      result.imageUrl = ogImage;
-    }
+    // Image – main product image
+    let imageUrl =
+      $("#imgTagWrapperId img").attr("src") ||
+      $("#landingImage").attr("src") ||
+      $("img#imgBlkFront").attr("src") ||
+      null;
 
-    // Description
-    const ogDesc = extractMeta(html, "og:description") || extractMeta(html, "description");
-    if (ogDesc) {
-      result.description = ogDesc.replace(/\s+/g, " ").trim();
-    }
+    // Price – we only care about the first visible price block
+    let priceText =
+      $("#priceblock_ourprice").text().trim() ||
+      $("#priceblock_dealprice").text().trim() ||
+      $("#priceblock_saleprice").text().trim() ||
+      $("span.a-price span.a-offscreen").first().text().trim() ||
+      null;
 
-    // Price
-    result.price = extractPrice(html);
-
-    return result;
+    return {
+      title,
+      imageUrl,
+      priceText, // raw
+      canonicalUrl: canonical,
+    };
   } catch (err) {
-    console.log("❌ Amazon scrape failed:", err.message || String(err));
-    return result;
+    console.error("scrapeAmazonProduct error:", err.message);
+    return {
+      title: null,
+      imageUrl: null,
+      priceText: null,
+      canonicalUrl: canonical,
+    };
   }
 }
 
-// ----------------- CRUD helpers -----------------
-
-async function createLinkFromUrl({ url, title, category, note, autoTitle }) {
-  const trimmedUrl = (url || "").trim();
-  if (!trimmedUrl) {
-    throw new Error("URL is required.");
+// Central helper: create one link (used by /create and /bulk)
+async function createSingleLink({ url, title, category, note, autoTitle }) {
+  if (!url || !isAmazonUrl(url)) {
+    throw new Error("Please provide a valid Amazon product URL.");
   }
 
-  const id = generateId();
-  const source = isAmazonUrl(trimmedUrl) ? "amazon" : "other";
+  const rawOriginalUrl = url.trim();
+  const resolved = await resolveRedirect(rawOriginalUrl);
+  const canonical = buildCanonicalAmazonUrl(resolved);
+  const affiliateUrl = addAffiliateTag(canonical);
 
-  let finalTitle = (title || "").trim();
-  let imageUrl = null;
-  let price = null;
-  let description = null;
+  let scraped = {
+    title: null,
+    imageUrl: null,
+    priceText: null,
+    canonicalUrl: canonical,
+  };
 
-  if (source === "amazon") {
-    const scraped = await scrapeAmazon(trimmedUrl);
-    if (!finalTitle && autoTitle && scraped.title) {
-      finalTitle = scraped.title;
-    }
-    imageUrl = scraped.imageUrl || null;
-    price = scraped.price || null;
-    description = scraped.description || null;
+  try {
+    scraped = await scrapeAmazonProduct(canonical);
+  } catch (e) {
+    console.error("Amazon scrape failed:", e.message || e);
   }
 
-  if (!finalTitle) {
-    finalTitle = "Product";
-  }
+  const finalTitle =
+    (autoTitle && scraped.title) || title || scraped.title || "Product";
 
-  // Fallback description if scraper didn't give us anything
-  if (!description) {
-    description = buildFallbackDescription(finalTitle, category, price);
-  }
+  const finalCategory =
+    category ||
+    autoCategoryFromTitle(finalTitle) ||
+    "other";
 
-  const doc = await Link.create({
-    id,
-    source,
+  const numericPrice = extractNumericPrice(scraped.priceText);
+
+  const link = new Link({
+    id: generateId(),
+    source: "amazon",
     title: finalTitle,
-    category: category || "-",
-    note: note || "-",
-    rawOriginalUrl: trimmedUrl,
-    originalUrl: trimmedUrl,
-    affiliateUrl: trimmedUrl, // you’re already pasting your affiliate links
-    imageUrl: imageUrl || null,
-    price: price || null,
-    description,
+    category: finalCategory,
+    note: note || "",
+    originalUrl: canonical,
+    rawOriginalUrl,
+    affiliateUrl,
+    imageUrl: scraped.imageUrl || null,
+    price: numericPrice,
     clicks: 0,
   });
 
-  return doc;
+  await link.save();
+  return link;
 }
 
-// ----------------- Routes -----------------
+// ---------- Routes ----------
 
-// Simple health check
+// Simple test route
 router.get("/test", (req, res) => {
-  res.json({ success: true, message: "Links API is alive." });
+  res.json({ success: true, message: "Links API is alive" });
 });
 
-// DB test
-router.get("/dbtest", async (req, res) => {
-  try {
-    const count = await Link.countDocuments();
-    res.json({ success: true, count });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// Get all links
+// Get all links (newest first)
 router.get("/all", async (req, res) => {
   try {
-    const links = await Link.find().sort({ createdAt: -1 });
+    const links = await Link.find().sort({ createdAt: -1 }).lean();
     res.json({ success: true, links });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("GET /all error:", err);
+    res.status(500).json({ success: false, message: "Failed to load links." });
   }
 });
 
-// Create single link
+// Create single affiliate link
 router.post("/create", async (req, res) => {
   try {
     const { url, title, category, note, autoTitle } = req.body || {};
-    const doc = await createLinkFromUrl({
+    if (!url) {
+      return res
+        .status(400)
+        .json({ success: false, message: "URL is required." });
+    }
+
+    const link = await createSingleLink({
       url,
       title,
       category,
       note,
-      autoTitle: !!autoTitle,
+      autoTitle: autoTitle !== false,
     });
-    res.json({ success: true, link: doc });
+
+    res.json({ success: true, link });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ success: false, message: err.message });
+    console.error("POST /create error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Create failed." });
   }
 });
 
-// Bulk create (up to 10)
+// Bulk create (up to 10 URLs)
 router.post("/bulk", async (req, res) => {
   try {
     const { urls, title, category, note, autoTitle } = req.body || {};
     if (!Array.isArray(urls) || !urls.length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No URLs provided." });
-    }
-    if (urls.length > 10) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Max 10 URLs at once." });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an array of URLs.",
+      });
     }
 
+    const cleanUrls = urls
+      .map((u) => String(u || "").trim())
+      .filter(Boolean)
+      .slice(0, 10);
+
     const created = [];
-    for (const rawUrl of urls) {
-      const u = (rawUrl || "").trim();
-      if (!u) continue;
+    for (const url of cleanUrls) {
       try {
-        const doc = await createLinkFromUrl({
-          url: u,
-          title: title || "",
-          category: category || "",
-          note: note || "",
-          autoTitle: !!autoTitle,
+        const link = await createSingleLink({
+          url,
+          title,
+          category,
+          note,
+          autoTitle: autoTitle !== false,
         });
-        created.push(doc);
-      } catch (err) {
-        console.log("Bulk create failed for", u, err.message);
+        created.push(link);
+      } catch (innerErr) {
+        console.error("Bulk create single error:", innerErr.message || innerErr);
+        // Skip bad ones, continue others
       }
     }
 
@@ -325,126 +392,186 @@ router.post("/bulk", async (req, res) => {
       links: created,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("POST /bulk error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Bulk create failed." });
   }
 });
 
-// Update link (title, category, note, price manual tweaks)
-router.put("/update/:id", async (req, res) => {
+// Redirect + count click
+router.get("/go/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-    const { title, category, note, price } = req.body || {};
-
-    const link = await Link.findOneAndUpdate(
-      { id },
-      {
-        ...(title !== undefined ? { title } : {}),
-        ...(category !== undefined ? { category } : {}),
-        ...(note !== undefined ? { note } : {}),
-        ...(price !== undefined ? { price } : {}),
-      },
-      { new: true }
-    );
+    const id = req.params.id;
+    const link = await Link.findOne({ id });
 
     if (!link) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Link not found." });
+      return res.status(404).send("Link not found");
     }
 
-    res.json({ success: true, link });
+    link.clicks = (link.clicks || 0) + 1;
+    await link.save();
+
+    const target =
+      link.affiliateUrl || link.originalUrl || link.rawOriginalUrl;
+
+    if (!target) {
+      return res.status(500).send("No target URL configured.");
+    }
+
+    res.redirect(target);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("GET /go/:id error:", err);
+    res.status(500).send("Error redirecting.");
   }
 });
 
 // Delete link
 router.delete("/delete/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-    const out = await Link.findOneAndDelete({ id });
-    if (!out) {
+    const id = req.params.id;
+    const result = await Link.findOneAndDelete({ id });
+
+    if (!result) {
       return res
         .status(404)
         .json({ success: false, message: "Link not found." });
     }
-    res.json({ success: true });
+
+    res.json({ success: true, message: "Link deleted." });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("DELETE /delete/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete link." });
   }
 });
 
-// Redirect + click count
-router.get("/go/:id", async (req, res) => {
+// Update link (title, category, note)
+router.put("/update/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-    const link = await Link.findOneAndUpdate(
-      { id },
-      { $inc: { clicks: 1 } },
-      { new: true }
-    );
+    const id = req.params.id;
+    const { title, category, note } = req.body || {};
+
+    const link = await Link.findOne({ id });
     if (!link) {
-      return res.status(404).send("Link not found.");
+      return res
+        .status(404)
+        .json({ success: false, message: "Link not found." });
     }
-    const target = link.affiliateUrl || link.originalUrl;
-    return res.redirect(target);
+
+    if (typeof title === "string" && title.trim()) {
+      link.title = title.trim();
+    }
+    if (typeof category === "string" && category.trim()) {
+      link.category = category.trim();
+    }
+    if (typeof note === "string") {
+      link.note = note;
+    }
+
+    await link.save();
+    res.json({ success: true, link });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error redirecting.");
+    console.error("PUT /update/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update link." });
   }
 });
 
-// Daily maintenance endpoint (for cron or manual trigger)
-// - re-scrape missing title/image/price for recent links
+// Daily maintenance: refresh info (title, image, price) for recent links
 router.post("/maintenance/daily", async (req, res) => {
   try {
-    const since = new Date();
-    since.setDate(since.getDate() - 7); // last 7 days only (cheap)
-
-    const links = await Link.find({
-      createdAt: { $gte: since },
-      source: "amazon",
-    }).limit(50);
+    // Limit to latest 50 links for safety; can adjust later
+    const links = await Link.find({})
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     let processed = 0;
     let updated = 0;
 
     for (const link of links) {
-      processed++;
-      const needs =
-        !link.imageUrl || !link.price || !link.title || link.title === "Product";
+      processed += 1;
 
-      if (!needs) continue;
+      try {
+        if (!link.originalUrl && link.rawOriginalUrl) {
+          link.originalUrl = buildCanonicalAmazonUrl(link.rawOriginalUrl);
+        }
 
-      const scraped = await scrapeAmazon(link.originalUrl || link.rawOriginalUrl);
-      const update = {};
+        if (!link.originalUrl) continue;
 
-      if (!link.title || link.title === "Product") {
-        if (scraped.title) update.title = scraped.title;
-      }
-      if (!link.imageUrl && scraped.imageUrl) {
-        update.imageUrl = scraped.imageUrl;
-      }
-      if (!link.price && scraped.price) {
-        update.price = scraped.price;
-      }
-      if (!link.description && scraped.description) {
-        update.description = scraped.description;
-      }
+        const scraped = await scrapeAmazonProduct(link.originalUrl);
 
-      if (Object.keys(update).length) {
-        await Link.updateOne({ _id: link._id }, { $set: update });
-        updated++;
+        let changed = false;
+
+        if (!link.title && scraped.title) {
+          link.title = scraped.title;
+          changed = true;
+        }
+
+        if (!link.imageUrl && scraped.imageUrl) {
+          link.imageUrl = scraped.imageUrl;
+          changed = true;
+        }
+
+        const newNumericPrice = extractNumericPrice(scraped.priceText);
+        if (newNumericPrice !== null && newNumericPrice !== link.price) {
+          link.price = newNumericPrice;
+          changed = true;
+        }
+
+        if (changed) {
+          await link.save();
+          updated += 1;
+        }
+      } catch (innerErr) {
+        console.error(
+          "maintenance/daily per-link error:",
+          innerErr.message || innerErr
+        );
+        // continue with next link
       }
     }
 
     res.json({ success: true, processed, updated });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("POST /maintenance/daily error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message || "Maintenance failed.",
+    });
+  }
+});
+
+// Simple analytics summary for dashboard
+router.get("/analytics/summary", async (req, res) => {
+  try {
+    const links = await Link.find().lean();
+    const totalLinks = links.length;
+    const totalClicks = links.reduce((sum, l) => sum + (l.clicks || 0), 0);
+
+    const top = [...links]
+      .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
+      .slice(0, 3)
+      .map((l) => ({
+        id: l.id,
+        title: l.title || "(no title)",
+        clicks: l.clicks || 0,
+      }));
+
+    res.json({
+      success: true,
+      totalLinks,
+      totalClicks,
+      topProducts: top,
+    });
+  } catch (err) {
+    console.error("GET /analytics/summary error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load analytics.",
+    });
   }
 });
 
