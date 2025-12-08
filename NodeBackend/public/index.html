@@ -117,30 +117,6 @@
         color: #f97373;
       }
 
-      .analytics-box {
-        margin-top: 24px;
-        margin-bottom: 8px;
-        padding: 14px 16px;
-        border-radius: 10px;
-        border: 1px solid #111827;
-        background: #020617;
-        display: grid;
-        grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
-        gap: 16px;
-        font-size: 13px;
-      }
-
-      .analytics-box h3 {
-        margin: 0 0 8px;
-        font-size: 14px;
-      }
-
-      .analytics-box ul {
-        margin: 4px 0 0;
-        padding-left: 16px;
-        color: #9ca3af;
-      }
-
       table {
         width: 100%;
         border-collapse: collapse;
@@ -211,8 +187,39 @@
         color: #4b5563;
       }
 
-      .price-cell {
-        white-space: nowrap;
+      .section-title {
+        font-size: 18px;
+        margin-top: 24px;
+      }
+
+      .analytics-box {
+        margin-top: 12px;
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .analytics-box h3 {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+
+      .analytics-box ul {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+
+      .analytics-box p {
+        margin: 0;
+        font-size: 12px;
+        color: #9ca3af;
       }
     </style>
   </head>
@@ -225,7 +232,7 @@
         redirects: <code class="mono">/api/links/go/:id</code>
       </div>
 
-      <h2 style="font-size: 18px; margin-top: 24px">Create affiliate link</h2>
+      <h2 class="section-title">Create affiliate link</h2>
       <div id="status"></div>
 
       <div class="row">
@@ -260,7 +267,10 @@
         />
       </div>
 
-      <div class="row" style="align-items: center; justify-content: space-between">
+      <div
+        class="row"
+        style="align-items: center; justify-content: space-between"
+      >
         <label>
           <input type="checkbox" id="auto-title-input" checked />
           Auto title from Amazon (recommended)
@@ -276,7 +286,7 @@
         <button id="create-btn">Create affiliate link</button>
       </div>
 
-      <h3 style="font-size: 16px; margin-top: 28px">Bulk create (optional)</h3>
+      <h3 class="section-title">Bulk create (optional)</h3>
       <div class="small">
         Paste up to 10 Amazon URLs below, one per line. If you fill category or
         note above, they will be applied to all links.
@@ -294,19 +304,19 @@
         <button id="bulk-btn" class="secondary">Create multiple links</button>
       </div>
 
-      <h2 style="font-size: 18px; margin-top: 28px">Analytics (overview)</h2>
+      <h3 class="section-title">Analytics (overview)</h3>
       <div class="analytics-box" id="analytics-box">
         <div>
           <h3>Summary</h3>
-          <div id="analytics-summary" class="small">Loading…</div>
+          <p id="summary-text">Links: 0 | Total clicks: 0</p>
         </div>
         <div>
           <h3>Top products by clicks</h3>
-          <ul id="analytics-top"></ul>
+          <ul id="top-clicks-list"></ul>
         </div>
       </div>
 
-      <h2 style="font-size: 18px; margin-top: 16px">Saved links</h2>
+      <h2 class="section-title">Saved links</h2>
 
       <table>
         <thead>
@@ -342,8 +352,8 @@
       const bulkInputEl = document.getElementById("bulk-input");
       const bulkBtn = document.getElementById("bulk-btn");
 
-      const analyticsSummaryEl = document.getElementById("analytics-summary");
-      const analyticsTopEl = document.getElementById("analytics-top");
+      const summaryTextEl = document.getElementById("summary-text");
+      const topClicksListEl = document.getElementById("top-clicks-list");
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
@@ -351,20 +361,44 @@
         if (type) statusEl.classList.add(type);
       }
 
-      function formatPrice(price) {
-        if (price === null || price === undefined) return "-";
-        if (typeof price === "number") {
-          return "₹" + price.toLocaleString("en-IN");
+      function updateAnalytics(links) {
+        const totalLinks = links.length;
+        const totalClicks = links.reduce(
+          (sum, l) => sum + (Number(l.clicks) || 0),
+          0
+        );
+
+        summaryTextEl.textContent = `Links: ${totalLinks} | Total clicks: ${totalClicks}`;
+
+        const sorted = [...links].sort(
+          (a, b) => (b.clicks || 0) - (a.clicks || 0)
+        );
+        const top = sorted.slice(0, 3);
+
+        topClicksListEl.innerHTML = "";
+        if (!top.length) {
+          const li = document.createElement("li");
+          li.textContent = "— No clicks yet";
+          topClicksListEl.appendChild(li);
+          return;
         }
-        const s = String(price).trim();
-        if (!s) return "-";
-        if (s.startsWith("₹")) return s;
-        return "₹" + s;
+
+        for (const link of top) {
+          const li = document.createElement("li");
+          const label =
+            link.title && link.title !== "-"
+              ? link.title
+              : link.originalUrl || link.rawOriginalUrl || "(no title)";
+          li.textContent = `${label} — ${link.clicks || 0} click${
+            (link.clicks || 0) === 1 ? "" : "s"
+          }`;
+          topClicksListEl.appendChild(li);
+        }
       }
 
       async function loadLinks() {
         try {
-          setStatus("Loading links...", "");
+          setStatus("Loading links...");
           const res = await fetch("/api/links/all");
           const data = await res.json();
           if (!res.ok || !data.success) {
@@ -372,44 +406,13 @@
           }
           const links = data.links || [];
           renderLinks(links);
-          renderAnalytics(links);
+          updateAnalytics(links);
           setStatus(`Loaded ${links.length} link(s).`, "ok");
         } catch (err) {
           console.error(err);
           setStatus("Failed to load links.", "error");
           renderLinks([]);
-        }
-      }
-
-      function renderAnalytics(links) {
-        const totalLinks = links.length;
-        const totalClicks = links.reduce(
-          (sum, l) => sum + (l.clicks || 0),
-          0
-        );
-
-        analyticsSummaryEl.textContent = `Links: ${totalLinks} | Total clicks: ${totalClicks}`;
-
-        const sorted = [...links].sort(
-          (a, b) => (b.clicks || 0) - (a.clicks || 0)
-        );
-        const top = sorted.slice(0, 3);
-
-        analyticsTopEl.innerHTML = "";
-        if (!top.length) {
-          const li = document.createElement("li");
-          li.textContent = "No clicks yet.";
-          analyticsTopEl.appendChild(li);
-          return;
-        }
-
-        for (const l of top) {
-          const li = document.createElement("li");
-          const c = l.clicks || 0;
-          li.textContent = `${l.title || l.originalUrl || "Untitled"} — ${c} click${
-            c === 1 ? "" : "s"
-          }`;
-          analyticsTopEl.appendChild(li);
+          updateAnalytics([]);
         }
       }
 
@@ -429,17 +432,14 @@
         for (const link of links) {
           const tr = document.createElement("tr");
 
-          // ID
           const tdId = document.createElement("td");
           tdId.textContent = link.id || "";
           tr.appendChild(tdId);
 
-          // Source
           const tdSource = document.createElement("td");
           tdSource.textContent = link.source || "-";
           tr.appendChild(tdSource);
 
-          // Image
           const tdImg = document.createElement("td");
           if (link.imageUrl) {
             const img = document.createElement("img");
@@ -455,57 +455,54 @@
           }
           tr.appendChild(tdImg);
 
-          // Title
           const tdTitle = document.createElement("td");
           tdTitle.textContent = link.title || "-";
           tr.appendChild(tdTitle);
 
-          // Category
           const tdCat = document.createElement("td");
           tdCat.textContent = link.category || "-";
           tr.appendChild(tdCat);
 
-          // Price
           const tdPrice = document.createElement("td");
-          tdPrice.className = "price-cell";
-          tdPrice.textContent = formatPrice(link.price);
+          tdPrice.textContent = link.price || "-";
           tr.appendChild(tdPrice);
 
-          // Note
           const tdNote = document.createElement("td");
           tdNote.textContent = link.note || "-";
           tr.appendChild(tdNote);
 
-          // Original URL
           const tdOriginal = document.createElement("td");
           tdOriginal.innerHTML = `<div class="mono">${
             link.originalUrl || link.rawOriginalUrl || ""
           }</div>`;
           tr.appendChild(tdOriginal);
 
-          // Affiliate URL
           const tdAff = document.createElement("td");
           tdAff.innerHTML = `<div class="mono">${link.affiliateUrl || ""}</div>`;
           tr.appendChild(tdAff);
 
-          // Clicks
           const tdClicks = document.createElement("td");
           const clicks = link.clicks || 0;
           tdClicks.innerHTML = `<span class="badge"><span>${clicks}</span> clicks</span>`;
           tr.appendChild(tdClicks);
 
-          // Created
           const tdCreated = document.createElement("td");
           if (link.createdAt) {
-            tdCreated.textContent = new Date(link.createdAt).toLocaleString();
+            tdCreated.textContent = new Date(
+              link.createdAt
+            ).toLocaleString();
           } else {
             tdCreated.textContent = "-";
           }
           tr.appendChild(tdCreated);
 
-          // Actions
           const tdActions = document.createElement("td");
           tdActions.className = "actions";
+
+          const editBtn = document.createElement("button");
+          editBtn.className = "secondary";
+          editBtn.textContent = "Edit";
+          editBtn.onclick = () => editLink(link);
 
           const copyAffBtn = document.createElement("button");
           copyAffBtn.className = "secondary";
@@ -528,6 +525,7 @@
           delBtn.textContent = "Delete";
           delBtn.onclick = () => deleteLink(link.id);
 
+          tdActions.appendChild(editBtn);
           tdActions.appendChild(copyAffBtn);
           tdActions.appendChild(shortBtn);
           tdActions.appendChild(openBtn);
@@ -552,7 +550,7 @@
         }
 
         createBtn.disabled = true;
-        setStatus("Creating link...", "");
+        setStatus("Creating link...");
 
         try {
           const res = await fetch("/api/links/create", {
@@ -567,7 +565,6 @@
 
           urlEl.value = "";
           titleEl.value = "";
-          // Keep category/note for reuse
           setStatus("Link created.", "ok");
           await loadLinks();
         } catch (err) {
@@ -606,7 +603,7 @@
         const autoTitle = !!autoTitleEl.checked;
 
         bulkBtn.disabled = true;
-        setStatus(`Creating ${lines.length} link(s)...`, "");
+        setStatus(`Creating ${lines.length} link(s)...`);
 
         try {
           const res = await fetch("/api/links/bulk", {
@@ -636,14 +633,66 @@
         }
       }
 
+      async function editLink(link) {
+        const currentTitle = link.title || "";
+        const currentCategory = link.category || "";
+        const currentPrice = link.price || "";
+        const currentNote = link.note || "";
+
+        const newTitle = window.prompt("Title", currentTitle);
+        if (newTitle === null) return;
+
+        const newCategory = window.prompt("Category", currentCategory);
+        if (newCategory === null) return;
+
+        const newPrice = window.prompt(
+          "Price (optional, e.g. ₹1499)",
+          currentPrice
+        );
+        if (newPrice === null) return;
+
+        const newNote = window.prompt("Note", currentNote);
+        if (newNote === null) return;
+
+        setStatus("Saving changes...");
+
+        try {
+          const res = await fetch(
+            `/api/links/update/${encodeURIComponent(link.id)}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: newTitle,
+                category: newCategory,
+                price: newPrice,
+                note: newNote,
+              }),
+            }
+          );
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Failed to update link.");
+          }
+          setStatus("Link updated.", "ok");
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+        }
+      }
+
       async function deleteLink(id) {
         if (!id) return;
         if (!confirm(`Delete link ${id}?`)) return;
 
         try {
-          const res = await fetch(`/api/links/delete/${encodeURIComponent(id)}`, {
-            method: "DELETE",
-          });
+          const res = await fetch(
+            `/api/links/delete/${encodeURIComponent(id)}`,
+            {
+              method: "DELETE",
+            }
+          );
           const data = await res.json();
           if (!res.ok || !data.success) {
             throw new Error(data.message || "Failed to delete link.");
