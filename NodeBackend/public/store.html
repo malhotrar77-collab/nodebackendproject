@@ -8,6 +8,26 @@
     <style>
       :root {
         color-scheme: dark;
+
+        /* THEME TOKENS – keep these same for all future pages */
+        --bg: #020617;
+        --bg-soft: #020617;
+        --card-bg: #020617;
+        --card-border: #111827;
+        --card-glow: rgba(249, 115, 22, 0.22);
+        --accent: #f97316;
+        --accent-soft: rgba(249, 115, 22, 0.12);
+        --accent-strong: #fb923c;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --muted-soft: #4b5563;
+        --line-subtle: #111827;
+        --pill-bg: #0f172a;
+        --pill-border: #1f2937;
+        --danger: #ef4444;
+        --radius-card: 18px;
+        --radius-pill: 999px;
+        --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.65);
       }
 
       * {
@@ -18,17 +38,21 @@
         margin: 0;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
-        background: #020617;
-        color: #e5e7eb;
+        background: var(--bg);
+        color: var(--text);
       }
 
       header {
         position: sticky;
         top: 0;
         z-index: 10;
-        backdrop-filter: blur(12px);
-        background: rgba(2, 6, 23, 0.9);
-        border-bottom: 1px solid #111827;
+        backdrop-filter: blur(14px);
+        background: linear-gradient(
+          to right,
+          rgba(2, 6, 23, 0.96),
+          rgba(15, 23, 42, 0.96)
+        );
+        border-bottom: 1px solid var(--line-subtle);
       }
 
       .nav-inner {
@@ -42,13 +66,17 @@
       }
 
       .logo {
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        font-size: 17px;
+        text-transform: uppercase;
       }
 
       .logo span {
-        color: #f97316;
+        background: linear-gradient(135deg, #f97316, #fb923c);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
 
       .nav-links {
@@ -59,12 +87,12 @@
       }
 
       .nav-links a {
-        color: #9ca3af;
+        color: var(--muted);
         text-decoration: none;
       }
 
       .nav-links a:hover {
-        color: #e5e7eb;
+        color: var(--text);
       }
 
       main {
@@ -81,15 +109,31 @@
         margin-bottom: 10px;
       }
 
-      .headline h1 {
-        font-size: 22px;
-        margin: 0;
+      .headline-left h1 {
+        font-size: 24px;
+        margin: 0 0 4px;
       }
 
-      .headline p {
+      .headline-left p {
         margin: 0;
         font-size: 13px;
-        color: #9ca3af;
+        color: var(--muted);
+      }
+
+      .headline-right {
+        font-size: 11px;
+        color: var(--muted);
+        text-align: right;
+      }
+
+      .headline-right span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 9px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--accent-soft);
+        background: rgba(15, 23, 42, 0.9);
       }
 
       .controls-row {
@@ -98,12 +142,12 @@
         gap: 10px;
         align-items: center;
         justify-content: space-between;
-        margin: 10px 0 16px;
+        margin: 14px 0 18px;
       }
 
       #status {
         font-size: 13px;
-        margin: 4px 0;
+        margin: 0 0 14px;
         min-height: 16px;
       }
 
@@ -123,18 +167,36 @@
 
       .pill {
         font-size: 11px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #9ca3af;
+        padding: 5px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--pill-border);
+        background: rgba(15, 23, 42, 0.95);
+        color: var(--muted);
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .pill-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--muted-soft);
       }
 
       .pill.active {
-        background: #f97316;
-        color: #020617;
-        border-color: #f97316;
+        border-color: var(--accent);
+        background: radial-gradient(
+          circle at top left,
+          var(--accent-soft),
+          rgba(15, 23, 42, 0.98)
+        );
+        color: var(--text);
+      }
+
+      .pill.active .pill-dot {
+        background: var(--accent);
       }
 
       .search-sort {
@@ -144,45 +206,88 @@
       }
 
       .search-input {
-        padding: 6px 10px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #e5e7eb;
+        padding: 7px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--pill-border);
+        background: rgba(2, 6, 23, 0.9);
+        color: var(--text);
         font-size: 13px;
         min-width: 180px;
         outline: none;
       }
 
+      .search-input::placeholder {
+        color: var(--muted-soft);
+      }
+
       .search-input:focus {
-        border-color: #f97316;
-        box-shadow: 0 0 0 1px #f97316;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent-soft);
       }
 
       .sort-select {
-        padding: 6px 10px;
-        border-radius: 999px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #e5e7eb;
+        padding: 7px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--pill-border);
+        background: rgba(2, 6, 23, 0.9);
+        color: var(--text);
         font-size: 13px;
       }
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 18px;
       }
 
       .card {
-        border-radius: 14px;
-        background: #020617;
-        border: 1px solid #111827;
+        border-radius: var(--radius-card);
+        background: radial-gradient(
+            circle at top,
+            rgba(249, 115, 22, 0.06),
+            transparent 58%
+          ),
+          var(--card-bg);
+        border: 1px solid var(--card-border);
         padding: 10px 10px 12px;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+        box-shadow: var(--shadow-soft);
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.16s ease-out, box-shadow 0.16s ease-out,
+          border-color 0.16s ease-out, background 0.16s ease-out;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          circle at top left,
+          rgba(249, 115, 22, 0.24),
+          transparent 55%
+        );
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease-out;
+      }
+
+      .card:hover {
+        transform: translateY(-4px) scale(1.01);
+        border-color: var(--accent-soft);
+        box-shadow: 0 20px 45px var(--card-glow);
+        background: radial-gradient(
+            circle at top,
+            rgba(249, 115, 22, 0.1),
+            transparent 60%
+          ),
+          var(--card-bg);
+      }
+
+      .card:hover::before {
+        opacity: 0.7;
       }
 
       .card-header {
@@ -194,26 +299,28 @@
 
       .source-pill {
         font-size: 11px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: #111827;
-        color: #9ca3af;
+        padding: 3px 8px;
+        border-radius: var(--radius-pill);
+        background: rgba(15, 23, 42, 0.95);
+        color: var(--muted);
+        border: 1px solid var(--pill-border);
       }
 
       .badge {
         font-size: 11px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: #0f172a;
-        border: 1px solid #1f2937;
-        color: #e5e7eb;
+        padding: 3px 8px;
+        border-radius: var(--radius-pill);
+        background: var(--pill-bg);
+        border: 1px solid var(--pill-border);
+        color: var(--text);
         text-transform: uppercase;
         letter-spacing: 0.06em;
+        white-space: nowrap;
       }
 
       .img-wrap {
-        border-radius: 10px;
-        border: 1px solid #111827;
+        border-radius: 12px;
+        border: 1px solid var(--card-border);
         background: #020617;
         overflow: hidden;
         aspect-ratio: 4 / 5;
@@ -231,7 +338,7 @@
 
       .img-placeholder {
         font-size: 11px;
-        color: #4b5563;
+        color: var(--muted-soft);
       }
 
       .card-title {
@@ -244,16 +351,29 @@
 
       .card-desc {
         font-size: 12px;
-        color: #9ca3af;
+        color: var(--muted);
         line-height: 1.35;
-        max-height: 5.4em;
+        max-height: 5.4em; /* ~4 lines */
         overflow: hidden;
       }
 
-      .card-price {
-        font-size: 13px;
+      .price-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 2px;
+      }
+
+      .price-main {
+        font-size: 15px;
         font-weight: 600;
-        color: #f97316;
+        color: var(--accent-strong);
+      }
+
+      .price-note {
+        font-size: 11px;
+        color: var(--muted-soft);
       }
 
       .card-meta {
@@ -263,16 +383,49 @@
         gap: 6px;
         font-size: 11px;
         color: #6b7280;
+        margin-top: 2px;
+      }
+
+      .meta-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .meta-badge {
+        padding: 2px 7px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--pill-border);
+        background: rgba(15, 23, 42, 0.9);
       }
 
       .clicks-pill {
-        padding: 2px 6px;
+        padding: 2px 7px;
+        border-radius: var(--radius-pill);
+        background: rgba(15, 23, 42, 0.9);
+      }
+
+      .note-pill {
+        margin-top: 2px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: var(--radius-pill);
+        border: 1px dashed rgba(148, 163, 184, 0.6);
+        color: var(--muted);
+      }
+
+      .note-dot {
+        width: 6px;
+        height: 6px;
         border-radius: 999px;
-        background: #111827;
+        background: var(--accent);
       }
 
       .actions {
-        margin-top: 4px;
+        margin-top: 6px;
         display: flex;
         gap: 8px;
         justify-content: space-between;
@@ -282,32 +435,32 @@
       button.buy-btn {
         flex: 1;
         padding: 8px 10px;
-        border-radius: 999px;
+        border-radius: var(--radius-pill);
         border: none;
         cursor: pointer;
         font-size: 13px;
         font-weight: 600;
-        background: #f97316;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
         color: #020617;
       }
 
       button.buy-btn:hover {
-        filter: brightness(1.1);
+        filter: brightness(1.05);
       }
 
       button.copy-btn {
-        padding: 6px 8px;
-        border-radius: 999px;
-        border: 1px solid #4b5563;
-        background: #020617;
-        color: #e5e7eb;
+        padding: 6px 9px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--pill-border);
+        background: rgba(2, 6, 23, 0.95);
+        color: var(--text);
         font-size: 11px;
         cursor: pointer;
         white-space: nowrap;
       }
 
       button.copy-btn:hover {
-        background: #111827;
+        background: rgba(15, 23, 42, 1);
       }
 
       .empty-state {
@@ -357,21 +510,29 @@
 
     <main>
       <div class="headline">
-        <div>
+        <div class="headline-left">
           <h1>Today’s hand-picked deals</h1>
-          <p>Curated products with tracked links – one tap to Amazon.</p>
+          <p>Amazon-powered products with Instagram-style cards and tracked links.</p>
+        </div>
+        <div class="headline-right">
+          <span>
+            <span style="width: 8px; height: 8px; border-radius: 999px; background: #22c55e;"></span>
+            Live deals powered by AlwaysOnSale
+          </span>
         </div>
       </div>
 
       <div class="controls-row">
-        <div class="pill-row" id="category-pills"></div>
+        <div class="pill-row" id="category-pills">
+          <!-- pills rendered by JS -->
+        </div>
 
         <div class="search-sort">
           <input
             id="search-input"
             class="search-input"
             type="text"
-            placeholder="Search products..."
+            placeholder="Search products or categories..."
           />
           <select id="sort-select" class="sort-select">
             <option value="newest">Newest first</option>
@@ -404,6 +565,8 @@
         statusEl.className = "";
         if (type) statusEl.classList.add(type);
       }
+
+      // ---- Category helpers ----
 
       const CATEGORY_FILTERS = [
         { key: "all", label: "All" },
@@ -485,21 +648,16 @@
         return found ? found.label : "Other";
       }
 
-      function formatPrice(price) {
-        if (price === null || price === undefined) return "";
-        if (typeof price === "number") {
-          return "₹" + price.toLocaleString("en-IN");
-        }
-        const s = String(price).trim();
-        if (!s) return "";
-        if (s.startsWith("₹")) return s;
-        return "₹" + s;
-      }
+      // ---- Smart Description V2 ----
 
       function buildSmartDescription(link) {
         const title = (link.title || "This product").trim();
         const key = mapToFilterKey(link.category);
-        const cleanName = title.split("|")[0].split("–")[0].split("-")[0].trim();
+        const cleanName = title
+          .split("|")[0]
+          .split("–")[0]
+          .split("-")[0]
+          .trim();
         const baseName = cleanName || title;
 
         switch (key) {
@@ -546,6 +704,8 @@
         }
       }
 
+      // ---- State ----
+
       let allLinks = [];
       let currentCategory = "all";
       let currentSearch = "";
@@ -557,8 +717,17 @@
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "pill" + (f.key === currentCategory ? " active" : "");
-          btn.textContent = f.label;
           btn.dataset.key = f.key;
+
+          const dot = document.createElement("span");
+          dot.className = "pill-dot";
+
+          const label = document.createElement("span");
+          label.textContent = f.label;
+
+          btn.appendChild(dot);
+          btn.appendChild(label);
+
           btn.onclick = () => {
             currentCategory = f.key;
             renderCategoryPills();
@@ -571,12 +740,14 @@
       function applyFiltersAndRender() {
         let links = [...allLinks];
 
+        // category
         if (currentCategory !== "all") {
           links = links.filter(
             (l) => mapToFilterKey(l.category) === currentCategory
           );
         }
 
+        // search
         const q = currentSearch.trim().toLowerCase();
         if (q) {
           links = links.filter((l) => {
@@ -586,6 +757,7 @@
           });
         }
 
+        // sort
         if (currentSort === "newest") {
           links.sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -679,16 +851,29 @@
           descDiv.className = "card-desc";
           descDiv.textContent = buildSmartDescription(link);
 
-          const priceText = formatPrice(link.price);
-          let priceDiv = null;
-          if (priceText) {
-            priceDiv = document.createElement("div");
-            priceDiv.className = "card-price";
-            priceDiv.textContent = priceText;
+          const priceRow = document.createElement("div");
+          priceRow.className = "price-row";
+
+          const priceMain = document.createElement("div");
+          priceMain.className = "price-main";
+          if (link.price) {
+            priceMain.textContent = link.price;
+          } else {
+            priceMain.textContent = "Best price on Amazon";
           }
+
+          const priceNote = document.createElement("div");
+          priceNote.className = "price-note";
+          priceNote.textContent = "Final price shown on Amazon page";
+
+          priceRow.appendChild(priceMain);
+          priceRow.appendChild(priceNote);
 
           const meta = document.createElement("div");
           meta.className = "card-meta";
+
+          const metaLeft = document.createElement("div");
+          metaLeft.className = "meta-left";
 
           const created = document.createElement("span");
           if (link.createdAt) {
@@ -698,13 +883,35 @@
             created.textContent = "";
           }
 
+          const metaBadge = document.createElement("span");
+          metaBadge.className = "meta-badge";
+          metaBadge.textContent = mapToFilterKey(link.category).toUpperCase();
+
+          metaLeft.appendChild(metaBadge);
+          if (created.textContent) metaLeft.appendChild(created);
+
           const clicks = document.createElement("span");
           const c = link.clicks || 0;
           clicks.className = "clicks-pill";
           clicks.textContent = c === 1 ? "1 click" : `${c} clicks`;
 
-          meta.appendChild(created);
+          meta.appendChild(metaLeft);
           meta.appendChild(clicks);
+
+          const notePill =
+            link.note && link.note.trim()
+              ? (() => {
+                  const np = document.createElement("div");
+                  np.className = "note-pill";
+                  const dot = document.createElement("span");
+                  dot.className = "note-dot";
+                  const text = document.createElement("span");
+                  text.textContent = link.note.trim();
+                  np.appendChild(dot);
+                  np.appendChild(text);
+                  return np;
+                })()
+              : null;
 
           const actions = document.createElement("div");
           actions.className = "actions";
@@ -731,8 +938,9 @@
           card.appendChild(imgWrap);
           card.appendChild(titleDiv);
           card.appendChild(descDiv);
-          if (priceDiv) card.appendChild(priceDiv);
+          card.appendChild(priceRow);
           card.appendChild(meta);
+          if (notePill) card.appendChild(notePill);
           card.appendChild(actions);
 
           gridEl.appendChild(card);
@@ -751,6 +959,8 @@
           setStatus("Could not copy link.", "error");
         }
       }
+
+      // ---- Events ----
 
       searchInput.addEventListener("input", (e) => {
         currentSearch = e.target.value || "";
