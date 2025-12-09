@@ -1,578 +1,432 @@
 // NodeBackend/routes/links.js
-
 const express = require("express");
-const axios = require("axios");
-const cheerio = require("cheerio");
-const Link = require("../models/link");
-
 const router = express.Router();
+const dayjs = require("dayjs");
+
+const Link = require("../models/link");
+const { scrapeAmazonProduct } = require("../scrapers/amazon");
 
 // ---------- Helpers ----------
 
-// Generate short-ish random id (not Mongo _id)
+// Generate a short random id for links like "c07f71"
 function generateId() {
-  return Math.random().toString(16).slice(2, 8);
+  return Math.random().toString(36).substring(2, 8);
 }
 
-// Very simple Amazon URL check
-function isAmazonUrl(url) {
-  if (!url) return false;
-  const u = url.toLowerCase();
-  return u.includes("amazon.") || u.includes("amzn.to");
-}
-
-// Follow amzn.to short links etc. to get final URL
-async function resolveRedirect(url) {
-  try {
-    const resp = await axios.get(url, {
-      maxRedirects: 5,
-      validateStatus: () => true,
-    });
-
-    if (resp.request && resp.request.res && resp.request.res.responseUrl) {
-      return resp.request.res.responseUrl;
-    }
-    return url;
-  } catch (err) {
-    console.error("resolveRedirect error:", err.message);
-    return url;
-  }
-}
-
-// Extract ASIN from full Amazon URL
+// Normalize and extract ASIN from an Amazon URL
 function extractAsin(url) {
-  if (!url) return null;
-  const m =
-    url.match(/\/dp\/([A-Z0-9]{8,12})/) ||
-    url.match(/\/gp\/product\/([A-Z0-9]{8,12})/);
-  return m ? m[1] : null;
+  // Very simple ASIN matcher
+  const asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/i) ||
+    url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+  if (!asinMatch) return null;
+  return asinMatch[1];
 }
 
-// Build a clean canonical Amazon product URL (without tag)
 function buildCanonicalAmazonUrl(url) {
   const asin = extractAsin(url);
-  if (!asin) return url;
-  // You can change .in to .com if needed later
+  if (!asin) return url.trim();
+  // Force to a simple canonical dp URL (India by default)
   return `https://www.amazon.in/dp/${asin}`;
 }
 
-// Add our associate tag to URL
-function addAffiliateTag(url) {
-  const tag = "alwaysonsale0-21"; // change if you want a different tag
-  try {
-    const u = new URL(url);
-    u.searchParams.set("tag", tag);
-    return u.toString();
-  } catch (e) {
-    return url;
-  }
+function buildAffiliateUrl(canonicalUrl) {
+  const asin = extractAsin(canonicalUrl);
+  if (!asin) return canonicalUrl;
+  const tag = process.env.AMAZON_ASSOC_TAG || "alwaysonsale-21";
+  return `https://www.amazon.in/dp/${asin}?tag=${encodeURIComponent(tag)}`;
 }
 
-// Convert a raw scraped price string into Number or null
-// Examples:
-//  "₹2,149" -> 2149
-//  "Rs. 349" -> 349
-//  "rs," or "₹ " -> null
-function extractNumericPrice(raw) {
-  if (!raw) return null;
-  const cleaned = String(raw).replace(/[^\d]/g, "");
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+// Parse a price string like "₹2,149" into { price, priceCurrency, priceRaw }
+function parsePrice(priceText) {
+  if (!priceText || typeof priceText !== "string") {
+    return { price: null, priceCurrency: null, priceRaw: null };
+  }
+
+  const raw = priceText.trim();
+  // Remove spaces and commas for numeric extraction
+  const numericPart = raw.replace(/,/g, "").match(/([\d.]+)/);
+  const price = numericPart ? parseFloat(numericPart[1]) : null;
+
+  let currency = null;
+  if (/₹|rs\.?/i.test(raw)) currency = "INR";
+  else if (/\$/i.test(raw)) currency = "USD";
+  else if (/€/.test(raw)) currency = "EUR";
+
+  if (!price || Number.isNaN(price)) {
+    return { price: null, priceCurrency: currency, priceRaw: raw };
+  }
+
+  return { price, priceCurrency: currency || "INR", priceRaw: raw };
 }
 
-// Auto-category V3: map title text -> category key
-function autoCategoryFromTitle(title) {
-  if (!title) return "";
+// Auto category from scraped category path or title
+function guessCategory(scraped, fallbackTitle) {
+  const path = (scraped?.categoryPath || []).map((p) => p.toLowerCase());
+  const title = (scraped?.title || fallbackTitle || "").toLowerCase();
 
-  const t = title.toLowerCase();
+  const text = [...path, title].join(" ");
 
-  // Shoes / sneakers
-  if (
-    t.includes("shoe") ||
-    t.includes("sneaker") ||
-    t.includes("running shoes") ||
-    t.includes("loafers") ||
-    t.includes("sandals") ||
-    t.includes("flip flops")
-  ) {
-    return "shoes";
-  }
-
-  // Clothing
-  if (
-    t.includes("t-shirt") ||
-    t.includes("t shirt") ||
-    t.includes("shirt") ||
-    t.includes("jeans") ||
-    t.includes("trouser") ||
-    t.includes("pant") ||
-    t.includes("jogger") ||
-    t.includes("kurta") ||
-    t.includes("saree") ||
-    t.includes("hoodie") ||
-    t.includes("jacket")
-  ) {
-    return "clothing";
-  }
-
-  // Bags / backpacks / wallets
-  if (
-    t.includes("bag") ||
-    t.includes("backpack") ||
-    t.includes("tote") ||
-    t.includes("duffel") ||
-    t.includes("sling") ||
-    t.includes("wallet")
-  ) {
-    return "bags";
-  }
-
-  // Beauty & hair
-  if (
-    t.includes("shampoo") ||
-    t.includes("conditioner") ||
-    t.includes("hair oil") ||
-    t.includes("face wash") ||
-    t.includes("serum") ||
-    t.includes("cream") ||
-    t.includes("lotion") ||
-    t.includes("spf") ||
-    t.includes("sunscreen")
-  ) {
-    return "beauty";
-  }
-
-  // Personal care
-  if (
-    t.includes("body wash") ||
-    t.includes("soap") ||
-    t.includes("face gel") ||
-    t.includes("deodorant") ||
-    t.includes("trimmer") ||
-    t.includes("grooming kit")
-  ) {
-    return "personal";
-  }
-
-  // Electronics
-  if (
-    t.includes("laptop") ||
-    t.includes("mobile") ||
-    t.includes("smartphone") ||
-    t.includes("earbuds") ||
-    t.includes("headphone") ||
-    t.includes("soundbar") ||
-    t.includes("speaker") ||
-    t.includes("tv ") ||
-    t.includes("smart tv") ||
-    t.includes("monitor")
-  ) {
+  if (text.includes("shoe") || text.includes("sneaker")) return "shoes";
+  if (text.includes("t-shirt") || text.includes("t shirt") || text.includes("shirt"))
+    return "tshirts";
+  if (text.includes("jean") || text.includes("trouser") || text.includes("pant"))
+    return "jeans";
+  if (text.includes("bag") || text.includes("backpack")) return "bags";
+  if (text.includes("laptop") || text.includes("headphone") || text.includes("speaker"))
     return "electronics";
-  }
-
-  // Home & living
-  if (
-    t.includes("bedsheet") ||
-    t.includes("pillow") ||
-    t.includes("blanket") ||
-    t.includes("curtain") ||
-    t.includes("sofa") ||
-    t.includes("decor") ||
-    t.includes("kitchen")
-  ) {
-    return "home";
-  }
+  if (text.includes("home") || text.includes("kitchen")) return "home & living";
 
   return "other";
 }
 
-// Scrape Amazon product page: title, image URL, price string
-async function scrapeAmazonProduct(url) {
-  if (!url) throw new Error("No URL provided to scraper");
-
-  const resolved = await resolveRedirect(url);
-  const canonical = buildCanonicalAmazonUrl(resolved);
-
-  try {
-    const resp = await axios.get(canonical, {
-      headers: {
-        // Very lightweight headers (we already hit bot wall sometimes)
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-      },
-    });
-
-    const html = resp.data || "";
-    if (html.includes("To discuss automated access to Amazon data")) {
-      console.warn("Amazon bot page detected for URL", canonical);
-      return {
-        title: null,
-        imageUrl: null,
-        priceText: null,
-        canonicalUrl: canonical,
-      };
-    }
-
-    const $ = cheerio.load(html);
-
-    // Title
-    let title =
-      $("#productTitle").text().trim() ||
-      $("h1 span#title").text().trim() ||
-      null;
-
-    // Image – main product image
-    let imageUrl =
-      $("#imgTagWrapperId img").attr("src") ||
-      $("#landingImage").attr("src") ||
-      $("img#imgBlkFront").attr("src") ||
-      null;
-
-    // Price – we only care about the first visible price block
-    let priceText =
-      $("#priceblock_ourprice").text().trim() ||
-      $("#priceblock_dealprice").text().trim() ||
-      $("#priceblock_saleprice").text().trim() ||
-      $("span.a-price span.a-offscreen").first().text().trim() ||
-      null;
-
-    return {
-      title,
-      imageUrl,
-      priceText, // raw
-      canonicalUrl: canonical,
-    };
-  } catch (err) {
-    console.error("scrapeAmazonProduct error:", err.message);
-    return {
-      title: null,
-      imageUrl: null,
-      priceText: null,
-      canonicalUrl: canonical,
-    };
-  }
-}
-
-// Central helper: create one link (used by /create and /bulk)
-async function createSingleLink({ url, title, category, note, autoTitle }) {
-  if (!url || !isAmazonUrl(url)) {
-    throw new Error("Please provide a valid Amazon product URL.");
-  }
-
-  const rawOriginalUrl = url.trim();
-  const resolved = await resolveRedirect(rawOriginalUrl);
-  const canonical = buildCanonicalAmazonUrl(resolved);
-  const affiliateUrl = addAffiliateTag(canonical);
-
-  let scraped = {
-    title: null,
-    imageUrl: null,
-    priceText: null,
-    canonicalUrl: canonical,
-  };
-
-  try {
-    scraped = await scrapeAmazonProduct(canonical);
-  } catch (e) {
-    console.error("Amazon scrape failed:", e.message || e);
-  }
-
-  const finalTitle =
-    (autoTitle && scraped.title) || title || scraped.title || "Product";
-
-  const finalCategory =
-    category ||
-    autoCategoryFromTitle(finalTitle) ||
-    "other";
-
-  const numericPrice = extractNumericPrice(scraped.priceText);
-
-  const link = new Link({
-    id: generateId(),
-    source: "amazon",
-    title: finalTitle,
-    category: finalCategory,
-    note: note || "",
-    originalUrl: canonical,
-    rawOriginalUrl,
-    affiliateUrl,
-    imageUrl: scraped.imageUrl || null,
-    price: numericPrice,
-    clicks: 0,
-  });
-
-  await link.save();
-  return link;
-}
-
 // ---------- Routes ----------
 
-// Simple test route
+// Simple test
 router.get("/test", (req, res) => {
-  res.json({ success: true, message: "Links API is alive" });
+  res.json({ success: true, message: "Affiliate links API is alive" });
 });
 
-// Get all links (newest first)
+// Quick DB test
+router.get("/dbtest", async (req, res) => {
+  try {
+    const count = await Link.countDocuments();
+    res.json({ success: true, count });
+  } catch (err) {
+    console.error("DB test error:", err);
+    res.status(500).json({ success: false, message: "DB error", error: err.message });
+  }
+});
+
+// Get all links (for dashboard + store)
 router.get("/all", async (req, res) => {
   try {
-    const links = await Link.find().sort({ createdAt: -1 }).lean();
+    const links = await Link.find().sort({ createdAt: -1 });
     res.json({ success: true, links });
   } catch (err) {
-    console.error("GET /all error:", err);
-    res.status(500).json({ success: false, message: "Failed to load links." });
+    console.error("Error fetching links:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch links" });
   }
 });
 
-// Create single affiliate link
+// Create a single Amazon affiliate link
 router.post("/create", async (req, res) => {
   try {
-    const { url, title, category, note, autoTitle } = req.body || {};
-    if (!url) {
+    const { originalUrl, category: manualCategory, note } = req.body || {};
+
+    if (!originalUrl || typeof originalUrl !== "string") {
       return res
         .status(400)
-        .json({ success: false, message: "URL is required." });
+        .json({ success: false, message: "originalUrl is required" });
     }
 
-    const link = await createSingleLink({
-      url,
+    const rawOriginalUrl = originalUrl.trim();
+    const canonicalUrl = buildCanonicalAmazonUrl(rawOriginalUrl);
+
+    if (!canonicalUrl.includes("amazon.")) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Only Amazon product URLs are supported right now." });
+    }
+
+    const id = generateId();
+    const affiliateUrl = buildAffiliateUrl(canonicalUrl);
+
+    let scraped = null;
+    try {
+      scraped = await scrapeAmazonProduct(canonicalUrl);
+    } catch (err) {
+      console.warn("Scrape error on create:", err.message);
+      if (err.isBotProtection) {
+        console.warn("Amazon bot protection hit. Creating minimal link.");
+      }
+      // We'll still create a basic record below
+    }
+
+    const title = scraped?.title || "Product";
+    const shortTitle = scraped?.shortTitle || title;
+    const brand = scraped?.brand || null;
+    const slug = scraped?.slug || null;
+    const shortDescription =
+      scraped?.shortDescription ||
+      "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.";
+    const longDescription = scraped?.longDescription || null;
+
+    const cat =
+      manualCategory && manualCategory.trim() !== ""
+        ? manualCategory.trim().toLowerCase()
+        : guessCategory(scraped, title);
+
+    const { price, priceCurrency, priceRaw } = parsePrice(scraped?.priceText);
+
+    const link = new Link({
+      id,
+      source: "amazon",
       title,
-      category,
-      note,
-      autoTitle: autoTitle !== false,
+      shortTitle,
+      brand,
+      category: cat,
+      categoryPath: scraped?.categoryPath || [],
+      note: note || "",
+      originalUrl: canonicalUrl,
+      rawOriginalUrl,
+      affiliateUrl,
+      tag: process.env.AMAZON_ASSOC_TAG || "alwaysonsale-21",
+      imageUrl: scraped?.primaryImage || null,
+      images: scraped?.images || [],
+      price,
+      priceCurrency,
+      priceRaw,
+      rating: scraped?.rating || null,
+      reviewsCount: scraped?.reviewsCount || null,
+      shortDescription,
+      longDescription,
+      slug,
+      isActive: true,
+      lastCheckedAt: new Date(),
+      lastError: scraped ? null : "scrape_failed_on_create",
     });
 
+    await link.save();
     res.json({ success: true, link });
   } catch (err) {
-    console.error("POST /create error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Create failed." });
+    console.error("Error creating link:", err);
+    res.status(500).json({ success: false, message: "Failed to create link" });
   }
 });
 
-// Bulk create (up to 10 URLs)
-router.post("/bulk", async (req, res) => {
+// Bulk create (10 URLs) – still Amazon-only
+router.post("/bulk-create", async (req, res) => {
   try {
-    const { urls, title, category, note, autoTitle } = req.body || {};
-    if (!Array.isArray(urls) || !urls.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide an array of URLs.",
-      });
+    const { urls, category: manualCategory, note } = req.body || {};
+    if (!Array.isArray(urls) || urls.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "urls must be a non-empty array" });
     }
 
-    const cleanUrls = urls
-      .map((u) => String(u || "").trim())
-      .filter(Boolean)
-      .slice(0, 10);
+    const results = [];
+    for (const url of urls) {
+      if (!url || typeof url !== "string") continue;
 
-    const created = [];
-    for (const url of cleanUrls) {
-      try {
-        const link = await createSingleLink({
-          url,
-          title,
-          category,
-          note,
-          autoTitle: autoTitle !== false,
+      const rawOriginalUrl = url.trim();
+      const canonicalUrl = buildCanonicalAmazonUrl(rawOriginalUrl);
+
+      if (!canonicalUrl.includes("amazon.")) {
+        results.push({
+          success: false,
+          url: rawOriginalUrl,
+          message: "Not an Amazon URL",
         });
-        created.push(link);
-      } catch (innerErr) {
-        console.error("Bulk create single error:", innerErr.message || innerErr);
-        // Skip bad ones, continue others
+        continue;
       }
+
+      const id = generateId();
+      const affiliateUrl = buildAffiliateUrl(canonicalUrl);
+
+      let scraped = null;
+      try {
+        scraped = await scrapeAmazonProduct(canonicalUrl);
+      } catch (err) {
+        console.warn("Scrape error in bulk-create:", err.message);
+      }
+
+      const title = scraped?.title || "Product";
+      const shortTitle = scraped?.shortTitle || title;
+      const brand = scraped?.brand || null;
+      const slug = scraped?.slug || null;
+      const shortDescription =
+        scraped?.shortDescription ||
+        "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.";
+      const longDescription = scraped?.longDescription || null;
+
+      const cat =
+        manualCategory && manualCategory.trim() !== ""
+          ? manualCategory.trim().toLowerCase()
+          : guessCategory(scraped, title);
+
+      const { price, priceCurrency, priceRaw } = parsePrice(scraped?.priceText);
+
+      const link = new Link({
+        id,
+        source: "amazon",
+        title,
+        shortTitle,
+        brand,
+        category: cat,
+        categoryPath: scraped?.categoryPath || [],
+        note: note || "",
+        originalUrl: canonicalUrl,
+        rawOriginalUrl,
+        affiliateUrl,
+        tag: process.env.AMAZON_ASSOC_TAG || "alwaysonsale-21",
+        imageUrl: scraped?.primaryImage || null,
+        images: scraped?.images || [],
+        price,
+        priceCurrency,
+        priceRaw,
+        rating: scraped?.rating || null,
+        reviewsCount: scraped?.reviewsCount || null,
+        shortDescription,
+        longDescription,
+        slug,
+        isActive: true,
+        lastCheckedAt: new Date(),
+        lastError: scraped ? null : "scrape_failed_on_bulk_create",
+      });
+
+      await link.save();
+      results.push({ success: true, url: rawOriginalUrl, link });
     }
 
     res.json({
       success: true,
-      createdCount: created.length,
-      links: created,
+      created: results.filter((r) => r.success).length,
+      results,
     });
   } catch (err) {
-    console.error("POST /bulk error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Bulk create failed." });
+    console.error("Error in bulk-create:", err);
+    res.status(500).json({ success: false, message: "Bulk create failed" });
   }
 });
 
-// Redirect + count click
+// Redirect + click tracking
 router.get("/go/:id", async (req, res) => {
   try {
-    const id = req.params.id;
-    const link = await Link.findOne({ id });
-
-    if (!link) {
-      return res.status(404).send("Link not found");
-    }
+    const link = await Link.findOne({ id: req.params.id });
+    if (!link) return res.status(404).send("Link not found");
 
     link.clicks = (link.clicks || 0) + 1;
     await link.save();
 
-    const target =
-      link.affiliateUrl || link.originalUrl || link.rawOriginalUrl;
-
-    if (!target) {
-      return res.status(500).send("No target URL configured.");
-    }
-
-    res.redirect(target);
+    res.redirect(link.affiliateUrl || link.originalUrl);
   } catch (err) {
-    console.error("GET /go/:id error:", err);
-    res.status(500).send("Error redirecting.");
+    console.error("Error in redirect:", err);
+    res.status(500).send("Error redirecting");
   }
 });
 
 // Delete link
 router.delete("/delete/:id", async (req, res) => {
   try {
-    const id = req.params.id;
-    const result = await Link.findOneAndDelete({ id });
-
-    if (!result) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Link not found." });
-    }
-
-    res.json({ success: true, message: "Link deleted." });
-  } catch (err) {
-    console.error("DELETE /delete/:id error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to delete link." });
-  }
-});
-
-// Update link (title, category, note)
-router.put("/update/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const { title, category, note } = req.body || {};
-
-    const link = await Link.findOne({ id });
+    const link = await Link.findOneAndDelete({ id: req.params.id });
     if (!link) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Link not found." });
+      return res.status(404).json({ success: false, message: "Link not found" });
     }
-
-    if (typeof title === "string" && title.trim()) {
-      link.title = title.trim();
-    }
-    if (typeof category === "string" && category.trim()) {
-      link.category = category.trim();
-    }
-    if (typeof note === "string") {
-      link.note = note;
-    }
-
-    await link.save();
-    res.json({ success: true, link });
+    res.json({ success: true });
   } catch (err) {
-    console.error("PUT /update/:id error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to update link." });
+    console.error("Error deleting link:", err);
+    res.status(500).json({ success: false, message: "Failed to delete link" });
   }
 });
 
-// Daily maintenance: refresh info (title, image, price) for recent links
+// Daily maintenance: refresh prices & fill missing metadata
 router.post("/maintenance/daily", async (req, res) => {
   try {
-    // Limit to latest 50 links for safety; can adjust later
-    const links = await Link.find({})
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    let processed = 0;
-    let updated = 0;
+    const links = await Link.find({ source: "amazon", isActive: true });
+    let updatedCount = 0;
 
     for (const link of links) {
-      processed += 1;
+      const lastChecked = link.lastCheckedAt
+        ? dayjs(link.lastCheckedAt)
+        : null;
+      const tooOld =
+        !lastChecked || dayjs().diff(lastChecked, "hour") >= 24;
 
-      try {
-        if (!link.originalUrl && link.rawOriginalUrl) {
-          link.originalUrl = buildCanonicalAmazonUrl(link.rawOriginalUrl);
-        }
+      const needsMetadata =
+        !link.title ||
+        !link.imageUrl ||
+        !link.shortDescription ||
+        !link.priceRaw;
 
-        if (!link.originalUrl) continue;
-
-        const scraped = await scrapeAmazonProduct(link.originalUrl);
-
-        let changed = false;
-
-        if (!link.title && scraped.title) {
-          link.title = scraped.title;
-          changed = true;
-        }
-
-        if (!link.imageUrl && scraped.imageUrl) {
-          link.imageUrl = scraped.imageUrl;
-          changed = true;
-        }
-
-        const newNumericPrice = extractNumericPrice(scraped.priceText);
-        if (newNumericPrice !== null && newNumericPrice !== link.price) {
-          link.price = newNumericPrice;
-          changed = true;
-        }
-
-        if (changed) {
-          await link.save();
-          updated += 1;
-        }
-      } catch (innerErr) {
-        console.error(
-          "maintenance/daily per-link error:",
-          innerErr.message || innerErr
-        );
-        // continue with next link
+      if (!tooOld && !needsMetadata) {
+        continue; // skip fresh links
       }
+
+      let scraped = null;
+      try {
+        scraped = await scrapeAmazonProduct(link.originalUrl);
+      } catch (err) {
+        console.warn(`Maintenance scrape error for ${link.id}:`, err.message);
+        link.lastError = err.message;
+        link.lastCheckedAt = new Date();
+        await link.save();
+        continue;
+      }
+
+      const { price, priceCurrency, priceRaw } = parsePrice(scraped.priceText);
+
+      // Handle price change bookkeeping
+      if (
+        price != null &&
+        (link.price == null || price !== link.price)
+      ) {
+        link.prevPrice = link.price;
+        link.prevPriceCurrency = link.priceCurrency;
+        link.priceChangeReason = "maintenance_update";
+      }
+
+      if (price != null) {
+        link.price = price;
+        link.priceCurrency = priceCurrency;
+      }
+      if (priceRaw) link.priceRaw = priceRaw;
+
+      if (scraped.title) link.title = scraped.title;
+      if (scraped.shortTitle) link.shortTitle = scraped.shortTitle;
+      if (scraped.brand) link.brand = scraped.brand;
+      if (scraped.primaryImage && !link.imageUrl)
+        link.imageUrl = scraped.primaryImage;
+      if (scraped.images && scraped.images.length > 0 && link.images.length === 0)
+        link.images = scraped.images;
+
+      if (!link.shortDescription && scraped.shortDescription) {
+        link.shortDescription = scraped.shortDescription;
+      }
+      if (!link.longDescription && scraped.longDescription) {
+        link.longDescription = scraped.longDescription;
+      }
+      if (!link.slug && scraped.slug) link.slug = scraped.slug;
+
+      if (scraped.rating != null) link.rating = scraped.rating;
+      if (scraped.reviewsCount != null)
+        link.reviewsCount = scraped.reviewsCount;
+
+      if (!link.category || link.category === "other") {
+        link.category = guessCategory(scraped, scraped.title);
+      }
+      if (
+        (!link.categoryPath || link.categoryPath.length === 0) &&
+        scraped.categoryPath &&
+        scraped.categoryPath.length > 0
+      ) {
+        link.categoryPath = scraped.categoryPath;
+      }
+
+      link.lastCheckedAt = new Date();
+      link.lastError = null;
+
+      await link.save();
+      updatedCount++;
     }
-
-    res.json({ success: true, processed, updated });
-  } catch (err) {
-    console.error("POST /maintenance/daily error:", err);
-    res.status(500).json({
-      success: false,
-      message: err.message || "Maintenance failed.",
-    });
-  }
-});
-
-// Simple analytics summary for dashboard
-router.get("/analytics/summary", async (req, res) => {
-  try {
-    const links = await Link.find().lean();
-    const totalLinks = links.length;
-    const totalClicks = links.reduce((sum, l) => sum + (l.clicks || 0), 0);
-
-    const top = [...links]
-      .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
-      .slice(0, 3)
-      .map((l) => ({
-        id: l.id,
-        title: l.title || "(no title)",
-        clicks: l.clicks || 0,
-      }));
 
     res.json({
       success: true,
-      totalLinks,
-      totalClicks,
-      topProducts: top,
+      processed: links.length,
+      updated: updatedCount,
     });
   } catch (err) {
-    console.error("GET /analytics/summary error:", err);
-    res.status(500).json({
-      success: false,
-      message: "Failed to load analytics.",
-    });
+    console.error("Error in maintenance/daily:", err);
+    res.status(500).json({ success: false, message: "Maintenance failed" });
   }
+});
+
+// Placeholder for future Admitad integration (keep existing route shape)
+router.post("/admitad", (req, res) => {
+  res.json({
+    success: false,
+    message:
+      "Admitad integration not implemented yet. We'll plug it in once programs are approved.",
+  });
 });
 
 module.exports = router;
