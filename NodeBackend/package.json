@@ -12,6 +12,7 @@
     "express": "^4.19.0",
     "mongoose": "^8.6.0",
     "cheerio": "^1.0.0-rc.12",
-    "cheerio-httpcli": "^0.8.0"
+    "cheerio-httpcli": "^0.8.0",
+    "dayjs": "^1.11.13"
   }
 }
