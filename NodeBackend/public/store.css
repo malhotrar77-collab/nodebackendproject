@@ -1,528 +1,422 @@
-/* ============================
-   AlwaysOnSale — Store Styles
-   ============================ */
+/* AlwaysOnSale — Store page styles
+   This file is ONLY for store.html.
+   It assumes the HTML structure we created earlier.
+*/
 
-:root {
-  --bg-body: #020617;
-  --bg-panel: #020617;
-  --bg-card: #020617;
-  --bg-card-elevated: #020617;
-  --bg-chip: #020617;
-  --bg-chip-active: #ef4444;
-  --bg-chip-active-soft: rgba(239, 68, 68, 0.16);
-  --bg-pill-live: #22c55e;
-  --bg-input: #020617;
-  --bg-input-inner: #020617;
-  --bg-button-primary: linear-gradient(135deg, #f97316, #ec4899);
-  --bg-button-secondary: #020617;
+/* ---------- Base layout just for this page ---------- */
 
-  --border-subtle: rgba(148, 163, 184, 0.25);
-  --border-card: rgba(15, 23, 42, 0.9);
-  --border-chip: rgba(148, 163, 184, 0.45);
-  --border-input: rgba(148, 163, 184, 0.35);
-
-  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.85);
-
-  --text-main: #e2e8f0;
-  --text-muted: #94a3b8;
-  --text-soft: #64748b;
-  --text-strong: #f9fafb;
-  --text-live: #16a34a;
-  --text-danger: #f97316;
-
-  --radius-pill: 999px;
-  --radius-card: 24px;
-  --radius-input: 999px;
-
-  --font-main: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", sans-serif;
-}
-
-/* ====================================
-   Page + global
-   ==================================== */
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html,
 body {
   margin: 0;
-  padding: 0;
-  background: radial-gradient(circle at top left, #0f172a 0, #020617 55%);
-  color: var(--text-main);
-  font-family: var(--font-main);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, #141b35 0, #050814 45%, #02040a 100%);
+  color: #f7f7ff;
 }
 
-body {
-  -webkit-font-smoothing: antialiased;
-}
-
-.page-shell {
-  min-height: 100vh;
-  padding: 32px 24px 40px;
-  max-width: 1280px;
+/* Wraps the whole store page content (inside <body>) */
+.page {
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 32px 16px 80px;
 }
 
-/* ====================================
-   Top header / nav
-   ==================================== */
+/* ---------- Top bar (logo + nav) ---------- */
 
-.store-header {
+.top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
-.store-brand {
+.brand {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.store-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #f97316;
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.9);
-}
-
-.store-name {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-main);
-}
-
-/* top-right "Store / Dashboard" links */
-.header-nav {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   font-size: 14px;
-}
-
-.header-nav a {
-  color: #e2e8f0;
-  text-decoration: none;
-  font-weight: 500;
-  opacity: 0.85;
-}
-
-.header-nav a:hover {
-  opacity: 1;
-}
-
-/* ====================================
-   Hero / title section
-   ==================================== */
-
-.hero-block {
-  margin-bottom: 18px;
-}
-
-.hero-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: radial-gradient(circle at top left, rgba(251, 113, 133, 0.1), transparent);
-  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+}
+
+.brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 20%, #fffd, #ff783c 40%, #f24941 85%);
+  box-shadow: 0 0 12px rgba(242, 142, 79, 0.8);
+}
+
+.brand-text-1 {
+  color: #f7f7ff;
+}
+
+.brand-text-2 {
+  color: #ff783c;
+}
+
+/* Right side nav (Store | Dashboard) */
+
+.top-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.top-nav a {
+  color: #9ca5d3;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: all 0.18s ease-out;
+}
+
+.top-nav a:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.top-nav a.selected {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ---------- Hero / heading area ---------- */
+
+.hero {
+  margin-bottom: 28px;
 }
 
 .hero-title {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 10px 0 4px;
-  color: var(--text-strong);
+  font-size: 32px;
+  font-weight: 750;
+  margin: 0 0 8px;
 }
 
 .hero-subtitle {
-  font-size: 13px;
-  color: var(--text-muted);
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #9ca5d3;
 }
 
-/* live badge on right (green pill) */
-
-.hero-meta-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-}
+/* “Live from AlwaysOnSale” pill */
 
 .live-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.5);
-  color: #bbf7d0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 0% 0%, #41ff8a, #059b4c 60%, #01723a 100%);
+  box-shadow: 0 0 12px rgba(16, 237, 125, 0.7);
   font-size: 11px;
+  font-weight: 600;
+  color: #02170b;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.11em;
 }
 
-.live-pill-dot {
-  width: 8px;
-  height: 8px;
+.live-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
-  background: #22c55e;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+  background: #02170b;
 }
 
-/* ====================================
-   Filters row (categories + search + sort)
-   ==================================== */
+/* ---------- Category pills row ---------- */
 
-.filters-shell {
-  margin: 18px 0 12px;
-}
-
-/* Category pills row */
-.category-bar {
+.categories-bar {
+  margin: 24px 0 18px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 12px 0;
+  gap: 8px;
 }
 
-.category-pill {
-  border-radius: var(--radius-pill);
-  padding: 7px 14px;
+.cat-pill {
+  border-radius: 999px;
+  padding: 6px 13px;
   font-size: 12px;
-  border: 1px solid var(--border-chip);
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--text-soft);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #aab3de;
+  background: rgba(9, 14, 36, 0.8);
   cursor: pointer;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: background 0.16s ease-out, border-color 0.16s ease-out,
-    color 0.16s ease-out, transform 0.08s ease-out;
+  transition: all 0.16s ease-out;
 }
 
-.category-pill span.dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.85);
+.cat-pill:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
-.category-pill:hover {
-  background: rgba(15, 23, 42, 0.98);
-  transform: translateY(-1px);
+.cat-pill.active {
+  background: radial-gradient(circle at top left, #ff9f4a, #ff5f6d);
+  border-color: transparent;
+  color: #050814;
 }
 
-.category-pill--active {
-  border-color: rgba(239, 68, 68, 0.8);
-  background: var(--bg-chip-active-soft);
-  color: #fecaca;
-}
+/* ---------- Search row ---------- */
 
-/* Search + sort row */
-
-.filters-bottom-row {
+.search-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 12px;
   align-items: center;
+  margin-bottom: 16px;
 }
 
-.search-shell {
-  flex: 1 1 230px;
+.search-input-wrap {
+  flex: 1 1 260px;
   position: relative;
 }
 
-.search-input {
+.search-input-wrap input {
   width: 100%;
-  border-radius: var(--radius-input);
-  border: 1px solid var(--border-input);
   padding: 9px 12px 9px 34px;
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--text-main);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(4, 8, 24, 0.9);
+  color: #f7f7ff;
   font-size: 13px;
-  outline: none;
 }
 
-.search-input::placeholder {
-  color: rgba(148, 163, 184, 0.85);
+.search-input-wrap input::placeholder {
+  color: #6f789f;
 }
 
 .search-icon {
   position: absolute;
-  left: 12px;
+  left: 11px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 12px;
-  color: rgba(148, 163, 184, 0.85);
+  font-size: 13px;
+  opacity: 0.7;
 }
 
-.sort-shell {
-  flex: 0 0 155px;
+.sort-wrap {
+  font-size: 12px;
 }
 
 .sort-select {
-  width: 100%;
-  border-radius: var(--radius-input);
-  border: 1px solid var(--border-input);
-  padding: 9px 12px;
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--text-main);
-  font-size: 13px;
+  padding: 7px 24px 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(7, 12, 28, 0.95);
+  color: #d5daf7;
 }
 
-/* ====================================
-   Products meta line
-   ==================================== */
+/* ---------- Status line (“Showing X deals”) ---------- */
 
-.products-meta {
+.status-line {
   font-size: 12px;
-  color: #22c55e;
-  margin: 10px 0 8px;
+  color: #56c36a;
+  margin-bottom: 18px;
 }
 
-/* ====================================
-   Products grid
-   ==================================== */
+/* ---------- Cards grid ---------- */
 
-/* Product grid layout */
-.products-grid {
+.cards-grid {
   display: grid;
-  grid-template-columns: 1fr;   /* mobile: 1 card per row */
-  gap: 24px;
-  padding: 24px 0 48px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
 }
 
-/* >= 640px: 2 cards per row */
-@media (min-width: 640px) {
-  .products-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+/* Individual card */
 
-/* >= 960px: 3 cards per row */
-@media (min-width: 960px) {
-  .products-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* >= 1280px: 4 cards per row (desktop) */
-@media (min-width: 1280px) {
-  .products-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-/* ====================================
-   Product card
-   ==================================== */
-
-.product-card {
-  background: radial-gradient(circle at top left, #020617 0, #020617 60%);
-  border-radius: var(--radius-card);
-  border: 1px solid rgba(15, 23, 42, 0.95);
+.deal-card {
+  border-radius: 20px;
+  background: radial-gradient(circle at top left, #141b35, #050814 55%);
   padding: 14px 14px 16px;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.8);
   position: relative;
-  overflow: hidden;
-  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out,
-    border-color 0.18s ease-out;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
-.product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-soft);
-  border-color: rgba(248, 113, 113, 0.7);
-}
+/* Source + category chips at top of card */
 
-/* header badges (Amazon, category) */
-
-.product-card-top {
+.card-tags {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-}
-
-.product-badge {
-  padding: 4px 9px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(148, 163, 184, 0.5);
-  background: rgba(15, 23, 42, 0.85);
-  color: var(--text-soft);
-}
-
-.product-badge--amazon {
-  border-color: rgba(248, 250, 252, 0.65);
-  color: #e5e7eb;
-}
-
-/* image */
-
-.product-image-wrapper {
-  border-radius: 18px;
-  overflow: hidden;
-  background: radial-gradient(circle at center, #020617 0, #020617 70%);
   margin-bottom: 10px;
-  min-height: 210px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+}
+
+.badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #b3bce8;
+}
+
+.badge-primary {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Image region */
+
+.deal-image {
+  border-radius: 16px;
+  background: radial-gradient(circle at top left, #11172e, #050814);
+  overflow: hidden;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  aspect-ratio: 3 / 4;
 }
 
-.product-image-wrapper.no-image {
-  border: 1px dashed rgba(51, 65, 85, 0.9);
-}
-
-.product-image {
+.deal-image img {
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: contain;
-  display: block;
 }
 
-/* text */
+/* Title & description */
 
-.product-title {
+.deal-title {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
+  font-weight: 650;
   margin-bottom: 4px;
 }
 
-.product-description {
-  font-size: 11px;
-  color: var(--text-muted);
+.deal-description {
+  font-size: 12px;
+  color: #a3abd6;
   line-height: 1.5;
-  max-height: 3.3em;
-  overflow: hidden;
+  margin-bottom: 10px;
 }
 
-/* price / meta row */
+/* Price row */
 
-.product-meta-row {
+.deal-price-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-top: 10px;
   font-size: 11px;
+  margin-bottom: 12px;
 }
 
-.product-price-main {
+.deal-price-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deal-price-label {
+  color: #a3abd6;
+}
+
+.deal-price-current {
+  font-size: 16px;
   font-weight: 700;
-  color: #f97316;
-  font-size: 13px;
+  color: #ffb36b;
 }
 
-.product-price-note {
-  font-size: 10px;
-  color: var(--text-soft);
-}
-
-.product-date-clicks {
+.deal-date {
   text-align: right;
-  font-size: 10px;
-  color: var(--text-soft);
+  color: #6f789f;
 }
 
-/* bottom buttons */
+/* Category + clicks chips at bottom */
 
-.product-card-footer {
+.deal-meta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
 }
 
-.button-primary {
-  flex: 1 1 auto;
-  border-radius: var(--radius-pill);
+.meta-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.meta-chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(18, 25, 57, 0.95);
+  color: #a3abd6;
+}
+
+/* Buttons row */
+
+.deal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  border-radius: 999px;
+  padding: 9px 0;
   border: none;
-  padding: 9px 14px;
-  background-image: var(--bg-button-primary);
-  color: white;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 12px 25px rgba(236, 72, 153, 0.45);
-  white-space: nowrap;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, background 0.12s ease-out;
 }
 
-.button-secondary {
-  flex: 0 0 auto;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(148, 163, 184, 0.65);
-  padding: 8px 12px;
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--text-main);
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
+.btn-primary {
+  background: radial-gradient(circle at 0% 0%, #ffb36b, #ff5f6d 70%);
+  color: #170312;
+  box-shadow: 0 12px 22px rgba(255, 116, 87, 0.4);
 }
 
-/* states */
-
-.empty-state {
-  padding: 40px 20px 60px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(255, 116, 87, 0.55);
 }
 
-/* ====================================
-   Responsive tweaks
-   ==================================== */
+.btn-secondary {
+  background: rgba(10, 15, 37, 0.95);
+  color: #cfd5ff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.btn-secondary:hover {
+  background: rgba(17, 25, 55, 1);
+}
+
+/* ---------- Empty / error state ---------- */
+
+.empty-state,
+.error-state {
+  margin-top: 40px;
+  font-size: 14px;
+  color: #ff9f7a;
+}
+
+/* ---------- Responsive tweaks ---------- */
 
 @media (max-width: 768px) {
-  .page-shell {
-    padding: 20px 14px 32px;
-  }
-
-  .store-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .header-nav {
-    gap: 12px;
-    font-size: 13px;
+  .page {
+    padding: 20px 12px 60px;
   }
 
   .hero-title {
     font-size: 24px;
   }
 
-  .product-image-wrapper {
-    min-height: 180px;
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 
-  .product-card {
-    border-radius: 18px;
+  .search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .deal-actions {
+    flex-direction: column;
   }
 }
