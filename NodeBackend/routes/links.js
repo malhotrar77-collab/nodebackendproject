@@ -41,7 +41,10 @@ async function scrapeAmazonProduct(rawUrl) {
     const { $, response } = await client.fetch(rawUrl, {});
 
     const finalUrl =
-      (response && response.request && response.request.uri && response.request.uri.href) ||
+      (response &&
+        response.request &&
+        response.request.uri &&
+        response.request.uri.href) ||
       rawUrl;
 
     // Title
@@ -73,7 +76,6 @@ async function scrapeAmazonProduct(rawUrl) {
         .trim()
         .toLowerCase() || "other";
 
-    // Clean category a bit
     if (!category) category = "other";
 
     return {
@@ -133,7 +135,7 @@ router.get("/all", async (req, res) => {
 // --- Create link (Amazon only, with scraping v2) ---
 
 router.post("/create", async (req, res) => {
-  try:
+  try {
     // Be VERY forgiving about the field name so the dashboard never breaks
     let originalUrlRaw =
       (req.body.originalUrl ||
@@ -142,10 +144,13 @@ router.post("/create", async (req, res) => {
         req.body.affiliateUrl ||
         "").trim();
 
-    const { title: manualTitle, category: manualCategory, note, autoTitle } = req.body;
+    const { title: manualTitle, category: manualCategory, note, autoTitle } =
+      req.body;
 
     if (!originalUrlRaw) {
-      return res.status(400).json({ success: false, error: "originalUrl is required" });
+      return res
+        .status(400)
+        .json({ success: false, error: "originalUrl is required" });
     }
 
     if (!isAmazonUrl(originalUrlRaw)) {
@@ -245,12 +250,16 @@ router.delete("/delete/:id", async (req, res) => {
   try {
     const deleted = await Link.findOneAndDelete({ id: req.params.id });
     if (!deleted) {
-      return res.status(404).json({ success: false, error: "Link not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Link not found" });
     }
     res.json({ success: true });
   } catch (err) {
     console.error("DELETE /delete/:id error:", err);
-    res.status(500).json({ success: false, error: "Failed to delete link" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to delete link" });
   }
 });
 
@@ -279,9 +288,8 @@ router.post("/maintenance/daily", async (req, res) => {
         }
         if (scraped.imageUrl && !link.imageUrl) {
           link.imageUrl = scraped.imageUrl;
-          link.images = link.images && link.images.length
-            ? link.images
-            : [scraped.imageUrl];
+          link.images =
+            link.images && link.images.length ? link.images : [scraped.imageUrl];
         }
         if (price != null) {
           link.price = price;
@@ -298,7 +306,7 @@ router.post("/maintenance/daily", async (req, res) => {
       } catch (err) {
         console.warn(
           `Maintenance scrape error for ${link.id}:`,
-          err.message || err,
+          err.message || err
         );
         link.lastCheckedAt = new Date();
         link.inactive = true;
