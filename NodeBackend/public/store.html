@@ -1,132 +1,380 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AlwaysOnSale – Deals</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="store.css" />
-</head>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="top-bar">
+        <div class="logo-badge">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-orange"></span>
+          <span class="dot dot-pink"></span>
+          <span class="logo-text-main">ALWAYS</span>
+          <span class="logo-text-secondary">ON SALE</span>
+        </div>
 
-<body>
-    <header class="topbar">
-        <div class="logo">🔴 ALWAYS <span>ON</span> SALE</div>
-        <nav>
-            <a href="/AlwaysOnSale" class="active">Store</a>
-            <a href="/index.html">Dashboard (admin)</a>
+        <nav class="top-nav">
+          <a href="/store.html" class="nav-link nav-link-active">Store</a>
+          <a href="/" class="nav-link">Dashboard (admin)</a>
         </nav>
-    </header>
+      </header>
 
-    <main class="container">
+      <main class="store-main">
+        <!-- Hero / heading -->
         <section class="hero">
-            <h1>Today's hand-picked deals</h1>
+          <div class="hero-text">
+            <h1>Today’s hand-picked deals</h1>
             <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
-            <span class="liveBadge">🟢 LIVE FROM ALWAYSonsale</span>
+
+            <div class="hero-meta">
+              <span class="live-pill">
+                <span class="live-dot"></span>
+                LIVE FROM ALWAYSonsale
+              </span>
+              <span class="hero-sub">
+                Showing <span id="dealCount">0</span> deals.
+              </span>
+            </div>
+          </div>
         </section>
 
-        <section class="filters">
-            <button class="filter active" data-category="all">All</button>
-            <button class="filter" data-category="clothing">Clothing</button>
-            <button class="filter" data-category="tshirts">Tshirts</button>
-            <button class="filter" data-category="shoes">Shoes</button>
-            <button class="filter" data-category="bags">Bags</button>
-            <button class="filter" data-category="electronics">Electronics</button>
-            <button class="filter" data-category="jeans">Jeans</button>
-            <button class="filter" data-category="laptops">Laptops</button>
+        <!-- Filters + search -->
+        <section class="toolbar">
+          <div class="toolbar-left">
+            <div class="pill-filter-group" id="categoryFilters">
+              <!-- Buttons created by JS -->
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <div class="search-wrapper">
+              <input
+                id="searchInput"
+                class="search-input"
+                type="search"
+                placeholder="Search products or category…"
+              />
+            </div>
+
+            <div class="sort-wrapper">
+              <label for="sortSelect" class="sort-label">Sort</label>
+              <select id="sortSelect" class="sort-select">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="price-low">Price: low to high</option>
+                <option value="price-high">Price: high to low</option>
+                <option value="clicks">Most clicked</option>
+              </select>
+            </div>
+          </div>
         </section>
 
-        <section class="searchSort">
-            <input id="searchBox" type="text" placeholder="Search products or category..." />
-            <select id="sortSelect">
-                <option value="new">Newest first</option>
-                <option value="old">Oldest first</option>
-                <option value="priceHigh">Price high → low</option>
-                <option value="priceLow">Price low → high</option>
-            </select>
+        <!-- Status / errors -->
+        <section id="statusBar" class="status-bar status-hidden">
+          <span id="statusMessage"></span>
         </section>
 
-        <p id="statusMessage">Loading deals...</p>
+        <!-- Products grid -->
+        <section id="productsSection" class="products-section">
+          <div id="productsGrid" class="products-grid">
+            <!-- Cards rendered by JS -->
+          </div>
+        </section>
+      </main>
 
-        <div id="grid" class="grid"></div>
-    </main>
+      <footer class="page-footer">
+        <span>AlwaysOnSale · Amazon engine, Instagram skin.</span>
+      </footer>
+    </div>
 
     <script>
-        const grid = document.getElementById("grid");
-        const statusMessage = document.getElementById("statusMessage");
+      const API_BASE = "/api/links";
 
-        async function fetchLinks() {
+      const CATEGORY_PRESETS = [
+        "All",
+        "Clothing",
+        "Tshirts",
+        "Shoes",
+        "Bags",
+        "Electronics",
+        "Jeans",
+        "Laptops",
+        "Other",
+      ];
+
+      const state = {
+        allLinks: [],
+        filtered: [],
+        activeCategory: "All",
+        searchTerm: "",
+        sortBy: "newest",
+      };
+
+      // ---------- Helpers ----------
+
+      function formatPrice(price, currency) {
+        if (price == null) return "";
+        const num = Number(price);
+        if (Number.isNaN(num)) return "";
+
+        if (currency === "INR") {
+          return "₹" + num.toLocaleString("en-IN");
+        }
+        if (!currency) {
+          return num.toLocaleString();
+        }
+        return currency + " " + num.toLocaleString();
+      }
+
+      function formatDate(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+
+      function showStatus(message, tone = "info") {
+        const bar = document.getElementById("statusBar");
+        const msg = document.getElementById("statusMessage");
+        if (!message) {
+          bar.classList.add("status-hidden");
+          msg.textContent = "";
+          return;
+        }
+        msg.textContent = message;
+        bar.className = "status-bar status-" + tone;
+      }
+
+      // ---------- Rendering ----------
+
+      function buildCategoryFilters() {
+        const container = document.getElementById("categoryFilters");
+        container.innerHTML = "";
+
+        CATEGORY_PRESETS.forEach((label) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "pill-filter";
+          btn.dataset.category = label;
+
+          if (label === state.activeCategory) {
+            btn.classList.add("pill-filter-active");
+          }
+
+          btn.textContent = label;
+          btn.addEventListener("click", () => {
+            state.activeCategory = label;
+            document
+              .querySelectorAll(".pill-filter")
+              .forEach((b) => b.classList.remove("pill-filter-active"));
+            btn.classList.add("pill-filter-active");
+            applyFiltersAndRender();
+          });
+
+          container.appendChild(btn);
+        });
+      }
+
+      function applyFiltersAndRender() {
+        const { allLinks, activeCategory, searchTerm, sortBy } = state;
+        let list = [...allLinks];
+
+        // Category filter
+        if (activeCategory && activeCategory !== "All") {
+          const cat = activeCategory.toLowerCase();
+          list = list.filter((l) =>
+            (l.category || "other").toLowerCase().includes(cat)
+          );
+        }
+
+        // Search filter
+        if (searchTerm.trim()) {
+          const q = searchTerm.toLowerCase();
+          list = list.filter((l) => {
+            const title = (l.title || "").toLowerCase();
+            const note = (l.note || "").toLowerCase();
+            const cat = (l.category || "").toLowerCase();
+            return title.includes(q) || note.includes(q) || cat.includes(q);
+          });
+        }
+
+        // Sorting
+        list.sort((a, b) => {
+          if (sortBy === "price-low" || sortBy === "price-high") {
+            const pa = Number(a.price ?? NaN);
+            const pb = Number(b.price ?? NaN);
+            if (Number.isNaN(pa) && Number.isNaN(pb)) return 0;
+            if (Number.isNaN(pa)) return 1;
+            if (Number.isNaN(pb)) return -1;
+            return sortBy === "price-low" ? pa - pb : pb - pa;
+          }
+
+          if (sortBy === "clicks") {
+            return (Number(b.clicks) || 0) - (Number(a.clicks) || 0);
+          }
+
+          // default: newest / oldest by createdAt
+          const da = new Date(a.createdAt || 0).getTime();
+          const db = new Date(b.createdAt || 0).getTime();
+          return sortBy === "oldest" ? da - db : db - da;
+        });
+
+        state.filtered = list;
+        renderGrid();
+      }
+
+      function renderGrid() {
+        const grid = document.getElementById("productsGrid");
+        const countEl = document.getElementById("dealCount");
+        const links = state.filtered;
+
+        countEl.textContent = links.length.toString();
+        grid.innerHTML = "";
+
+        if (!links.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.innerHTML =
+            "<p>No products yet. Add links from the Affiliate Links dashboard.</p>";
+          grid.appendChild(empty);
+          return;
+        }
+
+        links.forEach((link) => {
+          const card = document.createElement("article");
+          card.className = "product-card";
+
+          const imageHtml = link.imageUrl
+            ? `<img src="${link.imageUrl}" alt="${link.title || "Product image"}" class="product-image" />`
+            : `<div class="product-image product-image-empty">
+                 <span>No image</span>
+               </div>`;
+
+          const priceLabel = formatPrice(link.price, link.priceCurrency);
+          const dateLabel = formatDate(link.createdAt);
+          const clicks = Number(link.clicks) || 0;
+          const source = (link.source || "Amazon").toUpperCase();
+          const category = (link.category || "Other").toUpperCase();
+
+          const buyHref = link.id
+            ? \`/api/links/go/\${link.id}\`
+            : link.affiliateUrl || link.originalUrl || "#";
+
+          card.innerHTML = \`
+            <div class="card-badge-row">
+              <span class="badge badge-source">\${source}</span>
+              <span class="badge badge-category">\${category}</span>
+            </div>
+
+            <div class="card-image-wrapper">
+              \${imageHtml}
+            </div>
+
+            <div class="card-body">
+              <h2 class="product-title">\${link.title || "Product"}</h2>
+              <p class="product-note">\${link.note || "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle."}</p>
+
+              <div class="card-meta">
+                <div class="meta-price">
+                  \${priceLabel ? \`<span class="price-main">\${priceLabel}</span>\` : "<span class='price-main'>Best price on Amazon</span>"}
+                  <span class="price-sub">\${dateLabel ? \`Final price shown on Amazon page · \${dateLabel}\` : "Final price shown on Amazon page"}</span>
+                </div>
+                <div class="meta-clicks">
+                  <span>\${clicks}</span>
+                  <span class="meta-clicks-label">clicks</span>
+                </div>
+              </div>
+
+              <div class="card-actions">
+                <a href="\${buyHref}" target="_blank" rel="noopener" class="btn btn-primary">
+                  Buy on Amazon
+                </a>
+                <button type="button" class="btn btn-ghost" data-copy="\${buyHref}">
+                  Copy link
+                </button>
+              </div>
+            </div>
+          \`;
+
+          grid.appendChild(card);
+        });
+
+        // Wire copy buttons after cards are in DOM
+        grid.querySelectorAll("[data-copy]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const url = btn.getAttribute("data-copy");
             try {
-                const r = await fetch("/api/links/all");
-                const data = await r.json();
-
-                if (!data.success) throw new Error("Invalid API response");
-
-                statusMessage.textContent = `Showing ${data.links.length} deals.`;
-
-                renderCards(data.links);
-
-            } catch (e) {
-                statusMessage.textContent = "Could not load products. Try again in a bit.";
-                console.error("Error:", e);
+              await navigator.clipboard.writeText(url);
+              btn.textContent = "Copied!";
+              btn.classList.add("btn-copied");
+              setTimeout(() => {
+                btn.textContent = "Copy link";
+                btn.classList.remove("btn-copied");
+              }, 1200);
+            } catch (err) {
+              console.error("Copy failed", err);
+              showStatus("Could not copy link. Please copy from address bar.", "warn");
             }
+          });
+        });
+      }
+
+      // ---------- Data loading ----------
+
+      async function loadProducts() {
+        showStatus("Loading products…", "info");
+        try {
+          const res = await fetch(\`\${API_BASE}/all\`);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          const links = data.links || data || [];
+
+          state.allLinks = links;
+          showStatus(""); // clear
+          applyFiltersAndRender();
+        } catch (err) {
+          console.error(err);
+          showStatus(
+            "Could not load products. Please try again in a bit.",
+            "error"
+          );
         }
+      }
 
-        function renderCards(items) {
-            grid.innerHTML = "";
+      // ---------- Init ----------
 
-            items.forEach(item => {
-                const card = document.createElement("div");
-                card.className = "card";
+      document.addEventListener("DOMContentLoaded", () => {
+        buildCategoryFilters();
 
-                const imgContainer = document.createElement("div");
-                imgContainer.className = "imgContainer";
+        const searchInput = document.getElementById("searchInput");
+        const sortSelect = document.getElementById("sortSelect");
 
-                const img = document.createElement("img");
-                img.src = (item.imageUrl && item.imageUrl.includes("http")) ? item.imageUrl : "";
+        searchInput.addEventListener("input", (e) => {
+          state.searchTerm = e.target.value || "";
+          applyFiltersAndRender();
+        });
 
-                img.onload = () => {
-                    const ratio = img.naturalWidth / img.naturalHeight;
-                    if (ratio < 0.9) img.style.objectFit = "contain";
-                    else img.style.objectFit = "cover";
-                };
+        sortSelect.addEventListener("change", (e) => {
+          state.sortBy = e.target.value || "newest";
+          applyFiltersAndRender();
+        });
 
-                img.onerror = () => {
-                    imgContainer.classList.add("noImg");
-                    img.remove();
-                };
-
-                imgContainer.appendChild(img);
-                card.appendChild(imgContainer);
-
-                card.innerHTML += `
-                    <div class="sourceTag">${item.source.toUpperCase()}</div>
-                    <h2 class="title">${item.title || "Product"}</h2>
-                    <p class="descr">This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.</p>
-
-                    <div class="priceArea">
-                        ${
-                            item.price
-                                ? `<strong>₹${item.price}</strong>`
-                                : `<span class="noPrice">Best price on Amazon</span>`
-                        }
-                        <span class="date">${new Date(item.createdAt).toLocaleDateString()}</span>
-                    </div>
-
-                    <div class="actions">
-                        <a href="/api/links/go/${item.id}" target="_blank" class="buyBtn">Buy on Amazon</a>
-                        <button class="copyBtn" onclick="copy('${item.affiliateUrl}')">Copy link</button>
-                    </div>
-                `;
-
-                grid.appendChild(card);
-            });
-        }
-
-        function copy(text) {
-            navigator.clipboard.writeText(text);
-            alert("Copied!");
-        }
-
-        fetchLinks();
+        loadProducts();
+      });
     </script>
-</body>
+  </body>
 </html>
