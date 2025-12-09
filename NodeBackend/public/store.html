@@ -4,96 +4,460 @@
     <meta charset="UTF-8" />
     <title>AlwaysOnSale – Deals</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- If store.css exists, it will style everything nicely -->
     <link rel="stylesheet" href="store.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <div class="page-shell">
-      <header class="top-bar">
-        <div class="logo-badge">
-          <span class="dot dot-red"></span>
-          <span class="dot dot-orange"></span>
-          <span class="dot dot-pink"></span>
-          <span class="logo-text-main">ALWAYS</span>
-          <span class="logo-text-secondary">ON SALE</span>
-        </div>
+    <style>
+      /* Small safety styles in case store.css doesn't load */
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #050816;
+        color: #f9fafb;
+      }
+      .aos-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+      .aos-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .aos-logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        font-size: 14px;
+      }
+      .aos-logo-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #f97316;
+        box-shadow: 0 0 12px rgba(248, 113, 38, 0.9);
+      }
+      .aos-header-nav a {
+        font-size: 14px;
+        text-decoration: none;
+        color: #9ca3af;
+        margin-left: 12px;
+      }
+      .aos-header-nav a.active {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: radial-gradient(circle at top left, #f97316, #ef4444);
+        color: #0b1020;
+        font-weight: 600;
+      }
 
-        <nav class="top-nav">
-          <a href="/store.html" class="nav-link nav-link-active">Store</a>
-          <a href="/" class="nav-link">Dashboard (admin)</a>
+      .hero-card {
+        background: radial-gradient(circle at top left, #111827, #020617);
+        border-radius: 28px;
+        padding: 20px 20px 18px;
+        box-shadow: 0 28px 60px rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.08);
+        margin-bottom: 20px;
+      }
+      .hero-title {
+        font-size: 26px;
+        font-weight: 700;
+        margin: 0 0 4px;
+      }
+      .hero-sub {
+        margin: 0 0 14px;
+        font-size: 14px;
+        color: #9ca3af;
+      }
+      .hero-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .live-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: #16a34a;
+        color: #ecfdf5;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: #bbf7d0;
+        box-shadow: 0 0 8px rgba(187, 247, 208, 0.8);
+      }
+      .hero-meta {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .status-bar {
+        margin-top: 10px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .status-hidden {
+        display: none;
+      }
+      .status-info {
+        background: rgba(59, 130, 246, 0.08);
+        color: #bfdbfe;
+      }
+      .status-error {
+        background: rgba(239, 68, 68, 0.12);
+        color: #fecaca;
+      }
+      .status-warn {
+        background: rgba(234, 179, 8, 0.12);
+        color: #fef9c3;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-bottom: 10px;
+      }
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pill-filter {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.9);
+        padding: 6px 12px;
+        font-size: 12px;
+        color: #9ca3af;
+        cursor: pointer;
+      }
+      .pill-filter-active {
+        background: radial-gradient(circle at top left, #f97316, #ec4899);
+        border-color: transparent;
+        color: #020617;
+        font-weight: 600;
+      }
+      .toolbar-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .search-input {
+        flex: 1;
+        min-width: 0;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.9);
+        padding: 8px 14px;
+        color: #e5e7eb;
+        font-size: 13px;
+      }
+      .search-input::placeholder {
+        color: #6b7280;
+      }
+      .sort-select {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.9);
+        padding: 8px 14px;
+        color: #e5e7eb;
+        font-size: 13px;
+      }
+
+      .grid-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin: 10px 0;
+        font-size: 13px;
+        color: #9ca3af;
+      }
+      .grid-header strong {
+        color: #4ade80;
+      }
+
+      .products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-top: 6px;
+      }
+
+      .product-card {
+        background: radial-gradient(circle at top left, #020617, #020617);
+        border-radius: 24px;
+        padding: 14px 14px 16px;
+        border: 1px solid rgba(31, 41, 55, 0.9);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.9);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card-badge-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .badge {
+        border-radius: 999px;
+        padding: 4px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.45);
+        color: #9ca3af;
+      }
+      .badge-source {
+        border-color: rgba(248, 113, 38, 0.8);
+        color: #fed7aa;
+      }
+      .badge-category {
+        border-color: rgba(59, 130, 246, 0.8);
+        color: #bfdbfe;
+      }
+
+      .card-image-wrapper {
+        border-radius: 20px;
+        background: radial-gradient(circle at top left, #020617, #020617);
+        padding: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 180px;
+      }
+      .product-image {
+        max-width: 100%;
+        max-height: 260px;
+        border-radius: 16px;
+        object-fit: contain;
+        display: block;
+      }
+      .product-image-empty {
+        width: 100%;
+        height: 200px;
+        border-radius: 16px;
+        background: repeating-linear-gradient(
+          -45deg,
+          #020617,
+          #020617 8px,
+          #020617 8px,
+          #020617 16px
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #374151;
+        font-size: 13px;
+      }
+
+      .card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .product-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        color: #e5e7eb;
+      }
+      .product-note {
+        margin: 0;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+
+      .card-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: flex-end;
+        margin-top: 2px;
+      }
+      .meta-price {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .price-main {
+        font-size: 14px;
+        font-weight: 700;
+        color: #f97316;
+      }
+      .price-sub {
+        font-size: 11px;
+        color: #6b7280;
+      }
+      .meta-clicks {
+        text-align: right;
+        font-size: 11px;
+        color: #6b7280;
+      }
+      .meta-clicks span:first-child {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #e5e7eb;
+      }
+
+      .card-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .btn {
+        border-radius: 999px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        padding: 8px 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+      }
+      .btn-primary {
+        flex: 1;
+        background: radial-gradient(circle at top left, #f97316, #ec4899);
+        color: #020617;
+        font-weight: 600;
+        box-shadow: 0 10px 22px rgba(248, 113, 38, 0.4);
+        text-decoration: none;
+      }
+      .btn-ghost {
+        background: rgba(15, 23, 42, 0.9);
+        color: #e5e7eb;
+        border: 1px solid rgba(148, 163, 184, 0.45);
+      }
+      .btn-copied {
+        border-color: #4ade80;
+        color: #bbf7d0;
+      }
+
+      .empty-state {
+        padding: 36px 16px;
+        text-align: center;
+        font-size: 14px;
+        color: #9ca3af;
+        border-radius: 20px;
+        border: 1px dashed rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.7);
+      }
+
+      .aos-footer {
+        margin-top: 28px;
+        font-size: 11px;
+        color: #4b5563;
+        text-align: center;
+      }
+
+      @media (max-width: 640px) {
+        .hero-card {
+          padding: 18px 16px 16px;
+        }
+        .hero-title {
+          font-size: 22px;
+        }
+        .card-actions {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="aos-page">
+      <!-- Header -->
+      <header class="aos-header">
+        <div class="aos-logo">
+          <span class="aos-logo-dot"></span>
+          <span>ALWAYS ON SALE</span>
+        </div>
+        <nav class="aos-header-nav">
+          <a href="/store.html" class="active">Store</a>
+          <a href="/">Dashboard (admin)</a>
         </nav>
       </header>
 
-      <main class="store-main">
-        <!-- Hero / heading -->
-        <section class="hero">
-          <div class="hero-text">
-            <h1>Today’s hand-picked deals</h1>
-            <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
-
+      <!-- Hero / summary -->
+      <section class="hero-card">
+        <div class="hero-row">
+          <div>
+            <h1 class="hero-title">Today&apos;s hand-picked deals</h1>
+            <p class="hero-sub">
+              Amazon engine, Instagram skin. Curated products with tracked
+              links.
+            </p>
+          </div>
+          <div>
+            <div class="live-pill">
+              <span class="live-dot"></span>
+              LIVE FROM ALWAYSonsale
+            </div>
             <div class="hero-meta">
-              <span class="live-pill">
-                <span class="live-dot"></span>
-                LIVE FROM ALWAYSonsale
-              </span>
-              <span class="hero-sub">
-                Showing <span id="dealCount">0</span> deals.
-              </span>
+              Showing curated deals. Auto-updated via your affiliate dashboard.
             </div>
           </div>
-        </section>
+        </div>
 
-        <!-- Filters + search -->
-        <section class="toolbar">
-          <div class="toolbar-left">
-            <div class="pill-filter-group" id="categoryFilters">
-              <!-- Buttons created by JS -->
-            </div>
-          </div>
-
-          <div class="toolbar-right">
-            <div class="search-wrapper">
-              <input
-                id="searchInput"
-                class="search-input"
-                type="search"
-                placeholder="Search products or category…"
-              />
-            </div>
-
-            <div class="sort-wrapper">
-              <label for="sortSelect" class="sort-label">Sort</label>
-              <select id="sortSelect" class="sort-select">
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="price-low">Price: low to high</option>
-                <option value="price-high">Price: high to low</option>
-                <option value="clicks">Most clicked</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        <!-- Status / errors -->
-        <section id="statusBar" class="status-bar status-hidden">
+        <div id="statusBar" class="status-bar status-info status-hidden">
           <span id="statusMessage"></span>
-        </section>
+        </div>
+      </section>
 
-        <!-- Products grid -->
-        <section id="productsSection" class="products-section">
-          <div id="productsGrid" class="products-grid">
-            <!-- Cards rendered by JS -->
-          </div>
-        </section>
-      </main>
+      <!-- Filters & search -->
+      <section class="toolbar">
+        <div id="categoryFilters" class="pill-row"></div>
 
-      <footer class="page-footer">
-        <span>AlwaysOnSale · Amazon engine, Instagram skin.</span>
+        <div class="toolbar-row">
+          <input
+            id="searchInput"
+            class="search-input"
+            type="search"
+            placeholder="Search products or category..."
+          />
+          <select id="sortSelect" class="sort-select">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="price-low">Price: low to high</option>
+            <option value="price-high">Price: high to low</option>
+            <option value="clicks">Most clicks</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Grid -->
+      <section>
+        <div class="grid-header">
+          <span>
+            Showing <strong id="dealCount">0</strong> deal(s).
+          </span>
+        </div>
+        <div id="productsGrid" class="products-grid"></div>
+      </section>
+
+      <footer class="aos-footer">
+        AlwaysOnSale · Amazon engine, Instagram skin.
       </footer>
     </div>
 
@@ -109,6 +473,7 @@
         "Electronics",
         "Jeans",
         "Laptops",
+        "Home & Living",
         "Other",
       ];
 
@@ -258,11 +623,14 @@
           const card = document.createElement("article");
           card.className = "product-card";
 
-          const imageHtml = link.imageUrl
-            ? `<img src="${link.imageUrl}" alt="${link.title || "Product image"}" class="product-image" />`
-            : `<div class="product-image product-image-empty">
-                 <span>No image</span>
-               </div>`;
+          const hasImage = !!link.imageUrl;
+          const imageHtml = hasImage
+            ? '<img src="' +
+              link.imageUrl +
+              '" alt="' +
+              (link.title || "Product image") +
+              '" class="product-image" />'
+            : '<div class="product-image product-image-empty"><span>No image</span></div>';
 
           const priceLabel = formatPrice(link.price, link.priceCurrency);
           const dateLabel = formatDate(link.createdAt);
@@ -271,49 +639,65 @@
           const category = (link.category || "Other").toUpperCase();
 
           const buyHref = link.id
-            ? \`/api/links/go/\${link.id}\`
+            ? "/api/links/go/" + link.id
             : link.affiliateUrl || link.originalUrl || "#";
 
-          card.innerHTML = \`
-            <div class="card-badge-row">
-              <span class="badge badge-source">\${source}</span>
-              <span class="badge badge-category">\${category}</span>
-            </div>
+          const priceMainHtml = priceLabel
+            ? '<span class="price-main">' + priceLabel + "</span>"
+            : '<span class="price-main">Best price on Amazon</span>';
 
-            <div class="card-image-wrapper">
-              \${imageHtml}
-            </div>
+          const priceSubHtml = dateLabel
+            ? "Final price shown on Amazon page · " + dateLabel
+            : "Final price shown on Amazon page";
 
-            <div class="card-body">
-              <h2 class="product-title">\${link.title || "Product"}</h2>
-              <p class="product-note">\${link.note || "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle."}</p>
-
-              <div class="card-meta">
-                <div class="meta-price">
-                  \${priceLabel ? \`<span class="price-main">\${priceLabel}</span>\` : "<span class='price-main'>Best price on Amazon</span>"}
-                  <span class="price-sub">\${dateLabel ? \`Final price shown on Amazon page · \${dateLabel}\` : "Final price shown on Amazon page"}</span>
-                </div>
-                <div class="meta-clicks">
-                  <span>\${clicks}</span>
-                  <span class="meta-clicks-label">clicks</span>
-                </div>
-              </div>
-
-              <div class="card-actions">
-                <a href="\${buyHref}" target="_blank" rel="noopener" class="btn btn-primary">
-                  Buy on Amazon
-                </a>
-                <button type="button" class="btn btn-ghost" data-copy="\${buyHref}">
-                  Copy link
-                </button>
-              </div>
-            </div>
-          \`;
+          card.innerHTML =
+            '<div class="card-badge-row">' +
+            '<span class="badge badge-source">' +
+            source +
+            "</span>" +
+            '<span class="badge badge-category">' +
+            category +
+            "</span>" +
+            "</div>" +
+            '<div class="card-image-wrapper">' +
+            imageHtml +
+            "</div>" +
+            '<div class="card-body">' +
+            '<h2 class="product-title">' +
+            (link.title || "Product") +
+            "</h2>" +
+            '<p class="product-note">' +
+            (link.note ||
+              "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.") +
+            "</p>" +
+            '<div class="card-meta">' +
+            '<div class="meta-price">' +
+            priceMainHtml +
+            '<span class="price-sub">' +
+            priceSubHtml +
+            "</span>" +
+            "</div>" +
+            '<div class="meta-clicks">' +
+            "<span>" +
+            clicks +
+            "</span>" +
+            '<span class="meta-clicks-label">clicks</span>' +
+            "</div>" +
+            "</div>" +
+            '<div class="card-actions">' +
+            '<a href="' +
+            buyHref +
+            '" target="_blank" rel="noopener" class="btn btn-primary">Buy on Amazon</a>' +
+            '<button type="button" class="btn btn-ghost" data-copy="' +
+            buyHref +
+            '">Copy link</button>' +
+            "</div>" +
+            "</div>";
 
           grid.appendChild(card);
         });
 
-        // Wire copy buttons after cards are in DOM
+        // Copy buttons
         grid.querySelectorAll("[data-copy]").forEach((btn) => {
           btn.addEventListener("click", async () => {
             const url = btn.getAttribute("data-copy");
@@ -327,7 +711,10 @@
               }, 1200);
             } catch (err) {
               console.error("Copy failed", err);
-              showStatus("Could not copy link. Please copy from address bar.", "warn");
+              showStatus(
+                "Could not copy link. Please copy from address bar.",
+                "warn"
+              );
             }
           });
         });
@@ -338,13 +725,13 @@
       async function loadProducts() {
         showStatus("Loading products…", "info");
         try {
-          const res = await fetch(\`\${API_BASE}/all\`);
+          const res = await fetch(API_BASE + "/all");
           if (!res.ok) throw new Error("HTTP " + res.status);
           const data = await res.json();
           const links = data.links || data || [];
 
           state.allLinks = links;
-          showStatus(""); // clear
+          showStatus("");
           applyFiltersAndRender();
         } catch (err) {
           console.error(err);
