@@ -1,119 +1,53 @@
-/* ==== GLOBAL PAGE SETUP ==== */
-body {
-  margin: 0;
-  padding: 0;
-  font-family: "Inter", sans-serif;
-  background: #0c1220;
-  color: white;
+/* ---- UNIFORM PRODUCT CARD LAYOUT ---- */
+
+.deal-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.03);
+    border-radius: 18px;
+    padding: 18px;
+    width: 100%;
+    height: 520px; /* << FIXED HEIGHT FOR ALL CARDS */
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.07);
 }
 
-.container {
-  width: 100%;
-  max-width: 1400px;
-  margin: auto;
-  padding: 20px;
+.deal-card img {
+    width: 100%;
+    height: 220px !important;   /* << UNIFORM IMAGE HEIGHT */
+    object-fit: contain;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
 }
 
-/* ==== GRID LAYOUT ==== */
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 25px;
-  padding-top: 20px;
+.deal-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 10px 0 6px 0;
+    height: 40px;  /* << FORCE TITLES TO SAME HEIGHT */
+    overflow: hidden;
 }
 
-/* ==== PRODUCT CARD ==== */
-.product-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 18px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-
-  /* ✨ FIX UNEQUAL HEIGHTS */
-  min-height: 520px;
-  max-height: 520px;
-  overflow: hidden;
+.deal-desc {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-bottom: 6px;
+    height: 35px; /* << FORCE DESCRIPTION HEIGHT */
+    overflow: hidden;
 }
 
-/* ==== IMAGE ==== */
-.product-card img {
-  width: 100%;
-  height: 240px;          /* FIXED HEIGHT */
-  object-fit: contain;
-  border-radius: 12px;
-  margin-bottom: 15px;
+.price-block {
+    margin-top: auto;
+    margin-bottom: 10px;
 }
 
-/* ==== TAGS ==== */
-.tag-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+.card-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
 }
 
-.tag {
-  padding: 4px 10px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 20px;
-  font-size: 12px;
-  letter-spacing: 0.5px;
-}
-
-/* ==== TITLE ==== */
-.product-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  height: 40px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ==== DESCRIPTION ==== */
-.product-desc {
-  font-size: 13px;
-  opacity: 0.75;
-  height: 40px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 12px;
-}
-
-/* ==== PRICE SECTION ==== */
-.price-info {
-  font-size: 13px;
-  font-weight: 600;
-  color: #ff944d;
-  margin-bottom: 10px;
-}
-
-/* ==== BUTTONS ==== */
-.btn-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: auto;
-}
-
-.buy-btn {
-  background: linear-gradient(90deg, #ff6b4a, #ff3e72);
-  border: none;
-  border-radius: 25px;
-  color: white;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.copy-btn {
-  background: rgba(255,255,255,0.08);
-  border: none;
-  border-radius: 25px;
-  padding: 10px 14px;
-  color: white;
-  cursor: pointer;
-  font-size: 13px;
+.card-buttons button {
+    flex: 1;
 }
