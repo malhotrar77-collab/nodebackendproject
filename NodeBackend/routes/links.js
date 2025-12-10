@@ -1,9 +1,18 @@
 // NodeBackend/routes/links.js
+//
+// Main API for links:
+//  - /api/links/create
+//  - /api/links/bulk1
+//  - /api/links/all
+//  - /api/links/go/:id
+//  - /api/links/update/:id
+//  - /api/links/delete/:id
+//  - /api/links/maintenance/daily
+
 const express = require("express");
 const axios = require("axios");
-const cheerio = require("cheerio");
-const dayjs = require("dayjs");
 const Link = require("../models/link");
+const { scrapeAmazonProduct } = require("../scrapers/amazon");
 
 const router = express.Router();
 
@@ -64,54 +73,17 @@ function stripAmazonTracking(url) {
   }
 }
 
-// Scrape Amazon product page for title, price, image
-async function scrapeAmazonProduct(url) {
-  const finalUrl = await resolveAmazonUrl(url);
+// Build affiliate URL (very simple for now – you can upgrade to Admitad later)
+const DEFAULT_AMAZON_TAG = process.env.AMAZON_TAG || null;
+function buildAffiliateUrl(canonicalUrl) {
+  if (!canonicalUrl) return null;
+  if (!DEFAULT_AMAZON_TAG) return canonicalUrl;
 
-  const res = await axios.get(finalUrl, {
-    maxRedirects: 5,
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-IN,en;q=0.9",
-    },
-  });
+  // If URL already has a tag, keep it
+  if (/[?&]tag=/.test(canonicalUrl)) return canonicalUrl;
 
-  const html = res.data;
-  const $ = cheerio.load(html);
-
-  const title =
-    $("#productTitle").text().trim() ||
-    $('meta[property="og:title"]').attr("content") ||
-    $("title").text().trim() ||
-    "Amazon.in";
-
-  const price =
-    $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen")
-      .first()
-      .text()
-      .trim() ||
-    $(".a-price .a-offscreen").first().text().trim() ||
-    null;
-
-  let imageUrl =
-    $("#landingImage").attr("src") ||
-    $('img[data-old-hires]').attr("data-old-hires") ||
-    $('meta[property="og:image"]').attr("content") ||
-    null;
-
-  if (imageUrl && imageUrl.startsWith("//")) {
-    imageUrl = "https:" + imageUrl;
-  }
-
-  return {
-    finalUrl,
-    title: title || "Amazon.in",
-    price: price || null,
-    imageUrl: imageUrl || null,
-  };
+  const sep = canonicalUrl.includes("?") ? "&" : "?";
+  return `${canonicalUrl}${sep}tag=${DEFAULT_AMAZON_TAG}`;
 }
 
 // Common creator used by /create and /bulk1
@@ -121,35 +93,75 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
   }
 
   const source = "amazon";
-  const categorySafe = category && category.trim() ? category.trim() : "other";
+  const categoryInput = category && category.trim() ? category.trim() : "";
+
   const noteSafe = note && note.trim() ? note.trim() : "";
 
-  let finalTitle = title && title.trim() ? title.trim() : "";
-  let price = null;
-  let imageUrl = null;
-  let normalizedUrl = originalUrl;
+  let normalizedUrl = await resolveAmazonUrl(originalUrl);
+  if (!normalizedUrl) normalizedUrl = originalUrl;
+
+  let scraped = null;
   let scrapeError = null;
 
-  // Scrape if autoTitle is on OR we don't have a manual title
-  if (autoTitle || !finalTitle) {
+  // Scrape always if autoTitle, or if we need details
+  if (autoTitle || !title || !title.trim()) {
     try {
-      const scraped = await scrapeAmazonProduct(originalUrl);
-      normalizedUrl = scraped.finalUrl || originalUrl;
-      if (!finalTitle) finalTitle = scraped.title;
-      price = scraped.price;
-      imageUrl = scraped.imageUrl;
+      scraped = await scrapeAmazonProduct(normalizedUrl);
     } catch (err) {
-      console.error("Scrape error for", originalUrl, err.message);
-      scrapeError = err.message;
+      console.error("Scrape error for", normalizedUrl, err.message);
+      scrapeError = err.isBotProtection
+        ? "Amazon bot protection page detected"
+        : err.message;
     }
-  } else {
-    // even if not scraping for title, still normalize URL
-    normalizedUrl = await resolveAmazonUrl(originalUrl);
   }
 
-  if (!finalTitle) {
-    finalTitle = "Amazon.in";
+  // Title logic
+  let finalTitle =
+    (title && title.trim()) ||
+    (scraped && scraped.title) ||
+    "Amazon product";
+
+  const shortTitle =
+    (scraped && scraped.shortTitle) ||
+    (finalTitle.length > 80
+      ? finalTitle.slice(0, 77).trimEnd() + "…"
+      : finalTitle);
+
+  // Category logic
+  let topCategory = "other";
+  if (categoryInput) {
+    topCategory = categoryInput;
+  } else if (scraped && scraped.topCategory) {
+    topCategory = scraped.topCategory;
   }
+
+  // Images
+  const primaryImage = scraped && scraped.primaryImage;
+  const images = (scraped && scraped.images) || [];
+
+  // Price
+  const priceNum = scraped && scraped.price != null ? scraped.price : null;
+  const priceCurrency = scraped && scraped.priceCurrency;
+  const priceRaw = scraped && scraped.priceText;
+
+  // SEO descriptions
+  const shortDescription =
+    (scraped && scraped.shortDescription) ||
+    "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.";
+
+  const longDescription =
+    (scraped && scraped.longDescription) || shortDescription;
+
+  // Rating
+  const rating = scraped && scraped.rating;
+  const reviewsCount = scraped && scraped.reviewsCount;
+
+  // Category path + slug
+  const categoryPath = (scraped && scraped.categoryPath) || [];
+  const slug = (scraped && scraped.slug) || null;
+
+  // Affiliate URL
+  const affiliateUrl = buildAffiliateUrl(normalizedUrl);
 
   // ensure we always set id because schema requires it
   const id = generateId(5);
@@ -158,18 +170,38 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
     id,
     source,
     title: finalTitle,
-    category: categorySafe,
+    shortTitle,
+    brand: scraped && scraped.brand ? scraped.brand : undefined,
+
+    category: topCategory,
+    categoryPath,
+
     note: noteSafe,
-    price: price || undefined,
+
     originalUrl: normalizedUrl,
     rawOriginalUrl: originalUrl,
-    affiliateUrl: normalizedUrl, // until Admitad is wired in
-    imageUrl: imageUrl || undefined,
-    // safe defaults; your schema may already have defaults
+    affiliateUrl,
+    tag: DEFAULT_AMAZON_TAG || undefined,
+
+    imageUrl: primaryImage || undefined,
+    images,
+
+    price: priceNum != null ? priceNum : undefined,
+    priceCurrency: priceCurrency || undefined,
+    priceRaw: priceRaw || undefined,
+
+    rating: rating != null ? rating : undefined,
+    reviewsCount: reviewsCount != null ? reviewsCount : undefined,
+
+    shortDescription,
+    longDescription,
+    slug: slug || undefined,
+
+    isActive: true,
     clicks: 0,
-    inactive: false,
-    lastCheckedAt: null,
-    lastCheckStatus: scrapeError ? "error" : "ok",
+
+    lastCheckedAt: scraped ? new Date() : undefined,
+    lastError: scrapeError || undefined,
   });
 
   return linkDoc;
@@ -195,7 +227,8 @@ router.get("/all", async (req, res) => {
 // Create single link (used by dashboard "Create affiliate link")
 router.post("/create", async (req, res) => {
   try {
-    const { originalUrl, title, category, note, autoTitle = true } = req.body || {};
+    const { originalUrl, title, category, note, autoTitle = true } =
+      req.body || {};
 
     if (!originalUrl || !originalUrl.trim()) {
       return res
@@ -214,13 +247,14 @@ router.post("/create", async (req, res) => {
     res.json({ success: true, link: linkDoc });
   } catch (err) {
     console.error("POST /create error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Failed to create link." });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to create link.",
+    });
   }
 });
 
-// Bulk create (new endpoint used by updated dashboard)
+// Bulk create (new endpoint used by updated dashboard with urlsText)
 router.post("/bulk1", async (req, res) => {
   try {
     const { urlsText, category, note, autoTitle = true } = req.body || {};
@@ -274,13 +308,14 @@ router.post("/bulk1", async (req, res) => {
     });
   } catch (err) {
     console.error("POST /bulk1 error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Bulk create failed." });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Bulk create failed.",
+    });
   }
 });
 
-// Legacy bulk endpoint (old frontend) — keep as alias
+// Legacy bulk endpoint (old frontend) — supports { urls: [...] }
 router.post("/bulk", async (req, res) => {
   try {
     const { urls, category, note, autoTitle = true } = req.body || {};
@@ -290,14 +325,37 @@ router.post("/bulk", async (req, res) => {
         .json({ success: false, message: "urls array is required" });
     }
 
-    const urlsText = urls.join("\n");
-    req.body.urlsText = urlsText;
-    return router.handle(req, res); // let /bulk1 handler process? (simpler to just call function)
+    const created = [];
+    const errors = [];
+
+    for (const url of urls) {
+      try {
+        const doc = await createAmazonLink({
+          originalUrl: url,
+          title: "",
+          category,
+          note,
+          autoTitle,
+        });
+        created.push(doc);
+      } catch (err) {
+        console.error("Bulk create (legacy) error for", url, err.message);
+        errors.push({ url, error: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      created: created.length,
+      errors,
+      links: created,
+    });
   } catch (err) {
     console.error("POST /bulk alias error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Bulk create failed." });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Bulk create failed.",
+    });
   }
 });
 
@@ -310,8 +368,10 @@ router.put("/update/:id", async (req, res) => {
     const update = {};
     if (typeof title === "string") update.title = title;
     if (typeof category === "string") update.category = category;
-    if (typeof price === "string" || typeof price === "number")
-      update.price = price;
+    if (typeof price === "string" || typeof price === "number") {
+      const num = Number(price);
+      if (!Number.isNaN(num)) update.price = num;
+    }
     if (typeof note === "string") update.note = note;
 
     const updated = await Link.findOneAndUpdate({ id }, update, {
@@ -327,9 +387,10 @@ router.put("/update/:id", async (req, res) => {
     res.json({ success: true, link: updated });
   } catch (err) {
     console.error("PUT /update/:id error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Failed to update link." });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to update link.",
+    });
   }
 });
 
@@ -346,9 +407,10 @@ router.delete("/delete/:id", async (req, res) => {
     res.json({ success: true, deletedId: id });
   } catch (err) {
     console.error("DELETE /delete/:id error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Failed to delete link." });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to delete link.",
+    });
   }
 });
 
@@ -371,28 +433,61 @@ router.get("/go/:id", async (req, res) => {
   }
 });
 
-// Simple maintenance endpoint – can be improved later
+// Simple maintenance endpoint – refresh price & image
 router.post("/maintenance/daily", async (req, res) => {
   try {
-    const links = await Link.find({ source: "amazon" }).lean();
+    const links = await Link.find({ source: "amazon", isActive: { $ne: false } }).lean();
     let processed = 0;
     let updated = 0;
 
     for (const link of links) {
       processed++;
       try {
-        const info = await scrapeAmazonProduct(link.originalUrl || link.rawOriginalUrl);
-        await Link.updateOne(
-          { _id: link._id },
-          {
-            $set: {
-              price: info.price || link.price,
-              imageUrl: info.imageUrl || link.imageUrl,
-              lastCheckedAt: new Date(),
-              lastCheckStatus: "ok",
-            },
+        const urlToUse = link.originalUrl || link.rawOriginalUrl;
+        if (!urlToUse) continue;
+
+        const info = await scrapeAmazonProduct(urlToUse);
+
+        const update = {
+          lastCheckedAt: new Date(),
+          lastError: undefined,
+        };
+
+        // price changes
+        if (info.price != null) {
+          if (link.price != null && link.price !== info.price) {
+            update.prevPrice = link.price;
+            update.prevPriceCurrency = link.priceCurrency || info.priceCurrency;
+            update.priceChangeReason = "maintenance_refresh";
           }
-        );
+          update.price = info.price;
+          update.priceCurrency = info.priceCurrency || link.priceCurrency;
+          update.priceRaw = info.priceText || link.priceRaw;
+        }
+
+        if (info.primaryImage) {
+          update.imageUrl = info.primaryImage;
+        }
+        if (info.images && info.images.length) {
+          update.images = info.images;
+        }
+        if (info.rating != null) {
+          update.rating = info.rating;
+        }
+        if (info.reviewsCount != null) {
+          update.reviewsCount = info.reviewsCount;
+        }
+        if (info.shortDescription) {
+          update.shortDescription = info.shortDescription;
+        }
+        if (info.longDescription) {
+          update.longDescription = info.longDescription;
+        }
+        if (info.categoryPath && info.categoryPath.length) {
+          update.categoryPath = info.categoryPath;
+        }
+
+        await Link.updateOne({ _id: link._id }, { $set: update });
         updated++;
       } catch (err) {
         console.error("maintenance scrape error for", link.id, err.message);
@@ -401,7 +496,7 @@ router.post("/maintenance/daily", async (req, res) => {
           {
             $set: {
               lastCheckedAt: new Date(),
-              lastCheckStatus: "error",
+              lastError: err.message || "maintenance_error",
             },
           }
         );
@@ -411,9 +506,10 @@ router.post("/maintenance/daily", async (req, res) => {
     res.json({ success: true, processed, updated });
   } catch (err) {
     console.error("POST /maintenance/daily error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Maintenance failed." });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Maintenance failed.",
+    });
   }
 });
 
