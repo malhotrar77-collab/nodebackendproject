@@ -7,276 +7,230 @@ const Link = require("../models/link");
 
 const router = express.Router();
 
-/**
- * Small helpers
- */
+// ---------- Helpers ----------
 
-function normaliseCategory(raw) {
-  if (!raw) return "other";
-  const c = String(raw).toLowerCase();
-
-  if (c.includes("shoe")) return "shoes";
-  if (c.includes("sneaker")) return "shoes";
-  if (c.includes("tshirt") || c.includes("t-shirt")) return "tshirts";
-  if (c.includes("shirt") || c.includes("top")) return "clothing";
-  if (c.includes("jean") || c.includes("denim")) return "jeans";
-  if (c.includes("bag") || c.includes("backpack")) return "bags";
-  if (c.includes("laptop") || c.includes("phone") || c.includes("mobile")) {
-    return "electronics";
+// Simple random id, 5 chars like "a2f9x"
+function generateId(length = 5) {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
   }
-
-  return "other";
+  return out;
 }
 
-function detectSource(url) {
+// Normalize and resolve amzn.to → full Amazon URL (best effort)
+async function resolveAmazonUrl(url) {
+  if (!url) return null;
+
+  // If it's already a long amazon URL, just trim tracking junk
+  if (/amazon\./i.test(url)) {
+    return stripAmazonTracking(url);
+  }
+
+  // If it's amzn.to or other short url, follow redirects
+  try {
+    const res = await axios.get(url, {
+      maxRedirects: 5,
+      validateStatus: (s) => s >= 200 && s < 400,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      },
+    });
+
+    const finalUrl =
+      (res.request &&
+        res.request.res &&
+        res.request.res.responseUrl) ||
+      url;
+
+    return stripAmazonTracking(finalUrl);
+  } catch (err) {
+    console.warn("resolveAmazonUrl failed, falling back to raw URL:", err.message);
+    return stripAmazonTracking(url);
+  }
+}
+
+// Remove obvious tracking params so URLs are stable
+function stripAmazonTracking(url) {
   try {
     const u = new URL(url);
-    if (u.hostname.includes("amazon")) return "amazon";
-    if (u.hostname.includes("amzn.to")) return "amazon";
-    return "other";
+    // Keep only base and path + "dp/ASIN" etc
+    const clean = `${u.origin}${u.pathname}`;
+    return clean;
   } catch {
-    return "other";
+    return url;
   }
 }
 
-// Make axios look like a real browser a bit
-const AMAZON_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
-  "Accept-Language": "en-IN,en;q=0.9",
-};
+// Scrape Amazon product page for title, price, image
+async function scrapeAmazonProduct(url) {
+  const finalUrl = await resolveAmazonUrl(url);
 
-/**
- * Scrape Amazon product page (IN) for title, price, image, etc.
- * Works for both long amazon.in links and amzn.to short links.
- */
-async function scrapeAmazonMeta(url) {
-  const resp = await axios.get(url, {
-    headers: AMAZON_HEADERS,
-    // let axios follow redirects from amzn.to -> amazon.in
+  const res = await axios.get(finalUrl, {
     maxRedirects: 5,
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-IN,en;q=0.9",
+    },
   });
 
-  // Final URL after redirects (if any)
-  let finalUrl = url;
-  try {
-    if (resp.request && resp.request.res && resp.request.res.responseUrl) {
-      finalUrl = resp.request.res.responseUrl;
-    }
-  } catch {
-    // ignore
-  }
-
-  const html = resp.data;
+  const html = res.data;
   const $ = cheerio.load(html);
 
-  // Title
-  let title =
+  const title =
     $("#productTitle").text().trim() ||
-    $("#title span#productTitle").text().trim();
+    $('meta[property="og:title"]').attr("content") ||
+    $("title").text().trim() ||
+    "Amazon.in";
 
-  if (!title) {
-    // fall back to <title> tag (often "Amazon.in: XYZ")
-    const rawTitle = $("title").text().trim();
-    if (rawTitle) {
-      title = rawTitle.replace(/^Amazon\.in:\s*/i, "").trim();
-    }
-  }
+  const price =
+    $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen")
+      .first()
+      .text()
+      .trim() ||
+    $(".a-price .a-offscreen").first().text().trim() ||
+    null;
 
-  // Price (very rough; just so we have something)
-  let priceText =
-    $("#corePrice_feature_div .a-price-whole").first().text().trim() ||
-    $("#corePrice_feature_div .a-offscreen").first().text().trim();
-
-  if (!priceText) {
-    priceText = $(".a-price .a-offscreen").first().text().trim();
-  }
-
-  let price = null;
-  let priceCurrency = null;
-  if (priceText) {
-    // e.g. "₹1,234.00" -> currency "₹", value 1234
-    const match = priceText.match(/^([^\d]*)([\d,]+(?:\.\d+)?)/);
-    if (match) {
-      priceCurrency = match[1].trim() || null;
-      const numeric = match[2].replace(/,/g, "");
-      const parsed = parseFloat(numeric);
-      if (!Number.isNaN(parsed)) {
-        price = parsed;
-      }
-    }
-  }
-
-  // Main image
   let imageUrl =
-    $("#imgTagWrapperId img").attr("src") ||
-    $("img#landingImage").attr("src") ||
-    $("img[data-old-hires]").attr("data-old-hires");
+    $("#landingImage").attr("src") ||
+    $('img[data-old-hires]').attr("data-old-hires") ||
+    $('meta[property="og:image"]').attr("content") ||
+    null;
 
-  // Category guess from breadcrumbs
-  let breadcrumbText = "";
-  $("#wayfinding-breadcrumbs_feature_div li a").each((_, el) => {
-    const t = $(el).text().trim();
-    if (t) {
-      breadcrumbText += t + " ";
-    }
-  });
-
-  const category =
-    normaliseCategory(breadcrumbText) ||
-    normaliseCategory(title) ||
-    "other";
+  if (imageUrl && imageUrl.startsWith("//")) {
+    imageUrl = "https:" + imageUrl;
+  }
 
   return {
-    title: title || "Product",
-    price,
-    priceCurrency,
-    imageUrl: imageUrl || null,
-    category,
     finalUrl,
+    title: title || "Amazon.in",
+    price: price || null,
+    imageUrl: imageUrl || null,
   };
 }
 
-/**
- * Create a Link document from an Amazon URL (or other URL).
- * Shared by single-create and bulk-create routes.
- */
-async function createLinkFromUrl(rawUrl, options = {}) {
-  const { title: titleInput, category: catInput, note, autoTitle } = options;
-
-  if (!rawUrl || typeof rawUrl !== "string") {
+// Common creator used by /create and /bulk1
+async function createAmazonLink({ originalUrl, title, category, note, autoTitle }) {
+  if (!originalUrl) {
     throw new Error("originalUrl is required");
   }
 
-  const trimmedUrl = rawUrl.trim();
-  const source = detectSource(trimmedUrl);
+  const source = "amazon";
+  const categorySafe = category && category.trim() ? category.trim() : "other";
+  const noteSafe = note && note.trim() ? note.trim() : "";
 
-  let title = titleInput && titleInput.trim();
-  let category = catInput && catInput.trim();
-  let originalUrl = trimmedUrl;
-  let affiliateUrl = trimmedUrl;
-  let imageUrl = null;
+  let finalTitle = title && title.trim() ? title.trim() : "";
   let price = null;
-  let priceCurrency = null;
+  let imageUrl = null;
+  let normalizedUrl = originalUrl;
+  let scrapeError = null;
 
-  // For now, use the same URL as affiliate URL (you can plug Admitad later)
-  affiliateUrl = trimmedUrl;
-
-  if (source === "amazon") {
+  // Scrape if autoTitle is on OR we don't have a manual title
+  if (autoTitle || !finalTitle) {
     try {
-      // Scrape all info from Amazon
-      const meta = await scrapeAmazonMeta(trimmedUrl);
-
-      originalUrl = meta.finalUrl || trimmedUrl;
-      if (!title || autoTitle) title = meta.title;
-      if (!category) category = meta.category;
-      imageUrl = meta.imageUrl;
-      price = meta.price;
-      priceCurrency = meta.priceCurrency;
+      const scraped = await scrapeAmazonProduct(originalUrl);
+      normalizedUrl = scraped.finalUrl || originalUrl;
+      if (!finalTitle) finalTitle = scraped.title;
+      price = scraped.price;
+      imageUrl = scraped.imageUrl;
     } catch (err) {
-      console.error("Amazon scrape failed:", err.message || err);
-      // graceful fallback: just keep whatever title/category we have
-      if (!title) title = "Product";
-      if (!category) category = "other";
+      console.error("Scrape error for", originalUrl, err.message);
+      scrapeError = err.message;
     }
   } else {
-    // Non-Amazon – basic fallback
-    if (!title) title = "Product";
-    if (!category) category = "other";
+    // even if not scraping for title, still normalize URL
+    normalizedUrl = await resolveAmazonUrl(originalUrl);
   }
 
-  // Build document
-  const linkDoc = new Link({
-    // custom short id will be generated in model if you use nanoid/uuid there,
-    // otherwise `_id` will act as id.
+  if (!finalTitle) {
+    finalTitle = "Amazon.in";
+  }
+
+  // ensure we always set id because schema requires it
+  const id = generateId(5);
+
+  const linkDoc = await Link.create({
+    id,
     source,
-    title,
-    category: normaliseCategory(category),
-    note: note || "",
-    originalUrl,
-    rawOriginalUrl: trimmedUrl,
-    affiliateUrl,
-    imageUrl,
-    price,
-    priceCurrency,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    title: finalTitle,
+    category: categorySafe,
+    note: noteSafe,
+    price: price || undefined,
+    originalUrl: normalizedUrl,
+    rawOriginalUrl: originalUrl,
+    affiliateUrl: normalizedUrl, // until Admitad is wired in
+    imageUrl: imageUrl || undefined,
+    // safe defaults; your schema may already have defaults
+    clicks: 0,
+    inactive: false,
+    lastCheckedAt: null,
+    lastCheckStatus: scrapeError ? "error" : "ok",
   });
 
-  await linkDoc.save();
   return linkDoc;
 }
 
-/**
- * ROUTES
- */
+// ---------- Routes ----------
 
-// Simple test
 router.get("/test", (req, res) => {
-  res.json({ ok: true });
+  res.json({ success: true, message: "Links API OK" });
 });
 
-// Get all links (for dashboard + store)
+// All links for dashboard + store
 router.get("/all", async (req, res) => {
   try {
-    const links = await Link.find().sort({ createdAt: -1 });
+    const links = await Link.find().sort({ createdAt: -1 }).lean();
     res.json({ success: true, links });
   } catch (err) {
     console.error("GET /all error:", err);
-    res.status(500).json({ success: false, error: "Failed to load links" });
+    res.status(500).json({ success: false, message: "Failed to fetch links." });
   }
 });
 
-/**
- * POST /api/links/create
- * Create ONE affiliate link from a URL.
- */
+// Create single link (used by dashboard "Create affiliate link")
 router.post("/create", async (req, res) => {
   try {
-    const {
-      originalUrl, // required
-      title,
-      category,
-      note,
-      autoTitle,
-    } = req.body || {};
+    const { originalUrl, title, category, note, autoTitle = true } = req.body || {};
 
-    if (!originalUrl || !String(originalUrl).trim()) {
-      return res.status(400).json({ success: false, error: "originalUrl is required" });
+    if (!originalUrl || !originalUrl.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "originalUrl is required" });
     }
 
-    const link = await createLinkFromUrl(String(originalUrl), {
+    const linkDoc = await createAmazonLink({
+      originalUrl: originalUrl.trim(),
       title,
       category,
       note,
       autoTitle,
     });
 
-    res.json({ success: true, link });
+    res.json({ success: true, link: linkDoc });
   } catch (err) {
     console.error("POST /create error:", err);
     res
       .status(500)
-      .json({ success: false, error: err.message || "Failed to create link" });
+      .json({ success: false, message: err.message || "Failed to create link." });
   }
 });
 
-/**
- * POST /api/links/bulk   (and /bulk1 for backwards compatibility)
- * Body: { urlsText, category, note, autoTitle }
- * urlsText = multiline string, 1 URL per line
- */
-async function handleBulkCreate(req, res) {
+// Bulk create (new endpoint used by updated dashboard)
+router.post("/bulk1", async (req, res) => {
   try {
-    const { urlsText, category, note, autoTitle } = req.body || {};
-
-    if (!urlsText || !String(urlsText).trim()) {
+    const { urlsText, category, note, autoTitle = true } = req.body || {};
+    if (!urlsText || !urlsText.trim()) {
       return res
         .status(400)
-        .json({ success: false, error: "urlsText is required" });
+        .json({ success: false, message: "urlsText is required" });
     }
 
-    const lines = String(urlsText)
+    const lines = urlsText
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean);
@@ -284,124 +238,182 @@ async function handleBulkCreate(req, res) {
     if (!lines.length) {
       return res
         .status(400)
-        .json({ success: false, error: "No URLs found in input" });
+        .json({ success: false, message: "No valid URLs found." });
     }
 
-    const results = [];
-    for (const u of lines) {
+    if (lines.length > 10) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please limit to 10 URLs at once." });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (const url of lines) {
       try {
-        const link = await createLinkFromUrl(u, {
-          title: null,
+        const doc = await createAmazonLink({
+          originalUrl: url,
+          title: "", // per-URL title not supported in this simple bulk mode
           category,
           note,
           autoTitle,
         });
-        results.push({ url: u, status: "ok", id: link.id || link._id });
+        created.push(doc);
       } catch (err) {
-        console.error("Bulk create failed for URL:", u, err.message || err);
-        results.push({
-          url: u,
-          status: "error",
-          error: err.message || "Failed to create link",
-        });
+        console.error("Bulk create error for", url, err.message);
+        errors.push({ url, error: err.message });
       }
     }
 
     res.json({
       success: true,
-      total: lines.length,
-      created: results.filter((r) => r.status === "ok").length,
-      results,
+      created: created.length,
+      errors,
+      links: created,
     });
   } catch (err) {
-    console.error("POST /bulk error:", err);
+    console.error("POST /bulk1 error:", err);
     res
       .status(500)
-      .json({ success: false, error: "Bulk create failed", details: err.message });
+      .json({ success: false, message: err.message || "Bulk create failed." });
   }
-}
+});
 
-router.post("/bulk", handleBulkCreate);
-router.post("/bulk1", handleBulkCreate); // keep old JS working
+// Legacy bulk endpoint (old frontend) — keep as alias
+router.post("/bulk", async (req, res) => {
+  try {
+    const { urls, category, note, autoTitle = true } = req.body || {};
+    if (!Array.isArray(urls) || !urls.length) {
+      return res
+        .status(400)
+        .json({ success: false, message: "urls array is required" });
+    }
 
-/**
- * Redirect: /api/links/go/:id
- */
+    const urlsText = urls.join("\n");
+    req.body.urlsText = urlsText;
+    return router.handle(req, res); // let /bulk1 handler process? (simpler to just call function)
+  } catch (err) {
+    console.error("POST /bulk alias error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Bulk create failed." });
+  }
+});
+
+// Update basic fields (used by dashboard Edit)
+router.put("/update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, category, price, note } = req.body || {};
+
+    const update = {};
+    if (typeof title === "string") update.title = title;
+    if (typeof category === "string") update.category = category;
+    if (typeof price === "string" || typeof price === "number")
+      update.price = price;
+    if (typeof note === "string") update.note = note;
+
+    const updated = await Link.findOneAndUpdate({ id }, update, {
+      new: true,
+    }).lean();
+
+    if (!updated) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Link not found." });
+    }
+
+    res.json({ success: true, link: updated });
+  } catch (err) {
+    console.error("PUT /update/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Failed to update link." });
+  }
+});
+
+// Delete link
+router.delete("/delete/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Link.findOneAndDelete({ id }).lean();
+    if (!deleted) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Link not found." });
+    }
+    res.json({ success: true, deletedId: id });
+  } catch (err) {
+    console.error("DELETE /delete/:id error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Failed to delete link." });
+  }
+});
+
+// Redirect + click tracking (used by store + dashboard)
 router.get("/go/:id", async (req, res) => {
   try {
-    const id = req.params.id;
-    const link = await Link.findOne({ id }) || (await Link.findById(id));
-
+    const { id } = req.params;
+    const link = await Link.findOneAndUpdate(
+      { id },
+      { $inc: { clicks: 1 } },
+      { new: true }
+    );
     if (!link) {
       return res.status(404).send("Link not found");
     }
-
-    // increment click count
-    try {
-      link.clicks = (link.clicks || 0) + 1;
-      link.updatedAt = new Date();
-      await link.save();
-    } catch (err) {
-      console.error("Error incrementing clicks for", id, err);
-    }
-
     res.redirect(link.affiliateUrl || link.originalUrl);
   } catch (err) {
     console.error("GET /go/:id error:", err);
-    res.status(500).send("Server error");
+    res.status(500).send("Internal server error");
   }
 });
 
-/**
- * DELETE /api/links/:id
- */
-router.delete("/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const link =
-      (await Link.findOneAndDelete({ id })) ||
-      (await Link.findByIdAndDelete(id));
-
-    if (!link) {
-      return res.status(404).json({ success: false, error: "Link not found" });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error("DELETE /:id error:", err);
-    res.status(500).json({ success: false, error: "Failed to delete link" });
-  }
-});
-
-/**
- * Simple daily maintenance stub (so your existing button keeps working).
- * For now it just touches updatedAt and returns counts, so it
- * will not crash or return HTML.
- */
+// Simple maintenance endpoint – can be improved later
 router.post("/maintenance/daily", async (req, res) => {
   try {
-    const links = await Link.find();
+    const links = await Link.find({ source: "amazon" }).lean();
+    let processed = 0;
     let updated = 0;
 
     for (const link of links) {
-      // In future we can re-scrape here using scrapeAmazonMeta(link.originalUrl)
-      link.updatedAt = new Date();
-      await link.save();
-      updated += 1;
+      processed++;
+      try {
+        const info = await scrapeAmazonProduct(link.originalUrl || link.rawOriginalUrl);
+        await Link.updateOne(
+          { _id: link._id },
+          {
+            $set: {
+              price: info.price || link.price,
+              imageUrl: info.imageUrl || link.imageUrl,
+              lastCheckedAt: new Date(),
+              lastCheckStatus: "ok",
+            },
+          }
+        );
+        updated++;
+      } catch (err) {
+        console.error("maintenance scrape error for", link.id, err.message);
+        await Link.updateOne(
+          { _id: link._id },
+          {
+            $set: {
+              lastCheckedAt: new Date(),
+              lastCheckStatus: "error",
+            },
+          }
+        );
+      }
     }
 
-    res.json({
-      success: true,
-      processed: links.length,
-      updated,
-    });
+    res.json({ success: true, processed, updated });
   } catch (err) {
     console.error("POST /maintenance/daily error:", err);
-    res.status(500).json({
-      success: false,
-      error: "Maintenance failed",
-      details: err.message,
-    });
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Maintenance failed." });
   }
 });
 
