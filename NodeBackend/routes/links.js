@@ -261,141 +261,182 @@ LongDescription: ${longDescription || ""}`;
   }
 }
 
-// ------------ scraping function that uses legacyScrape with safe fallbacks ------------
+// ------------ scraping function that uses legacyScrape with safe fallbacks and proxy priority ------------
 async function scrapeAmazonProduct(url) {
   // Normalize/resolve
   const finalUrl = await resolveAmazonUrl(url);
 
-  // Try existing scraper module first (from /scrapers/amazon)
-  try {
-    const scraped = await legacyScrape(finalUrl);
-    // legacyScrape returns many fields; unify into required subset
-    return {
-      finalUrl,
-      title: scraped.title || scraped.shortTitle || "Amazon product",
-      priceText: scraped.priceText || null,
-      price: null, // we'll parse using parsePriceValue below
-      priceCurrency: null,
-      imageUrl: scraped.primaryImage || (scraped.images && scraped.images[0]) || null,
-      primaryImage: scraped.primaryImage || null,
-      images: scraped.images || [],
-      shortDescription: scraped.shortDescription || null,
-      longDescription: scraped.longDescription || null,
-      rating: scraped.rating || null,
-      reviewsCount: scraped.reviewsCount || null,
-      categoryPath: scraped.categoryPath || [],
-      slug: scraped.slug || null,
-      brand: scraped.brand || null,
-    };
-  } catch (err) {
-    // fallback fetch + cheerio parse
+  const SCRAPINGBEE_KEY = process.env.SCRAPINGBEE_KEY || null;
+  let html = null;
+  let isProxied = false;
+
+  // --- NEW: Attempt 1 - Use ScrapingBee Proxy if available (Prioritized) ---
+  if (SCRAPINGBEE_KEY) {
+    console.log("Attempting scrape via ScrapingBee proxy...");
     try {
-      const res = await axios.get(finalUrl, {
-        maxRedirects: 5,
-        timeout: 15000,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-          "Accept-Language": "en-IN,en;q=0.9",
-        },
-        validateStatus: () => true,
+      const proxyUrl = `https://app.scrapingbee.com/api/v1?api_key=${encodeURIComponent(
+        SCRAPINGBEE_KEY
+      )}&url=${encodeURIComponent(finalUrl)}&premium_proxy=true&forward_headers=true&session_id=amazon-scraper`;
+      const pRes = await axios.get(proxyUrl, {
+        timeout: 30000,
+        validateStatus: (s) => s >= 200 && s < 400,
       });
-
-      const html = res.data || "";
-      const $ = cheerio.load(html);
-
-      const title = $("#productTitle").text().trim() || $("title").text().trim() || "Amazon product";
-
-      // image selectors
-      let image =
-        $("#landingImage").attr("src") ||
-        $("#imgTagWrapperId img").attr("data-old-hires") ||
-        $('img[data-old-hires]').attr("data-old-hires") ||
-        $('meta[property="og:image"]').attr("content") ||
-        null;
-      if (image && image.startsWith("//")) image = "https:" + image;
-
-      // primary selectors for price (The Fix applied here too)
-      let priceText =
-        $("#corePriceDisplay_feature_div .a-offscreen").first().text().trim() || // NEW/UPDATED
-        $("#desktop_buybox .a-price .a-offscreen").first().text().trim() || // NEW/UPDATED
-        $("#priceblock_ourprice").text().trim() ||
-        $("#priceblock_dealprice").text().trim() ||
-        $("#corePrice_feature_div .a-offscreen").first().text().trim() ||
-        $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen").first().text().trim() ||
-        $(".a-price .a-offscreen").first().text().trim() ||
-        null;
-
-      // If not found, try a page-wide regex (captures ₹, Rs, USD, $ etc.)
-      if (!priceText || !priceText.trim()) {
-        const pageText = (html || "").replace(/\s+/g, " ");
-        const match = pageText.match(/(₹|Rs\.?|INR|\$|USD|£|€)\s?[0-9\.,]{1,}/i);
-        if (match) {
-          priceText = match[0];
-          console.log("Price regex fallback found:", priceText);
-        }
+      if (pRes.data) {
+        html = pRes.data;
+        isProxied = true;
+        console.log("ScrapingBee returned HTML content.");
       }
-
-      const priceParsed = parsePriceValue(priceText);
-      if (!priceParsed.parsed && priceParsed.raw) {
-        console.warn("Price present but failed to parse. raw price:", priceParsed.raw);
-      }
-
-      // bullets
-      const bullets = [];
-      $("#feature-bullets li").each((_, li) => {
-        const t = $(li).text().replace(/\s+/g, " ").trim();
-        if (t) bullets.push(t);
-      });
-      const shortDescription = bullets[0] || null;
-      const longDescription = bullets.slice(0, 5).join(" ") || null;
-
-      // rating
-      let rating = null;
-      const ratingText = $(".a-icon.a-icon-star span.a-icon-alt").first().text();
-      if (ratingText) {
-        const m = ratingText.match(/([\d.]+)/);
-        if (m) rating = parseFloat(m[1]);
-      }
-
-      // reviews count
-      let reviewsCount = null;
-      const reviewsText = $("#acrCustomerReviewText").text();
-      if (reviewsText) {
-        const m2 = reviewsText.replace(/,/g, "").match(/([\d]+)/);
-        if (m2) reviewsCount = parseInt(m2[1], 10);
-      }
-
-      // category path
-      const categoryPath = [];
-      $("#wayfinding-breadcrumbs_container ul li a").each((_, a) => {
-        const t = $(a).text().replace(/\s+/g, " ").trim();
-        if (t) categoryPath.push(t);
-      });
-
-      return {
-        finalUrl,
-        title,
-        priceText: priceParsed.raw || priceText || null,
-        price: priceParsed.parsed,
-        priceCurrency: priceParsed.currency || null,
-        imageUrl: image || null,
-        primaryImage: image || null,
-        images: image ? [image] : [],
-        shortDescription,
-        longDescription,
-        rating,
-        reviewsCount,
-        categoryPath,
-        slug: null,
-        brand: null,
-      };
-    } catch (err2) {
-      console.error("Fallback scrape failed:", err2.message || err2);
-      throw err2;
+    } catch (err) {
+      console.warn("ScrapingBee failed, falling back to direct request.", err.message || err);
     }
   }
+
+  // --- Fallback: Direct Scrape with Scrapers/Amazon.js (same as before) ---
+  if (!html) {
+    console.log("Attempting direct scrape...");
+    try {
+      // This uses the updated amazon.js with better headers
+      const scraped = await legacyScrape(finalUrl); 
+      
+      // If successful, legacyScrape returns structured data, not raw HTML
+      return {
+        finalUrl,
+        title: scraped.title || scraped.shortTitle || "Amazon product",
+        priceText: scraped.priceText || null,
+        price: null, // will be parsed later
+        priceCurrency: null,
+        imageUrl: scraped.primaryImage || (scraped.images && scraped.images[0]) || null,
+        primaryImage: scraped.primaryImage || null,
+        images: scraped.images || [],
+        shortDescription: scraped.shortDescription || null,
+        longDescription: scraped.longDescription || null,
+        rating: scraped.rating || null,
+        reviewsCount: scraped.reviewsCount || null,
+        categoryPath: scraped.categoryPath || [],
+        slug: scraped.slug || null,
+        brand: scraped.brand || null,
+      };
+    } catch (err) {
+      console.warn("Direct scrape failed (Bot or other issue). Falling back to Cheerio parse of raw HTML.", err.message || err);
+      // If legacyScrape failed, we try the direct raw fetch as a final fallback:
+      try {
+        const res = await axios.get(finalUrl, {
+          maxRedirects: 5,
+          timeout: 15000,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-IN,en;q=0.9",
+          },
+          validateStatus: () => true,
+        });
+        html = res.data || "";
+      } catch (err3) {
+        console.error("Final direct fetch failed:", err3.message || err3);
+        // We throw an error here, which will be caught in createAmazonLink
+        throw new Error("Scraping failed after all attempts.");
+      }
+    }
+  }
+
+  // --- Common Cheerio Parsing for Proxied or Raw HTML ---
+  if (html) {
+    // If we got HTML from ScrapingBee or the final direct fetch, parse it manually here
+    const $ = cheerio.load(html);
+
+    const title =
+      $("#productTitle").text().trim() ||
+      $("title").text().trim() ||
+      "Amazon product";
+      
+    // image selectors
+    let image =
+      $("#landingImage").attr("src") ||
+      $("#imgTagWrapperId img").attr("data-old-hires") ||
+      $('img[data-old-hires]').attr("data-old-hires") ||
+      $('meta[property="og:image"]').attr("content") ||
+      null;
+    if (image && image.startsWith("//")) image = "https:" + image;
+
+    // primary selectors for price 
+    let priceText =
+      $("#corePriceDisplay_feature_div .a-offscreen").first().text().trim() || // NEW/UPDATED
+      $("#desktop_buybox .a-price .a-offscreen").first().text().trim() || // NEW/UPDATED
+      $("#priceblock_ourprice").text().trim() ||
+      $("#priceblock_dealprice").text().trim() ||
+      $("#corePrice_feature_div .a-offscreen").first().text().trim() ||
+      $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen").first().text().trim() ||
+      $(".a-price .a-offscreen").first().text().trim() ||
+      null;
+
+    // If not found, try a page-wide regex
+    if (!priceText || !priceText.trim()) {
+      const pageText = (html || "").replace(/\s+/g, " ");
+      const match = pageText.match(/(₹|Rs\.?|INR|\$|USD|£|€)\s?[0-9\.,]{1,}/i);
+      if (match) {
+        priceText = match[0];
+        console.log("Price regex fallback found:", priceText);
+      }
+    }
+
+    const priceParsed = parsePriceValue(priceText);
+    if (!priceParsed.parsed && priceParsed.raw) {
+      console.warn("Price present but failed to parse. raw price:", priceParsed.raw);
+    }
+
+    // bullets
+    const bullets = [];
+    $("#feature-bullets li").each((_, li) => {
+      const t = $(li).text().replace(/\s+/g, " ").trim();
+      if (t) bullets.push(t);
+    });
+    const shortDescription = bullets[0] || null;
+    const longDescription = bullets.slice(0, 5).join(" ") || null;
+
+    // rating
+    let rating = null;
+    const ratingText = $(".a-icon.a-icon-star span.a-icon-alt").first().text();
+    if (ratingText) {
+      const m = ratingText.match(/([\d.]+)/);
+      if (m) rating = parseFloat(m[1]);
+    }
+
+    // reviews count
+    let reviewsCount = null;
+    const reviewsText = $("#acrCustomerReviewText").text();
+    if (reviewsText) {
+      const m2 = reviewsText.replace(/,/g, "").match(/([\d]+)/);
+      if (m2) reviewsCount = parseInt(m2[1], 10);
+    }
+
+    // category path
+    const categoryPath = [];
+    $("#wayfinding-breadcrumbs_container ul li a").each((_, a) => {
+      const t = $(a).text().replace(/\s+/g, " ").trim();
+      if (t) categoryPath.push(t);
+    });
+
+    return {
+      finalUrl,
+      title,
+      priceText: priceParsed.raw || priceText || null,
+      price: priceParsed.parsed,
+      priceCurrency: priceParsed.currency || null,
+      imageUrl: image || null,
+      primaryImage: image || null,
+      images: image ? [image] : [],
+      shortDescription,
+      longDescription,
+      rating,
+      reviewsCount,
+      categoryPath,
+      slug: null,
+      brand: null,
+    };
+  } // end if (html)
+
+  throw new Error("Failed to get product data from Amazon after all attempts.");
 }
 
 // ------------ affiliate URL builder ------------
