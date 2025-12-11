@@ -6,7 +6,7 @@ const dayjs = require("dayjs");
 const Link = require("../models/link");
 const { scrapeAmazonProduct: legacyScrape } = require("../scrapers/amazon");
 
-// OpenAI client
+// OpenAI client (official SDK)
 const { OpenAI } = require("openai");
 const openaiKey = process.env.OPENAI_API_KEY || "";
 let openai = null;
@@ -20,7 +20,6 @@ const router = express.Router();
 
 // ---------- Helpers ----------
 
-// Simple random id, 5 chars like "a2f9x"
 function generateId(length = 5) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
@@ -30,19 +29,15 @@ function generateId(length = 5) {
   return out;
 }
 
-// Remove obvious tracking params so URLs are stable
 function stripAmazonTracking(url) {
   try {
     const u = new URL(url);
-    // Keep protocol + origin + pathname only (strip search params)
-    const clean = `${u.origin}${u.pathname}`;
-    return clean;
+    return `${u.origin}${u.pathname}`;
   } catch {
     return url;
   }
 }
 
-// Try to resolve short amzn.to links (best effort)
 async function resolveAmazonUrl(url) {
   if (!url) return null;
   if (/amazon\./i.test(url)) return stripAmazonTracking(url);
@@ -56,9 +51,9 @@ async function resolveAmazonUrl(url) {
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
           "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
       },
+      timeout: 15000,
     });
 
-    // axios stores final URL differently depending on environment; try both
     const finalUrl =
       (res.request && res.request.res && res.request.res.responseUrl) ||
       (res.request && res.request._redirectable && res.request._redirectable._currentUrl) ||
@@ -66,8 +61,74 @@ async function resolveAmazonUrl(url) {
 
     return stripAmazonTracking(finalUrl);
   } catch (err) {
-    console.warn("resolveAmazonUrl failed, returning original:", err.message);
+    console.warn("resolveAmazonUrl failed, returning original:", err && err.message ? err.message : err);
     return stripAmazonTracking(url);
+  }
+}
+
+// Price parser - returns number (or null)
+function parsePriceValue(raw) {
+  if (raw == null) return null;
+  if (typeof raw === "number") return raw;
+
+  let s = String(raw).trim();
+
+  // Empty
+  if (!s) return null;
+
+  // Remove currency symbols and non-digit except . and ,
+  // But keep both . and , to attempt international formats
+  s = s.replace(/\u00A0/g, " "); // non-breaking spaces
+  // Common currency symbols
+  s = s.replace(/[₹$€£¥¢฿₨₩]/g, "");
+  // Remove any letters
+  s = s.replace(/[A-Za-z]/g, "");
+  s = s.replace(/^\s*-/g, ""); // strip leading dash
+
+  // If string contains both '.' and ',' assume '.' is decimal only when '.' appears after comma? heuristic:
+  // Common formats:
+  //  - "1,234.56" -> remove commas -> 1234.56
+  //  - "1.234,56" -> european -> replace '.' (thousand) with '' and replace ',' with '.' -> 1234.56
+  //  - "₹57,990.00" -> remove ₹ and commas -> 57990.00
+
+  const hasDot = s.indexOf(".") >= 0;
+  const hasComma = s.indexOf(",") >= 0;
+
+  try {
+    if (hasDot && hasComma) {
+      // Determine which is decimal by last separator
+      const lastDot = s.lastIndexOf(".");
+      const lastComma = s.lastIndexOf(",");
+      if (lastDot > lastComma) {
+        // dot is decimal separator, commas are thousands
+        s = s.replace(/,/g, "");
+      } else {
+        // comma is decimal separator, dots are thousands
+        s = s.replace(/\./g, "").replace(/,/g, ".");
+      }
+    } else if (hasComma && !hasDot) {
+      // Could be "1,234" (thousands) or "1234,56" (decimal)
+      // If there are multiple commas or length of part after comma == 2 assume decimal
+      const parts = s.split(",");
+      if (parts.length === 2 && parts[1].length === 2) {
+        s = parts.join(".");
+      } else {
+        s = s.replace(/,/g, "");
+      }
+    } else {
+      // only dot or neither -> remove commas (already none)
+      s = s.replace(/,/g, "");
+    }
+
+    // Remove whitespace leftover
+    s = s.replace(/\s+/g, "");
+
+    const num = Number(s);
+    if (!Number.isFinite(num)) return null;
+    return num;
+  } catch (err) {
+    console.warn("parsePriceValue error for raw:", raw, err && err.message ? err.message : err);
+    return null;
   }
 }
 
@@ -84,14 +145,16 @@ function extractTextFromAIResponse(resp) {
           if (!o) return "";
           if (typeof o === "string") return o;
           if (Array.isArray(o.content)) {
-            return o.content
-              .map((c) => (typeof c === "string" ? c : c.text || ""))
-              .join("");
+            return o.content.map((c) => (typeof c === "string" ? c : c.text || "")).join("");
           }
           return o.text || "";
         })
         .join("\n")
         .trim();
+    }
+    // Newer SDK: resp.output?.[0]?.content?.[0]?.text
+    if (resp?.output?.length && resp.output[0]?.content?.length) {
+      return resp.output[0].content.map((c) => c.text || "").join("\n").trim();
     }
     return "";
   } catch (err) {
@@ -119,7 +182,7 @@ Output only valid JSON.
 
   try {
     const resp = await openai.responses.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // if not available change to a model you have access to
       input: prompt,
       max_output_tokens: 400,
     });
@@ -143,7 +206,7 @@ Output only valid JSON.
 
     if (!parsed) {
       return {
-        title: title,
+        title,
         short: shortDescription || title,
         description: longDescription || shortDescription || title,
         rawAI: aiText,
@@ -153,63 +216,33 @@ Output only valid JSON.
     return {
       title: parsed.title || title,
       short: parsed.short || (parsed.title || "").slice(0, 80),
-      description:
-        parsed.description ||
-        parsed.longDescription ||
-        parsed.short ||
-        shortDescription ||
-        title,
+      description: parsed.description || parsed.longDescription || parsed.short || shortDescription || title,
       rawAI: aiText,
     };
   } catch (err) {
-    console.error("OpenAI rewrite failed:", err.message || err);
+    console.error("OpenAI rewrite failed:", err && err.message ? err.message : err);
     return null;
   }
 }
 
-// Parse a price string to a Number (e.g. "₹57,990.00" -> 57990)
-function parsePriceValue(priceInput) {
-  if (priceInput == null) return null;
-  if (typeof priceInput === "number") return priceInput;
-
-  let s = String(priceInput).trim();
-  if (!s) return null;
-
-  // Common patterns:
-  // "₹57,990.00", "57,990", "INR 57,990", "$123.45"
-  // Remove currency symbols and words, keep digits, dots and minus
-  // Replace commas used as thousand separators
-  // If decimal comma used (e.g., "1.234,56"), this is out-of-scope; we assume dot decimal.
-  // Remove non-digit, non-dot, non-minus characters
-  s = s.replace(/[, ]+/g, ""); // remove commas and spaces
-  s = s.replace(/[^0-9.\-]/g, ""); // remove currency symbols/letters
-
-  if (!s) return null;
-  // final check: must be a valid number
-  const n = Number(s);
-  if (Number.isFinite(n)) return n;
-  return null;
-}
-
-// Scrape Amazon product page for core data (re-using your scraper)
+// Scrape Amazon product page for core data (re-using your scraper if present)
 async function scrapeAmazonProduct(url) {
-  // First resolve/normalize to canonical URL
   const finalUrl = await resolveAmazonUrl(url);
 
-  // Use existing scraper module if it is present (keeps logic central)
   try {
+    // attempt legacy scraper module (if exists)
     const scraped = await legacyScrape(finalUrl);
     return {
-      finalUrl: finalUrl,
+      finalUrl,
       title: scraped.title || scraped.shortTitle || "Amazon product",
-      price: scraped.priceText || scraped.price || null,
+      priceText: scraped.priceText || scraped.price || null,
+      price: scraped.price || scraped.priceText || null,
       imageUrl: scraped.primaryImage || (scraped.images && scraped.images[0]) || null,
       shortDescription: scraped.shortDescription || null,
       longDescription: scraped.longDescription || null,
-      rawScraped: scraped,
     };
   } catch (err) {
-    // fallback simple fetch + cheerio attempt (best-effort)
+    // fallback simple fetch
     try {
       const res = await axios.get(finalUrl, {
         maxRedirects: 5,
@@ -220,6 +253,7 @@ async function scrapeAmazonProduct(url) {
             "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
           "Accept-Language": "en-IN,en;q=0.9",
         },
+        timeout: 15000,
       });
       const $ = cheerio.load(res.data);
       const title = $("#productTitle").text().trim() || $("title").text().trim();
@@ -236,20 +270,20 @@ async function scrapeAmazonProduct(url) {
       return {
         finalUrl,
         title: title || "Amazon product",
-        price,
+        priceText: price,
+        price: price,
         imageUrl: image,
         shortDescription: null,
         longDescription: null,
-        rawScraped: null,
       };
     } catch (err2) {
-      console.error("Fallback scrape failed:", err2.message || err2);
+      console.error("Fallback scrape failed:", err2 && err2.message ? err2.message : err2);
       throw err2;
     }
   }
 }
 
-// Common creation logic used by /create and /bulk1
+// ---------- Core creation logic ----------
 async function createAmazonLink({ originalUrl, title, category, note, autoTitle }) {
   if (!originalUrl) throw new Error("originalUrl is required");
 
@@ -258,35 +292,45 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
   const noteSafe = note && note.trim() ? note.trim() : "";
 
   let finalTitle = title && title.trim() ? title.trim() : "";
-  let price = null;
   let imageUrl = null;
   let normalizedUrl = originalUrl;
   let scrapeError = null;
   let shortDescription = "";
   let longDescription = "";
+  let priceRaw = null;
+  let parsedPrice = null;
 
-  // Scrape if autoTitle is on OR we don't have a manual title
   if (autoTitle || !finalTitle) {
     try {
       const scraped = await scrapeAmazonProduct(originalUrl);
       normalizedUrl = scraped.finalUrl || originalUrl;
       if (!finalTitle && scraped.title) finalTitle = scraped.title;
-      price = scraped.price || null;
       imageUrl = scraped.imageUrl || null;
       shortDescription = scraped.shortDescription || "";
       longDescription = scraped.longDescription || "";
+      priceRaw = scraped.priceText || scraped.price || null;
     } catch (err) {
-      console.error("Scrape error for", originalUrl, err.message || err);
-      scrapeError = err.message || String(err);
+      console.error("Scrape error for", originalUrl, err && err.message ? err.message : err);
+      scrapeError = err && err.message ? err.message : String(err);
     }
   } else {
-    // still normalize URL
     normalizedUrl = await resolveAmazonUrl(originalUrl);
   }
 
   if (!finalTitle) finalTitle = "Amazon product";
 
-  // Attempt AI rewrite (if OpenAI configured)
+  // parse price safely
+  if (priceRaw != null) {
+    parsedPrice = parsePriceValue(priceRaw);
+    console.debug("Price parse:", { raw: priceRaw, parsed: parsedPrice });
+    if (parsedPrice == null) {
+      console.warn("Price present but failed to parse. raw price:", priceRaw);
+    }
+  } else {
+    console.debug("Price parse: { raw: null, parsed: null }");
+  }
+
+  // AI rewrite
   let aiFields = null;
   if (openai) {
     try {
@@ -300,44 +344,29 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
         if (aiResp.title) finalTitle = aiResp.title;
       }
     } catch (e) {
-      console.error("AI rewrite failed:", e.message || e);
+      console.error("AI rewrite failed:", e && e.message ? e.message : e);
     }
   }
 
-  // Parse price safely into a Number (mongoose expects Number)
-  let parsedPrice = null;
-  try {
-    parsedPrice = parsePriceValue(price);
-    if (price != null && parsedPrice == null) {
-      console.warn("Price present but failed to parse. raw price:", price);
-    }
-    console.debug("Price parse:", { raw: price, parsed: parsedPrice });
-  } catch (e) {
-    console.warn("Price parse error:", e && e.message ? e.message : e);
-    parsedPrice = null;
-  }
-
-  // ensure we always set id because schema requires it
   const id = generateId(5);
 
   const linkDoc = await Link.create({
     id,
     source,
     title: finalTitle,
-    shortTitle:
-      (aiFields && aiFields.short) ||
-      (finalTitle.length > 80 ? finalTitle.slice(0, 77) + "…" : finalTitle),
+    shortTitle: (aiFields && aiFields.short) || (finalTitle.length > 80 ? finalTitle.slice(0, 77) + "…" : finalTitle),
     category: categorySafe,
     note: noteSafe,
     price: parsedPrice != null ? parsedPrice : undefined,
+    priceRaw: priceRaw || undefined,        // <-- stored raw string for debugging & display
     originalUrl: normalizedUrl,
     rawOriginalUrl: originalUrl,
-    affiliateUrl: normalizedUrl, // until Admitad/other deeplink is wired in
+    affiliateUrl: normalizedUrl, // placeholder until deeplinking
     imageUrl: imageUrl || undefined,
     shortDescription: (aiFields && aiFields.short) || shortDescription || undefined,
     longDescription: (aiFields && aiFields.description) || longDescription || undefined,
     clicks: 0,
-    lastCheckedAt: aiFields ? new Date() : null,
+    lastCheckedAt: new Date(),
     lastError: scrapeError || undefined,
   });
 
@@ -378,7 +407,7 @@ router.post("/create", async (req, res) => {
 
     res.json({ success: true, link: linkDoc });
   } catch (err) {
-    console.error("POST /create error:", err);
+    console.error("POST /create error:", err && err.message ? err.message : err);
     res.status(500).json({ success: false, message: err.message || "Failed to create link." });
   }
 });
@@ -418,8 +447,8 @@ router.post("/bulk1", async (req, res) => {
         });
         created.push(doc);
       } catch (err) {
-        console.error("Bulk create error for", url, err.message || err);
-        errors.push({ url, error: err.message || String(err) });
+        console.error("Bulk create error for", url, err && err.message ? err.message : err);
+        errors.push({ url, error: err && err.message ? err.message : String(err) });
       }
     }
 
@@ -458,8 +487,8 @@ router.put("/update/:id", async (req, res) => {
     if (typeof title === "string") update.title = title;
     if (typeof category === "string") update.category = category;
     if (typeof price === "string" || typeof price === "number") {
-      const maybe = parsePriceValue(price);
-      if (maybe != null) update.price = maybe;
+      const num = Number(price);
+      if (!Number.isNaN(num)) update.price = num;
     }
     if (typeof note === "string") update.note = note;
 
@@ -513,23 +542,21 @@ router.post("/maintenance/daily", async (req, res) => {
       processed++;
       try {
         const info = await scrapeAmazonProduct(link.originalUrl || link.rawOriginalUrl);
+        // set raw and parsed
+        const rawFound = info.priceText || info.price || null;
+        const maybePrice = parsePriceValue(rawFound);
 
         const update = {
           lastCheckedAt: new Date(),
+          priceRaw: rawFound != null ? rawFound : undefined,
         };
-
-        const maybePrice = parsePriceValue(info.price);
         if (maybePrice != null) update.price = maybePrice;
-
         if (info.imageUrl) update.imageUrl = info.imageUrl;
 
-        await Link.updateOne(
-          { _id: link._id },
-          { $set: update }
-        );
+        await Link.updateOne({ _id: link._id }, { $set: update });
         updated++;
       } catch (err) {
-        console.error("maintenance scrape error for", link.id, err.message || err);
+        console.error("maintenance scrape error for", link.id, err && err.message ? err.message : err);
         await Link.updateOne({ _id: link._id }, { $set: { lastCheckedAt: new Date() } });
       }
     }
