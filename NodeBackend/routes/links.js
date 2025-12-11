@@ -1,8 +1,5 @@
 // NodeBackend/routes/links.js
 // Complete, resilient links API (create / bulk / all / go / update / delete / maintenance)
-// - safer resolveAmazonUrl with optional scraping proxy (ScrapingBee)
-// - robust price parsing to avoid Mongoose numeric cast errors
-// - optional OpenAI rewriting if OPENAI_API_KEY env var is present
 
 const express = require("express");
 const axios = require("axios");
@@ -16,6 +13,7 @@ let openai = null;
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 if (OPENAI_KEY) {
   try {
+    // FIX: Ensure OpenAI import is done correctly
     const { OpenAI } = require("openai");
     openai = new OpenAI({ apiKey: OPENAI_KEY });
     console.log("OpenAI client configured.");
@@ -177,6 +175,11 @@ function parsePriceValue(priceRaw) {
 async function extractTextFromAIResponse(resp) {
   try {
     if (!resp) return "";
+    // Note: OpenAI SDK v4+ uses message content structure
+    if (resp.choices && resp.choices.length > 0 && resp.choices[0].message && resp.choices[0].message.content) {
+        return resp.choices[0].message.content.trim();
+    }
+    // Fallback for older/different response structures
     if (typeof resp.output_text === "string" && resp.output_text.trim()) {
       return resp.output_text.trim();
     }
@@ -202,26 +205,28 @@ async function extractTextFromAIResponse(resp) {
 async function rewriteWithAI({ title, shortDescription, longDescription }) {
   if (!openai) return null;
 
-  const prompt = `
-You are an expert ecommerce copywriter. Given the product title and descriptions from an Amazon product page, return a JSON object (no extra text) with three properties:
+  const systemPrompt = `You are an expert ecommerce copywriter. Given the product title and descriptions from an Amazon product page, return a JSON object (no extra text) with three properties:
 - "title": an SEO-friendly product title (<= 120 chars).
 - "short": a short 1-line card hook (<= 80 chars).
 - "description": a 2-3 sentence user-focused description (<= 220 chars).
-
-Input:
+Output only valid JSON.`;
+    
+    const userMessage = `Input:
 Title: ${title || ""}
 ShortDescription: ${shortDescription || ""}
-LongDescription: ${longDescription || ""}
-
-Output only valid JSON.
-`;
+LongDescription: ${longDescription || ""}`;
 
   try {
-    const resp = await openai.responses.create({
+    const resp = await openai.chat.completions.create({ // Use chat.completions for JSON output
       model: "gpt-4o-mini",
-      input: prompt,
-      max_output_tokens: 400,
+      messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage }
+      ],
+      max_tokens: 400,
+      response_format: { type: "json_object" } // Request JSON object output
     });
+    
     const aiText = await extractTextFromAIResponse(resp);
     // try parse JSON
     let parsed = null;
@@ -420,23 +425,24 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
   let scrapeError = null;
   let shortDescription = "";
   let longDescription = "";
+  let scrapedData = null; // Store scraped data here
 
   if (autoTitle || !finalTitle) {
     try {
-      const scraped = await scrapeAmazonProduct(originalUrl);
-      normalizedUrl = scraped.finalUrl || originalUrl;
-      if (!finalTitle && scraped.title) finalTitle = scraped.title;
-      if (scraped.price != null) {
-        priceNum = scraped.price;
-      } else if (scraped.priceText) {
-        const pp = parsePriceValue(scraped.priceText);
+      scrapedData = await scrapeAmazonProduct(originalUrl);
+      normalizedUrl = scrapedData.finalUrl || originalUrl;
+      if (!finalTitle && scrapedData.title) finalTitle = scrapedData.title;
+      if (scrapedData.price != null) {
+        priceNum = scrapedData.price;
+      } else if (scrapedData.priceText) {
+        const pp = parsePriceValue(scrapedData.priceText);
         priceNum = pp.parsed;
         priceCurrency = pp.currency || null;
-        priceRaw = pp.raw || scraped.priceText;
+        priceRaw = pp.raw || scrapedData.priceText;
       }
-      imageUrl = scraped.imageUrl || scraped.primaryImage || null;
-      shortDescription = scraped.shortDescription || "";
-      longDescription = scraped.longDescription || "";
+      imageUrl = scrapedData.imageUrl || scrapedData.primaryImage || null;
+      shortDescription = scrapedData.shortDescription || "";
+      longDescription = scrapedData.longDescription || "";
     } catch (err) {
       console.error("Scrape error for", originalUrl, err.message || err);
       scrapeError = err.message || String(err);
@@ -453,9 +459,9 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
 
   if (!finalTitle) finalTitle = "Amazon product";
 
-  // AI rewriting (optional)
+  // AI rewriting (optional) - Trigger only if we got some description from scraping
   let aiFields = null;
-  if (openai) {
+  if (openai && (shortDescription || longDescription)) {
     try {
       aiFields = await rewriteWithAI({
         title: finalTitle,
@@ -485,27 +491,27 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
     shortTitle:
       (aiFields && aiFields.short) ||
       (finalTitle.length > 80 ? finalTitle.slice(0, 77).trimEnd() + "…" : finalTitle),
-    brand: undefined,
+    brand: scrapedData?.brand || undefined,
     category: categorySafe,
-    categoryPath: undefined,
+    categoryPath: scrapedData?.categoryPath || undefined,
     note: noteSafe,
     originalUrl: normalizedUrl,
     rawOriginalUrl: originalUrl,
     affiliateUrl,
     tag: DEFAULT_AMAZON_TAG || undefined,
     imageUrl: imageUrl || undefined,
-    images: imageUrl ? [imageUrl] : undefined,
+    images: imageUrl ? (scrapedData?.images || [imageUrl]) : undefined,
     price: priceForDb,
     priceCurrency: priceCurrency || undefined,
     priceRaw: priceRaw || undefined,
     prevPrice: undefined,
     prevPriceCurrency: undefined,
     priceChangeReason: undefined,
-    rating: undefined,
-    reviewsCount: undefined,
+    rating: scrapedData?.rating || undefined,
+    reviewsCount: scrapedData?.reviewsCount || undefined,
     shortDescription: (aiFields && aiFields.short) || shortDescription || undefined,
     longDescription: (aiFields && aiFields.description) || longDescription || undefined,
-    slug: undefined,
+    slug: scrapedData?.slug || undefined,
     isActive: true,
     clicks: 0,
     lastCheckedAt: aiFields ? new Date() : undefined,
