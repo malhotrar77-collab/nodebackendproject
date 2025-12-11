@@ -1,35 +1,30 @@
 // NodeBackend/routes/links.js
-// Full replacement for your previous file — improved scraping, price parsing, AI rewrite support.
+// Complete, resilient links API (create / bulk / all / go / update / delete / maintenance)
+// - safer resolveAmazonUrl with optional scraping proxy (ScrapingBee)
+// - robust price parsing to avoid Mongoose numeric cast errors
+// - optional OpenAI rewriting if OPENAI_API_KEY env var is present
 
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
 const dayjs = require("dayjs");
 const Link = require("../models/link");
-
-// Try to reuse your scraper module (if present)
-let legacyScraper = null;
-try {
-  legacyScraper = require("../scrapers/amazon").scrapeAmazonProduct;
-} catch (e) {
-  legacyScraper = null;
-  console.warn("No legacy scraper module found or failed to load:", e.message || e);
-}
+const { scrapeAmazonProduct: legacyScrape } = require("../scrapers/amazon");
 
 // OpenAI client (optional)
 let openai = null;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-if (OPENAI_API_KEY) {
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+if (OPENAI_KEY) {
   try {
     const { OpenAI } = require("openai");
-    openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    openai = new OpenAI({ apiKey: OPENAI_KEY });
     console.log("OpenAI client configured.");
-  } catch (err) {
-    console.warn("Failed to initialize OpenAI client:", err.message || err);
+  } catch (e) {
+    console.warn("OpenAI SDK not installed or failed to init:", e.message || e);
     openai = null;
   }
 } else {
-  console.log("OPENAI_API_KEY not set; AI rewriting disabled.");
+  console.warn("OPENAI_API_KEY not set — AI rewriting disabled.");
 }
 
 const router = express.Router();
@@ -39,235 +34,179 @@ const router = express.Router();
 function generateId(length = 5) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
-  for (let i = 0; i < length; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < length; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
   return out;
 }
 
-// Normalize canonical Amazon urls by stripping search params
 function stripAmazonTracking(url) {
   try {
     const u = new URL(url);
+    // Return origin + pathname (strip search params)
     return `${u.origin}${u.pathname}`;
-  } catch {
+  } catch (e) {
     return url;
   }
 }
 
-// Resolve short amzn.to style redirects -> canonical URL (best-effort).
+// ------------ robust resolveAmazonUrl ------------
 async function resolveAmazonUrl(url) {
   if (!url) return null;
   if (/amazon\./i.test(url)) return stripAmazonTracking(url);
 
-  try {
-    const res = await axios.get(url, {
-      maxRedirects: 5,
-      timeout: 15000,
-      validateStatus: (s) => s >= 200 && s < 400,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-      },
-    });
+  const SCRAPINGBEE_KEY = process.env.SCRAPINGBEE_KEY || null;
+  const tryGet = async (u) => {
+    try {
+      const res = await axios.get(u, {
+        maxRedirects: 5,
+        timeout: 15000,
+        validateStatus: () => true, // allow non-2xx so we can inspect headers
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        },
+      });
+      const finalUrl =
+        (res.request && res.request.res && res.request.res.responseUrl) ||
+        (res.request &&
+          res.request._redirectable &&
+          res.request._redirectable._currentUrl) ||
+        null;
+      if (finalUrl) return stripAmazonTracking(finalUrl);
 
-    // axios stores final URL differently across envs. Try common places.
-    const finalUrl =
-      (res.request && res.request.res && res.request.res.responseUrl) ||
-      (res.request && res.request._redirectable && res.request._redirectable._currentUrl) ||
-      url;
+      const loc = (res.headers && (res.headers.location || res.headers.Location)) || null;
+      if (loc) {
+        try {
+          return stripAmazonTracking(new URL(loc, u).toString());
+        } catch {}
+      }
+      return null;
+    } catch (err) {
+      return null;
+    }
+  };
 
-    return stripAmazonTracking(finalUrl);
-  } catch (err) {
-    console.warn("resolveAmazonUrl failed, returning original (error):", err.message || err);
-    return stripAmazonTracking(url);
+  // If scraper proxy key present, attempt to fetch via proxy which often resolves redirects
+  if (SCRAPINGBEE_KEY) {
+    try {
+      const proxyUrl = `https://app.scrapingbee.com/api/v1?api_key=${encodeURIComponent(
+        SCRAPINGBEE_KEY
+      )}&url=${encodeURIComponent(url)}&render_js=false&forward_headers=true`;
+      const pRes = await axios.get(proxyUrl, {
+        timeout: 20000,
+        validateStatus: () => true,
+      });
+      const finalUrl =
+        (pRes.request && pRes.request.res && pRes.request.res.responseUrl) ||
+        (pRes.request && pRes.request._redirectable && pRes.request._redirectable._currentUrl) ||
+        null;
+      if (finalUrl) return stripAmazonTracking(finalUrl);
+    } catch (err) {
+      console.warn("Scraper proxy resolve attempt failed:", err.message || err);
+    }
   }
+
+  // 1) tolerant GET
+  try {
+    const g = await tryGet(url);
+    if (g) return g;
+  } catch (e) {}
+
+  // 2) HEAD fallback
+  try {
+    const head = await axios.head(url, {
+      maxRedirects: 5,
+      timeout: 10000,
+      validateStatus: () => true,
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    const finalUrl =
+      (head.request && head.request.res && head.request.res.responseUrl) ||
+      (head.headers && (head.headers.location || head.headers.Location)) ||
+      null;
+    if (finalUrl) {
+      try {
+        return stripAmazonTracking(new URL(finalUrl, url).toString());
+      } catch {}
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Last resort: return stripped original
+  return stripAmazonTracking(url);
 }
 
-// Price parsing: accepts strings like "₹57,990.00", "Rs. 4,599", "₹1,299", "$29.99" etc.
-// Returns { raw: originalStringOrNull, parsed: numericOrNull, currency: stringOrNull }
+// ------------ price parsing helper ------------
 function parsePriceValue(priceRaw) {
   if (!priceRaw) return { raw: null, parsed: null, currency: null };
   try {
-    const s = priceRaw.toString().trim();
+    let s = priceRaw.toString().replace(/\u00A0/g, " ").trim();
+    s = s.replace(/\s+/g, " ");
+    if (!s) return { raw: priceRaw.toString(), parsed: null, currency: null };
 
-    // capture currency symbol / text
-    const currencyMatch = s.match(/(₹|Rs\.?|INR|\$|USD|£|€)/i);
-    const currency = currencyMatch ? currencyMatch[0].replace(/\./g, "") : null;
+    const currMatch = s.match(/(₹|Rs\.?|INR|USD|\$|£|€)/i);
+    const currency = currMatch ? currMatch[0].replace(/\./g, "") : null;
 
-    // remove all non-digit, non-dot, non-comma characters (keep decimal)
-    // Then remove commas -> standardize -> parseFloat
-    // Examples: "₹57,990.00" -> "57990.00"
+    // Remove everything except digits, dot, comma
     let digits = s.replace(/[^\d.,]/g, "");
     if (!digits) return { raw: s, parsed: null, currency };
 
-    // If string contains both commas and dots, assume comma is thousand sep (Indian style)
-    // Heuristic: if digits has a dot after last 3 digits it's decimal; otherwise treat commas as thousand separators
-    // Replace commas, keep dot, then parseFloat
+    // Remove comma thousand separators, keep the dot for decimals
     digits = digits.replace(/,/g, "");
-    const val = parseFloat(digits);
-    if (Number.isFinite(val)) {
-      return { raw: s, parsed: val, currency };
+    const num = parseFloat(digits);
+
+    if (Number.isFinite(num)) return { raw: s, parsed: num, currency };
+
+    // Try fallback regex for number groups
+    const m = s.match(/([0-9]{1,3}(?:[.,][0-9]{2,3})+)/);
+    if (m) {
+      const candidate = m[1].replace(/,/g, "");
+      const n2 = parseFloat(candidate);
+      if (Number.isFinite(n2)) return { raw: s, parsed: n2, currency };
     }
 
     return { raw: s, parsed: null, currency };
   } catch (err) {
-    return { raw: priceRaw.toString(), parsed: null, currency: null };
+    return { raw: String(priceRaw), parsed: null, currency: null };
   }
 }
 
-// Try to extract core product fields from an Amazon product URL.
-// Uses legacyScraper (if loaded) else falls back to a minimal cheerio-based extractor.
-async function scrapeAmazonProduct(finalUrlOrInput) {
-  const resolved = await resolveAmazonUrl(finalUrlOrInput);
-  const finalUrl = resolved || finalUrlOrInput;
-
-  // First try legacy scraper if available (keeps your existing logic)
-  if (legacyScraper) {
-    try {
-      const legacy = await legacyScraper(finalUrl);
-      // legacy may return priceText or price; normalize
-      const priceText = legacy.priceText || legacy.price || null;
-      const priceParsed = parsePriceValue(priceText);
-      return {
-        finalUrl,
-        title: legacy.title || legacy.shortTitle || "Amazon product",
-        priceRaw: priceText || null,
-        price: priceParsed.parsed,
-        priceCurrency: priceParsed.currency || null,
-        imageUrl: legacy.primaryImage || (legacy.images && legacy.images[0]) || null,
-        images: legacy.images || [],
-        shortDescription: legacy.shortDescription || null,
-        longDescription: legacy.longDescription || null,
-        slug: legacy.slug || null,
-        rating: legacy.rating || null,
-        reviewsCount: legacy.reviewsCount || null,
-      };
-    } catch (err) {
-      console.warn("legacy scraper failed, falling back:", err.message || err);
-      // fall through to fallback
-    }
-  }
-
-  // Fallback simple >= cheerio extractor with extra debugging & regex fallback for price
+// ------------ AI rewrite helper (optional) ------------
+async function extractTextFromAIResponse(resp) {
   try {
-    const res = await axios.get(finalUrl, {
-      maxRedirects: 5,
-      timeout: 15000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-IN,en;q=0.9",
-      },
-      validateStatus: (s) => s >= 200 && s < 400,
-    });
-
-    console.log("Fallback scrape HTTP status:", res.status);
-    console.log("Response HTML length:", (res.data || "").length);
-
-    // small snippet to quickly see whether page contains bot protection text
-    const snippet = (res.data || "").slice(0, 2000).replace(/\n/g, " ");
-    console.log("HTML snippet (first 2k chars):", snippet);
-
-    const $ = cheerio.load(res.data);
-
-    const title = $("#productTitle").text().trim() || $("title").text().trim() || null;
-
-    // Common places for Indian prices
-    let priceText =
-      $("#priceblock_ourprice").text().trim() ||
-      $("#priceblock_dealprice").text().trim() ||
-      $("#corePrice_feature_div .a-offscreen").first().text().trim() ||
-      $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen").first().text().trim() ||
-      $(".a-price .a-offscreen").first().text().trim() ||
-      null;
-
-    // If price not found, try searching page with regex for currency-looking strings
-    let regexFallback = null;
-    if (!priceText) {
-      const pageText = (res.data || "").replace(/\s+/g, " ");
-      const match = pageText.match(/(₹|Rs\.?|INR|\$|USD|£|€)\s?[0-9\.,]{2,}/i);
-      if (match) {
-        regexFallback = match[0];
-        console.log("Price regex fallback found:", regexFallback);
-      }
+    if (!resp) return "";
+    if (typeof resp.output_text === "string" && resp.output_text.trim()) {
+      return resp.output_text.trim();
     }
-
-    priceText = priceText || regexFallback || null;
-
-    // image extraction
-    let image =
-      $("#landingImage").attr("src") ||
-      $("#imgTagWrapperId img").attr("data-old-hires") ||
-      $("#imgTagWrapperId img").attr("src") ||
-      $('img[data-a-dynamic-image]').attr("src") ||
-      $('meta[property="og:image"]').attr("content") ||
-      null;
-
-    if (image && image.startsWith("//")) image = "https:" + image;
-
-    const images = [];
-    $("#altImages img").each((_, img) => {
-      let src = $(img).attr("src");
-      if (!src) return;
-      src = src.replace(/\._.*?_\./, "._SL800_.");
-      if (src && src.startsWith("//")) src = "https:" + src;
-      images.push(src);
-    });
-    if (image && images.indexOf(image) === -1) images.unshift(image);
-
-    // Short / long descriptions
-    const bullets = [];
-    $("#feature-bullets li").each((_, li) => {
-      const t = $(li).text().replace(/\s+/g, " ").trim();
-      if (t) bullets.push(t);
-    });
-    const shortDescription = bullets[0] || null;
-    const longDescription = bullets.slice(0, 5).join(" ") || null;
-
-    const priceParsed = parsePriceValue(priceText);
-
-    return {
-      finalUrl,
-      title: title || "Amazon product",
-      priceRaw: priceText,
-      price: priceParsed.parsed,
-      priceCurrency: priceParsed.currency,
-      imageUrl: image,
-      images,
-      shortDescription,
-      longDescription,
-      slug: title ? title.toString().slice(0, 120).replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase() : null,
-      rating: null,
-      reviewsCount: null,
-    };
+    if (Array.isArray(resp.output) && resp.output.length) {
+      return resp.output
+        .map((o) => {
+          if (!o) return "";
+          if (typeof o === "string") return o;
+          if (Array.isArray(o.content)) {
+            return o.content.map((c) => (typeof c === "string" ? c : c.text || "")).join("");
+          }
+          return o.text || "";
+        })
+        .join("\n")
+        .trim();
+    }
+    return "";
   } catch (err) {
-    console.error("Fallback scrape failed:", err.message || err);
-    // bubble up so caller can mark lastError
-    throw err;
+    return "";
   }
 }
 
-// Compose affiliate URL (simple tag param). Use AMAZON_TAG env var if present.
-const DEFAULT_AMAZON_TAG = process.env.AMAZON_TAG || null;
-function buildAffiliateUrl(canonicalUrl) {
-  if (!canonicalUrl) return null;
-  if (!DEFAULT_AMAZON_TAG) return canonicalUrl;
-  if (/[?&]tag=/.test(canonicalUrl)) return canonicalUrl;
-  const sep = canonicalUrl.includes("?") ? "&" : "?";
-  return `${canonicalUrl}${sep}tag=${DEFAULT_AMAZON_TAG}`;
-}
-
-// --- OpenAI rewrite helper (returns { title, short, description, rawAI } or null)
 async function rewriteWithAI({ title, shortDescription, longDescription }) {
   if (!openai) return null;
 
-  // Compact JSON-output prompt
   const prompt = `
-You are an expert ecommerce copywriter. Given the product title and descriptions, return ONLY a JSON object (no extra text) with properties:
-- "title": SEO-friendly name (<= 120 chars).
-- "short": a 1-line card hook (<= 80 chars).
-- "description": a 2-3 sentence listing description (<= 220 chars).
+You are an expert ecommerce copywriter. Given the product title and descriptions from an Amazon product page, return a JSON object (no extra text) with three properties:
+- "title": an SEO-friendly product title (<= 120 chars).
+- "short": a short 1-line card hook (<= 80 chars).
+- "description": a 2-3 sentence user-focused description (<= 220 chars).
 
 Input:
 Title: ${title || ""}
@@ -279,53 +218,32 @@ Output only valid JSON.
 
   try {
     const resp = await openai.responses.create({
-      model: "gpt-4o-mini", // change if your account doesn't have this model
+      model: "gpt-4o-mini",
       input: prompt,
       max_output_tokens: 400,
     });
-
-    // Extract text robustly
-    let aiText = "";
-    try {
-      if (typeof resp.output_text === "string") aiText = resp.output_text;
-      else if (Array.isArray(resp.output) && resp.output.length) {
-        aiText = resp.output.map((o) => (o && (o.content || o.text) ? (o.content || o.text) : "")).join("");
-      } else if (resp.data && resp.data[0] && resp.data[0].text) {
-        aiText = resp.data[0].text;
-      } else {
-        aiText = JSON.stringify(resp, null, 2);
-      }
-    } catch (e) {
-      aiText = String(resp);
-    }
-
-    // try parse JSON from aiText
+    const aiText = await extractTextFromAIResponse(resp);
+    // try parse JSON
     let parsed = null;
     try {
       parsed = JSON.parse(aiText);
     } catch (e) {
-      // attempt to extract JSON substring
       const start = aiText.indexOf("{");
       const end = aiText.lastIndexOf("}");
       if (start >= 0 && end > start) {
         try {
           parsed = JSON.parse(aiText.slice(start, end + 1));
-        } catch (ee) {
-          parsed = null;
-        }
+        } catch {}
       }
     }
-
     if (!parsed) {
-      // fallback: return safe values
       return {
-        title: title,
-        short: (shortDescription && shortDescription.slice(0, 80)) || (title && title.slice(0, 80)) || "",
-        description: (longDescription && longDescription.slice(0, 220)) || (shortDescription && shortDescription.slice(0, 220)) || title,
+        title,
+        short: shortDescription || title,
+        description: longDescription || shortDescription || title,
         rawAI: aiText,
       };
     }
-
     return {
       title: parsed.title || title,
       short: parsed.short || (parsed.title || "").slice(0, 80),
@@ -338,7 +256,152 @@ Output only valid JSON.
   }
 }
 
-// Create link logic used by POST /create and bulk
+// ------------ scraping function that uses legacyScrape with safe fallbacks ------------
+async function scrapeAmazonProduct(url) {
+  // Normalize/resolve
+  const finalUrl = await resolveAmazonUrl(url);
+
+  // Try existing scraper module first (from /scrapers/amazon)
+  try {
+    const scraped = await legacyScrape(finalUrl);
+    // legacyScrape returns many fields; unify into required subset
+    return {
+      finalUrl,
+      title: scraped.title || scraped.shortTitle || "Amazon product",
+      priceText: scraped.priceText || null,
+      price: null, // we'll parse using parsePriceValue below
+      priceCurrency: null,
+      imageUrl: scraped.primaryImage || (scraped.images && scraped.images[0]) || null,
+      primaryImage: scraped.primaryImage || null,
+      images: scraped.images || [],
+      shortDescription: scraped.shortDescription || null,
+      longDescription: scraped.longDescription || null,
+      rating: scraped.rating || null,
+      reviewsCount: scraped.reviewsCount || null,
+      categoryPath: scraped.categoryPath || [],
+      slug: scraped.slug || null,
+      brand: scraped.brand || null,
+    };
+  } catch (err) {
+    // fallback fetch + cheerio parse
+    try {
+      const res = await axios.get(finalUrl, {
+        maxRedirects: 5,
+        timeout: 15000,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "en-IN,en;q=0.9",
+        },
+        validateStatus: () => true,
+      });
+
+      const html = res.data || "";
+      const $ = cheerio.load(html);
+
+      const title = $("#productTitle").text().trim() || $("title").text().trim() || "Amazon product";
+
+      // image selectors
+      let image =
+        $("#landingImage").attr("src") ||
+        $("#imgTagWrapperId img").attr("data-old-hires") ||
+        $('img[data-old-hires]').attr("data-old-hires") ||
+        $('meta[property="og:image"]').attr("content") ||
+        null;
+      if (image && image.startsWith("//")) image = "https:" + image;
+
+      // primary selectors for price
+      let priceText =
+        $("#priceblock_ourprice").text().trim() ||
+        $("#priceblock_dealprice").text().trim() ||
+        $("#corePrice_feature_div .a-offscreen").first().text().trim() ||
+        $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen").first().text().trim() ||
+        $(".a-price .a-offscreen").first().text().trim() ||
+        null;
+
+      // If not found, try a page-wide regex (captures ₹, Rs, USD, $ etc.)
+      if (!priceText || !priceText.trim()) {
+        const pageText = (html || "").replace(/\s+/g, " ");
+        const match = pageText.match(/(₹|Rs\.?|INR|\$|USD|£|€)\s?[0-9\.,]{1,}/i);
+        if (match) {
+          priceText = match[0];
+          console.log("Price regex fallback found:", priceText);
+        }
+      }
+
+      const priceParsed = parsePriceValue(priceText);
+      if (!priceParsed.parsed && priceParsed.raw) {
+        console.warn("Price present but failed to parse. raw price:", priceParsed.raw);
+      }
+
+      // bullets
+      const bullets = [];
+      $("#feature-bullets li").each((_, li) => {
+        const t = $(li).text().replace(/\s+/g, " ").trim();
+        if (t) bullets.push(t);
+      });
+      const shortDescription = bullets[0] || null;
+      const longDescription = bullets.slice(0, 5).join(" ") || null;
+
+      // rating
+      let rating = null;
+      const ratingText = $(".a-icon.a-icon-star span.a-icon-alt").first().text();
+      if (ratingText) {
+        const m = ratingText.match(/([\d.]+)/);
+        if (m) rating = parseFloat(m[1]);
+      }
+
+      // reviews count
+      let reviewsCount = null;
+      const reviewsText = $("#acrCustomerReviewText").text();
+      if (reviewsText) {
+        const m2 = reviewsText.replace(/,/g, "").match(/([\d]+)/);
+        if (m2) reviewsCount = parseInt(m2[1], 10);
+      }
+
+      // category path
+      const categoryPath = [];
+      $("#wayfinding-breadcrumbs_container ul li a").each((_, a) => {
+        const t = $(a).text().replace(/\s+/g, " ").trim();
+        if (t) categoryPath.push(t);
+      });
+
+      return {
+        finalUrl,
+        title,
+        priceText: priceParsed.raw || priceText || null,
+        price: priceParsed.parsed,
+        priceCurrency: priceParsed.currency || null,
+        imageUrl: image || null,
+        primaryImage: image || null,
+        images: image ? [image] : [],
+        shortDescription,
+        longDescription,
+        rating,
+        reviewsCount,
+        categoryPath,
+        slug: null,
+        brand: null,
+      };
+    } catch (err2) {
+      console.error("Fallback scrape failed:", err2.message || err2);
+      throw err2;
+    }
+  }
+}
+
+// ------------ affiliate URL builder ------------
+const DEFAULT_AMAZON_TAG = process.env.AMAZON_TAG || null;
+function buildAffiliateUrl(canonicalUrl) {
+  if (!canonicalUrl) return null;
+  if (!DEFAULT_AMAZON_TAG) return canonicalUrl;
+  if (/[?&]tag=/.test(canonicalUrl)) return canonicalUrl;
+  const sep = canonicalUrl.includes("?") ? "&" : "?";
+  return `${canonicalUrl}${sep}tag=${DEFAULT_AMAZON_TAG}`;
+}
+
+// ------------ create logic used by /create and /bulk ------------
 async function createAmazonLink({ originalUrl, title, category, note, autoTitle = true }) {
   if (!originalUrl) throw new Error("originalUrl is required");
 
@@ -346,97 +409,117 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
   const categorySafe = category && category.trim() ? category.trim() : "other";
   const noteSafe = note && note.trim() ? note.trim() : "";
 
+  let finalTitle = title && title.trim() ? title.trim() : "";
+  let priceNum = null;
+  let priceCurrency = null;
+  let priceRaw = null;
+  let imageUrl = null;
   let normalizedUrl = originalUrl;
-  try {
-    normalizedUrl = (await resolveAmazonUrl(originalUrl)) || originalUrl;
-  } catch (e) {
-    normalizedUrl = originalUrl;
-  }
-
-  let scraped = null;
   let scrapeError = null;
+  let shortDescription = "";
+  let longDescription = "";
 
-  if (autoTitle || !title || !title.trim()) {
+  if (autoTitle || !finalTitle) {
     try {
-      scraped = await scrapeAmazonProduct(normalizedUrl);
+      const scraped = await scrapeAmazonProduct(originalUrl);
+      normalizedUrl = scraped.finalUrl || originalUrl;
+      if (!finalTitle && scraped.title) finalTitle = scraped.title;
+      if (scraped.price != null) {
+        priceNum = scraped.price;
+      } else if (scraped.priceText) {
+        const pp = parsePriceValue(scraped.priceText);
+        priceNum = pp.parsed;
+        priceCurrency = pp.currency || null;
+        priceRaw = pp.raw || scraped.priceText;
+      }
+      imageUrl = scraped.imageUrl || scraped.primaryImage || null;
+      shortDescription = scraped.shortDescription || "";
+      longDescription = scraped.longDescription || "";
     } catch (err) {
+      console.error("Scrape error for", originalUrl, err.message || err);
       scrapeError = err.message || String(err);
-      console.warn("Scrape error (createAmazonLink):", scrapeError);
+      // still try to resolve canonical URL
+      try {
+        normalizedUrl = await resolveAmazonUrl(originalUrl);
+      } catch {}
     }
+  } else {
+    try {
+      normalizedUrl = await resolveAmazonUrl(originalUrl);
+    } catch {}
   }
 
-  let finalTitle = (title && title.trim()) || (scraped && scraped.title) || "Amazon product";
+  if (!finalTitle) finalTitle = "Amazon product";
 
-  // parse price from scraped
-  const priceNum = scraped && scraped.price != null ? scraped.price : undefined;
-  const priceCurrency = scraped && scraped.priceCurrency ? scraped.priceCurrency : undefined;
-  const priceRaw = scraped && scraped.priceRaw ? scraped.priceRaw : undefined;
-
-  // images
-  const primaryImage = scraped && scraped.imageUrl ? scraped.imageUrl : undefined;
-  const images = scraped && scraped.images ? scraped.images : [];
-
-  // short/long description
-  let shortDescription = (scraped && scraped.shortDescription) || "";
-  let longDescription = (scraped && scraped.longDescription) || "";
-
-  // Try AI rewrite if available
+  // AI rewriting (optional)
   let aiFields = null;
   if (openai) {
     try {
-      aiFields = await rewriteWithAI({ title: finalTitle, shortDescription, longDescription });
-      if (aiFields && aiFields.title) finalTitle = aiFields.title;
+      aiFields = await rewriteWithAI({
+        title: finalTitle,
+        shortDescription,
+        longDescription,
+      });
+      if (aiFields && aiFields.title) {
+        finalTitle = aiFields.title;
+      }
     } catch (e) {
-      console.warn("AI rewrite attempt failed:", e.message || e);
-      aiFields = null;
+      console.error("AI rewrite failed:", e.message || e);
     }
   }
 
-  const id = generateId(6);
+  // ensure numeric price is either a number or undefined (avoid Mongoose cast errors)
+  const priceForDb = typeof priceNum === "number" && Number.isFinite(priceNum) ? priceNum : undefined;
 
-  // Build affiliate url (tag param) if AMAZON_TAG set, otherwise use canonical
+  // affiliate deeplink (simple tag injection for now)
   const affiliateUrl = buildAffiliateUrl(normalizedUrl);
 
-  // Prepare document for create — ensure numeric price or omitted
+  const id = generateId(5);
+
   const doc = {
     id,
     source,
     title: finalTitle,
     shortTitle:
       (aiFields && aiFields.short) ||
-      (finalTitle && finalTitle.length > 80 ? finalTitle.slice(0, 77).trimEnd() + "…" : finalTitle),
+      (finalTitle.length > 80 ? finalTitle.slice(0, 77).trimEnd() + "…" : finalTitle),
     brand: undefined,
     category: categorySafe,
-    categoryPath: scraped && scraped.categoryPath ? scraped.categoryPath : undefined,
+    categoryPath: undefined,
     note: noteSafe,
     originalUrl: normalizedUrl,
     rawOriginalUrl: originalUrl,
     affiliateUrl,
     tag: DEFAULT_AMAZON_TAG || undefined,
-    imageUrl: primaryImage,
-    images: images && images.length ? images : undefined,
-    price: typeof priceNum === "number" ? priceNum : undefined,
+    imageUrl: imageUrl || undefined,
+    images: imageUrl ? [imageUrl] : undefined,
+    price: priceForDb,
     priceCurrency: priceCurrency || undefined,
     priceRaw: priceRaw || undefined,
-    rating: scraped && scraped.rating ? scraped.rating : undefined,
-    reviewsCount: scraped && scraped.reviewsCount ? scraped.reviewsCount : undefined,
+    prevPrice: undefined,
+    prevPriceCurrency: undefined,
+    priceChangeReason: undefined,
+    rating: undefined,
+    reviewsCount: undefined,
     shortDescription: (aiFields && aiFields.short) || shortDescription || undefined,
     longDescription: (aiFields && aiFields.description) || longDescription || undefined,
-    slug: scraped && scraped.slug ? scraped.slug : undefined,
+    slug: undefined,
     isActive: true,
     clicks: 0,
-    lastCheckedAt: scraped ? new Date() : undefined,
+    lastCheckedAt: aiFields ? new Date() : undefined,
     lastError: scrapeError || undefined,
   };
 
-  // create in DB
-  const created = await Link.create(doc);
-  return created;
+  // create document
+  const linkDoc = await Link.create(doc);
+  return linkDoc;
 }
 
 // ---------- Routes ----------
 
-router.get("/test", (req, res) => res.json({ success: true, message: "Links API OK" }));
+router.get("/test", (req, res) => {
+  res.json({ success: true, message: "Links API OK" });
+});
 
 router.get("/all", async (req, res) => {
   try {
@@ -454,7 +537,6 @@ router.post("/create", async (req, res) => {
     if (!originalUrl || !originalUrl.trim()) {
       return res.status(400).json({ success: false, message: "originalUrl is required" });
     }
-
     const linkDoc = await createAmazonLink({
       originalUrl: originalUrl.trim(),
       title,
@@ -462,10 +544,9 @@ router.post("/create", async (req, res) => {
       note,
       autoTitle,
     });
-
     res.json({ success: true, link: linkDoc });
   } catch (err) {
-    console.error("POST /create error:", err && err.message ? err.message : err);
+    console.error("POST /create error:", err);
     res.status(500).json({ success: false, message: err.message || "Failed to create link." });
   }
 });
@@ -476,42 +557,40 @@ router.post("/bulk1", async (req, res) => {
     if (!urlsText || !urlsText.trim()) {
       return res.status(400).json({ success: false, message: "urlsText is required" });
     }
-
     const lines = urlsText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (!lines.length) return res.status(400).json({ success: false, message: "No valid URLs found." });
-    if (lines.length > 20) return res.status(400).json({ success: false, message: "Please limit to 20 URLs at once." });
+    if (lines.length > 10) return res.status(400).json({ success: false, message: "Please limit to 10 URLs at once." });
 
     const created = [];
     const errors = [];
-
     for (const url of lines) {
       try {
         const doc = await createAmazonLink({ originalUrl: url, title: "", category, note, autoTitle });
         created.push(doc);
       } catch (err) {
-        console.error("Bulk create error for", url, err && err.message ? err.message : err);
-        errors.push({ url, error: err && err.message ? err.message : String(err) });
+        console.error("Bulk create error for", url, err.message || err);
+        errors.push({ url, error: err.message || String(err) });
       }
     }
-
     res.json({ success: true, created: created.length, errors, links: created });
   } catch (err) {
-    console.error("POST /bulk1 error:", err && err.message ? err.message : err);
+    console.error("POST /bulk1 error:", err);
     res.status(500).json({ success: false, message: err.message || "Bulk create failed." });
   }
 });
 
-// Legacy alias: allow { urls: [...] }
+// legacy bulk that accepts { urls: [...] }
 router.post("/bulk", async (req, res, next) => {
   try {
     const { urls } = req.body || {};
     if (Array.isArray(urls)) {
       req.body.urlsText = urls.join("\n");
     }
+    // forward to /bulk1 handler
     return router.handle(req, res, next);
   } catch (err) {
     console.error("POST /bulk alias error:", err);
-    res.status(500).json({ success: false, message: "Bulk create failed." });
+    res.status(500).json({ success: false, message: err.message || "Bulk create failed." });
   }
 });
 
@@ -519,11 +598,10 @@ router.put("/update/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { title, category, price, note } = req.body || {};
-
     const update = {};
     if (typeof title === "string") update.title = title;
     if (typeof category === "string") update.category = category;
-    if (price !== undefined && price !== null) {
+    if (typeof price === "string" || typeof price === "number") {
       const num = Number(price);
       if (!Number.isNaN(num)) update.price = num;
     }
@@ -531,7 +609,6 @@ router.put("/update/:id", async (req, res) => {
 
     const updated = await Link.findOneAndUpdate({ id }, update, { new: true }).lean();
     if (!updated) return res.status(404).json({ success: false, message: "Link not found." });
-
     res.json({ success: true, link: updated });
   } catch (err) {
     console.error("PUT /update/:id error:", err);
@@ -563,51 +640,45 @@ router.get("/go/:id", async (req, res) => {
   }
 });
 
-// Maintenance job — refresh price + image + metadata for active amazon links
+// maintenance: refresh info (price/image) for amazon links
 router.post("/maintenance/daily", async (req, res) => {
   try {
     const links = await Link.find({ source: "amazon", isActive: { $ne: false } }).lean();
     let processed = 0;
     let updated = 0;
-
     for (const link of links) {
       processed++;
       try {
         const urlToUse = link.originalUrl || link.rawOriginalUrl;
         if (!urlToUse) continue;
         const info = await scrapeAmazonProduct(urlToUse);
-
-        const update = {
-          lastCheckedAt: new Date(),
-          lastError: undefined,
-        };
-
+        const update = { lastCheckedAt: new Date(), lastError: undefined };
+        // price logic
         if (info.price != null) {
           if (link.price != null && link.price !== info.price) {
             update.prevPrice = link.price;
             update.prevPriceCurrency = link.priceCurrency || info.priceCurrency;
             update.priceChangeReason = "maintenance_refresh";
           }
-          update.price = info.price;
+          update.price = typeof info.price === "number" && Number.isFinite(info.price) ? info.price : link.price;
           update.priceCurrency = info.priceCurrency || link.priceCurrency;
-          update.priceRaw = info.priceRaw || link.priceRaw;
+          update.priceRaw = info.priceText || link.priceRaw;
         }
-
-        if (info.imageUrl) update.imageUrl = info.imageUrl;
+        if (info.primaryImage || info.imageUrl) update.imageUrl = info.primaryImage || info.imageUrl;
         if (info.images && info.images.length) update.images = info.images;
-        if (info.shortDescription) update.shortDescription = info.shortDescription;
-        if (info.longDescription) update.longDescription = info.longDescription;
         if (info.rating != null) update.rating = info.rating;
         if (info.reviewsCount != null) update.reviewsCount = info.reviewsCount;
+        if (info.shortDescription) update.shortDescription = info.shortDescription;
+        if (info.longDescription) update.longDescription = info.longDescription;
+        if (info.categoryPath && info.categoryPath.length) update.categoryPath = info.categoryPath;
 
         await Link.updateOne({ _id: link._id }, { $set: update });
         updated++;
       } catch (err) {
-        console.error("maintenance scrape error for", link.id, err && err.message ? err.message : err);
-        await Link.updateOne({ _id: link._id }, { $set: { lastCheckedAt: new Date(), lastError: err.message || String(err) } });
+        console.error("maintenance scrape error for", link.id, err.message || err);
+        await Link.updateOne({ _id: link._id }, { $set: { lastCheckedAt: new Date(), lastError: err.message || "maintenance_error" } });
       }
     }
-
     res.json({ success: true, processed, updated });
   } catch (err) {
     console.error("POST /maintenance/daily error:", err);
