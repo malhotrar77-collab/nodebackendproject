@@ -75,24 +75,26 @@ function inferTopCategory(categoryPath = []) {
 }
 
 /**
- * Scrape key product fields from an Amazon product page.
- * Returns a plain object; does NOT talk to Mongo.
- *
- * Throws:
- *  - err.isBotProtection = true  if Amazon shows bot-protection page
- */
+ * Scrape key product fields from an Amazon product page.
+ * Returns a plain object; does NOT talk to Mongo.
+ *
+ * Throws:
+ * - err.isBotProtection = true  if Amazon shows bot-protection page
+ */
 async function scrapeAmazonProduct(url) {
   const res = await axios.get(url, {
     headers: {
-      // UPDATED HEADERS FOR BOT DETECTION BYPASS
+      // Crucial: A full, up-to-date User-Agent string
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      // Critical: Request gzip, deflate, and br (Brotli) compression
       "Accept-Encoding": "gzip, deflate, br",
+      // Accept HTML/XHTML
       Accept:
         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
       "Accept-Language": "en-IN,en;q=0.9",
-      "DNT": "1",
+      "DNT": "1", // Do Not Track (makes it look like a real browser)
     },
     maxRedirects: 5,
     validateStatus: (s) => s >= 200 && s < 400,
