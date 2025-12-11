@@ -1,78 +1,46 @@
 // NodeBackend/models/link.js
 const mongoose = require("mongoose");
 
-const linkSchema = new mongoose.Schema(
+const LinkSchema = new mongoose.Schema(
   {
-    // Short internal id used in URLs like /api/links/go/:id
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-    },
+    id: { type: String, required: true, unique: true },
+    source: { type: String, required: true }, // e.g., "amazon"
+    title: { type: String },
+    shortTitle: { type: String },
+    brand: { type: String },
+    category: { type: String },
+    categoryPath: { type: [String], default: [] },
+    note: { type: String },
 
-    // Where this link came from (currently only "amazon")
-    source: {
-      type: String,
-      required: true,
-      default: "amazon",
-    },
+    originalUrl: { type: String },
+    rawOriginalUrl: { type: String },
+    affiliateUrl: { type: String },
+    tag: { type: String },
 
-    // Core product info
-    title: { type: String },          // full product title from Amazon
-    shortTitle: { type: String },     // trimmed title for cards
-    brand: { type: String },          // e.g. "Raymond"
+    imageUrl: { type: String },
+    images: { type: [String], default: [] },
 
-    category: { type: String },       // our top-level category (clothing, shoes, etc.)
-    categoryPath: [String],           // optional: ["Clothing", "Men", "Sweaters"]
+    // price fields
+    price: { type: Number },         // parsed numeric price (optional)
+    priceRaw: { type: String },      // raw scraped string like "₹57,990.00"
+    priceCurrency: { type: String },
 
-    note: { type: String },           // manual note from dashboard (optional)
+    rating: { type: Number },
+    reviewsCount: { type: Number },
 
-    // URLs
-    originalUrl: { type: String, required: true }, // cleaned canonical URL (usually /dp/ASIN)
-    rawOriginalUrl: { type: String },              // exactly what user pasted
-    affiliateUrl: { type: String },                // deeplink with tag
-    tag: { type: String },                         // affiliate tag (e.g. alwaysonsale-21)
+    shortDescription: { type: String },
+    longDescription: { type: String },
+    slug: { type: String },
 
-    // Images
-    imageUrl: { type: String },        // main image (used in cards)
-    images: [String],                  // gallery images if available
-
-    // Pricing (normalized)
-    price: { type: Number },           // numeric price (e.g. 2149)
-    priceCurrency: { type: String },   // "INR", "USD", etc.
-    priceRaw: { type: String },        // original text, e.g. "₹2,149"
-
-    // Previous price (for change detection later)
-    prevPrice: { type: Number },
-    prevPriceCurrency: { type: String },
-    priceChangeReason: { type: String }, // e.g. "scrape_update"
-
-    // Rating metadata (optional, may be null)
-    rating: { type: Number },         // 4.3
-    reviewsCount: { type: Number },   // 1234
-
-    // Descriptions
-    shortDescription: { type: String }, // 1–2 line description for cards
-    longDescription: { type: String },  // longer description for detail page
-
-    // SEO helpers
-    slug: { type: String },           // "raymond-men-wool-sweatshirt"
     isActive: { type: Boolean, default: true },
-
-    // Stats
     clicks: { type: Number, default: 0 },
 
-    // Maintenance
-    lastCheckedAt: { type: Date },   // when scraper last refreshed this link
-    lastError: { type: String },     // last scraping error message (if any)
+    lastCheckedAt: { type: Date },
+    lastError: { type: String },
   },
   {
-    timestamps: true, // createdAt, updatedAt
+    timestamps: true,
   }
 );
 
-// Helpful compound index for lookups
-linkSchema.index({ source: 1, createdAt: -1 });
-
-module.exports = mongoose.model("Link", linkSchema);
+module.exports = mongoose.models.Link || mongoose.model("Link", LinkSchema);
