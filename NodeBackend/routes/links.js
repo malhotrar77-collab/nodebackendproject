@@ -1,4 +1,6 @@
 // NodeBackend/routes/links.js
+// Updated: hardened resolveAmazonUrl, stricter timeouts, improved OpenAI handling and logging.
+
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
@@ -6,7 +8,7 @@ const dayjs = require("dayjs");
 const Link = require("../models/link");
 const { scrapeAmazonProduct: legacyScrape } = require("../scrapers/amazon");
 
-// OpenAI client
+// OpenAI client (newer SDK)
 const { OpenAI } = require("openai");
 const openaiKey = process.env.OPENAI_API_KEY || "";
 let openai = null;
@@ -42,58 +44,86 @@ function stripAmazonTracking(url) {
   }
 }
 
-// Try to resolve short amzn.to links (best effort)
+// Hardened resolver for short amazon links.
+// - tries HEAD first (less likely to trigger protections), then GET fallback
+// - uses timeouts and logs the actual failing URL and error
 async function resolveAmazonUrl(url) {
   if (!url) return null;
+
+  // If it already looks like an Amazon domain, just strip tracking and return
   if (/amazon\./i.test(url)) return stripAmazonTracking(url);
 
+  // HEAD attempt (fast)
   try {
-    const res = await axios.get(url, {
+    const headRes = await axios.head(url, {
       maxRedirects: 5,
+      timeout: 8000,
       validateStatus: (s) => s >= 200 && s < 400,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
           "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        Accept: "*/*",
       },
     });
 
-    // axios stores final URL differently depending on environment; try both
-    const finalUrl =
-      (res.request && res.request.res && res.request.res.responseUrl) ||
-      (res.request && res.request._redirectable && res.request._redirectable._currentUrl) ||
+    const headFinal =
+      (headRes.request && headRes.request.res && headRes.request.res.responseUrl) ||
       url;
+    return stripAmazonTracking(headFinal);
+  } catch (headErr) {
+    // HEAD failed; try a GET fallback (some shortlink resolvers require GET)
+    try {
+      const res = await axios.get(url, {
+        maxRedirects: 5,
+        timeout: 12000,
+        validateStatus: (s) => s >= 200 && s < 400,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
 
-    return stripAmazonTracking(finalUrl);
-  } catch (err) {
-    console.warn("resolveAmazonUrl failed, returning original:", err.message);
-    return stripAmazonTracking(url);
+      const finalUrl =
+        (res.request && res.request.res && res.request.res.responseUrl) ||
+        (res.request && res.request._redirectable && res.request._redirectable._currentUrl) ||
+        url;
+
+      return stripAmazonTracking(finalUrl);
+    } catch (err) {
+      // Log the exact URL + message to help debugging
+      console.warn("resolveAmazonUrl failed for:", url, "error:", (err && err.message) || err);
+      return stripAmazonTracking(url); // fallback to original
+    }
   }
 }
 
 // Robustly extract text from OpenAI responses
 function extractTextFromAIResponse(resp) {
   try {
-    // new SDK often gives `output` (array) and sometimes `output_text`
     if (!resp) return "";
     if (typeof resp.output_text === "string" && resp.output_text.trim()) {
       return resp.output_text.trim();
     }
     if (Array.isArray(resp.output) && resp.output.length) {
-      // join content pieces
       return resp.output
         .map((o) => {
           if (!o) return "";
           if (typeof o === "string") return o;
           if (Array.isArray(o.content)) {
-            return o.content
-              .map((c) => (typeof c === "string" ? c : c.text || ""))
-              .join("");
+            return o.content.map((c) => (typeof c === "string" ? c : c.text || "")).join("");
           }
           return o.text || "";
         })
         .join("\n")
         .trim();
+    }
+    // Some SDKs return `choices` like old style — handle conservatively
+    if (resp.choices && Array.isArray(resp.choices) && resp.choices.length) {
+      return resp.choices.map((c) => c.message?.content || c.text || "").join("\n").trim();
     }
     return "";
   } catch (err) {
@@ -121,19 +151,20 @@ Output only valid JSON.
 `;
 
   try {
+    // Use responses.create for the new SDK
     const resp = await openai.responses.create({
-      model: "gpt-4o-mini", // if your account doesn't have this, change to a model available to you
+      model: "gpt-4o-mini", // change to one available in your account if necessary
       input: prompt,
       max_output_tokens: 400,
     });
 
     const aiText = extractTextFromAIResponse(resp);
-    // resp often returns one string containing JSON; try to parse
+    // Try parse JSON
     let parsed = null;
     try {
       parsed = JSON.parse(aiText);
     } catch (e) {
-      // If there is extra text before/after JSON, try to locate JSON substring
+      // try to pick JSON substring if there is extraneous text
       const start = aiText.indexOf("{");
       const end = aiText.lastIndexOf("}");
       if (start >= 0 && end > start) {
@@ -147,7 +178,7 @@ Output only valid JSON.
     }
 
     if (!parsed) {
-      // As a final fallback, return the plain text in fields
+      // fallback structured response (not ideal but safe)
       return {
         title: title,
         short: shortDescription || title,
@@ -159,16 +190,12 @@ Output only valid JSON.
     return {
       title: parsed.title || title,
       short: parsed.short || (parsed.title || "").slice(0, 80),
-      description:
-        parsed.description ||
-        parsed.longDescription ||
-        parsed.short ||
-        shortDescription ||
-        title,
+      description: parsed.description || parsed.longDescription || parsed.short || shortDescription || title,
       rawAI: aiText,
     };
   } catch (err) {
-    console.error("OpenAI rewrite failed:", err.message || err);
+    // Provide helpful log so you can see rate limits / 429s / key issues
+    console.error("OpenAI rewrite failed:", (err && err.message) || err);
     return null;
   }
 }
@@ -180,9 +207,7 @@ async function scrapeAmazonProduct(url) {
 
   // Use existing scraper module if it is present (keeps logic central)
   try {
-    // legacyScrape returns many fields (title, shortTitle, priceText, images etc.)
     const scraped = await legacyScrape(finalUrl);
-    // Ensure fields
     return {
       finalUrl: finalUrl,
       title: scraped.title || scraped.shortTitle || "Amazon product",
@@ -196,6 +221,7 @@ async function scrapeAmazonProduct(url) {
     try {
       const res = await axios.get(finalUrl, {
         maxRedirects: 5,
+        timeout: 12000,
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
@@ -225,7 +251,7 @@ async function scrapeAmazonProduct(url) {
         longDescription: null,
       };
     } catch (err2) {
-      console.error("Fallback scrape failed:", err2.message || err2);
+      console.error("Fallback scrape failed for:", finalUrl, (err2 && err2.message) || err2);
       throw err2;
     }
   }
@@ -258,12 +284,17 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
       shortDescription = scraped.shortDescription || "";
       longDescription = scraped.longDescription || "";
     } catch (err) {
-      console.error("Scrape error for", originalUrl, err.message || err);
+      console.error("Scrape error for", originalUrl, (err && err.message) || err);
       scrapeError = err.message || String(err);
+      // continue with fallback values
     }
   } else {
     // still normalize URL
-    normalizedUrl = await resolveAmazonUrl(originalUrl);
+    try {
+      normalizedUrl = await resolveAmazonUrl(originalUrl);
+    } catch (e) {
+      normalizedUrl = originalUrl;
+    }
   }
 
   if (!finalTitle) finalTitle = "Amazon product";
@@ -279,11 +310,10 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
       });
       if (aiResp) {
         aiFields = aiResp;
-        // prefer AI title if provided
         if (aiResp.title) finalTitle = aiResp.title;
       }
     } catch (e) {
-      console.error("AI rewrite failed:", e.message || e);
+      console.error("AI rewrite failed for", originalUrl, (e && e.message) || e);
     }
   }
 
@@ -294,7 +324,9 @@ async function createAmazonLink({ originalUrl, title, category, note, autoTitle 
     id,
     source,
     title: finalTitle,
-    shortTitle: (aiFields && aiFields.short) || (finalTitle.length > 80 ? finalTitle.slice(0, 77) + "…" : finalTitle),
+    shortTitle:
+      (aiFields && aiFields.short) ||
+      (finalTitle.length > 80 ? finalTitle.slice(0, 77) + "…" : finalTitle),
     category: categorySafe,
     note: noteSafe,
     price: price || undefined,
@@ -386,7 +418,7 @@ router.post("/bulk1", async (req, res) => {
         });
         created.push(doc);
       } catch (err) {
-        console.error("Bulk create error for", url, err.message || err);
+        console.error("Bulk create error for", url, (err && err.message) || err);
         errors.push({ url, error: err.message || String(err) });
       }
     }
@@ -405,7 +437,6 @@ router.post("/bulk1", async (req, res) => {
 
 // alias /bulk -> forward to bulk1
 router.post("/bulk", async (req, res, next) => {
-  // transform urls array to urlsText if needed
   try {
     const { urls } = req.body || {};
     if (Array.isArray(urls)) {
@@ -426,7 +457,10 @@ router.put("/update/:id", async (req, res) => {
     const update = {};
     if (typeof title === "string") update.title = title;
     if (typeof category === "string") update.category = category;
-    if (typeof price === "string" || typeof price === "number") update.price = price;
+    if (typeof price === "string" || typeof price === "number") {
+      const num = Number(price);
+      if (!Number.isNaN(num)) update.price = num;
+    }
     if (typeof note === "string") update.note = note;
 
     const updated = await Link.findOneAndUpdate({ id }, update, { new: true }).lean();
@@ -491,7 +525,7 @@ router.post("/maintenance/daily", async (req, res) => {
         );
         updated++;
       } catch (err) {
-        console.error("maintenance scrape error for", link.id, err.message || err);
+        console.error("maintenance scrape error for", link.id, (err && err.message) || err);
         await Link.updateOne({ _id: link._id }, { $set: { lastCheckedAt: new Date() } });
       }
     }
