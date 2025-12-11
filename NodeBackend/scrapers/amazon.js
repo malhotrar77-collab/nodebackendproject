@@ -141,16 +141,20 @@ async function scrapeAmazonProduct(url) {
     images.unshift(primaryImage);
   }
 
-  // Price text (we'll parse into number)
-  const priceText =
-    $("#priceblock_ourprice").text() ||
-    $("#priceblock_dealprice").text() ||
-    $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen")
-      .first()
-      .text() ||
-    $("#tp_price_block_total_price_ww .a-offscreen").first().text() ||
-    $(".a-price .a-offscreen").first().text() ||
-    null;
+  // NodeBackend/scrapers/amazon.js (FIXED)
+  // Price text (we'll parse into number)
+  const priceText =
+    // Modern high-priority price containers
+    $("#corePriceDisplay_feature_div .a-offscreen").first().text() ||
+    $("#desktop_buybox .a-price .a-offscreen").first().text() ||
+    // Older, but sometimes still valid selectors
+    $("#priceblock_ourprice").text() ||
+    $("#priceblock_dealprice").text() ||
+    $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen")
+      .first()
+      .text() ||
+    $(".a-price .a-offscreen").first().text() ||
+    null;
 
   const priceParsed = parsePriceText(priceText);
 
