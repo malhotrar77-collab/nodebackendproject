@@ -1,227 +1,166 @@
 // NodeBackend/scrapers/amazon.js
-//
-// Single source of truth for Amazon scraping.
-// Pure functions – NO Mongo calls here.
-
+// Single source of truth for Amazon scraping – now with random costumes
 const axios = require("axios");
 const cheerio = require("cheerio");
+const { pickCostume } = require("../userAgents");   // kid-added costume box
 
-// --------- Small utilities ----------
-
-// Very small slug helper for SEO-friendly URLs
+// --------- tiny helpers ----------
 function slugify(text) {
-  if (!text) return "";
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  if (!text) return "";
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function isBotPage(html) {
-  // Amazon's bot/robot check page usually contains this text
-  return html.includes("To discuss automated access to Amazon data");
+  return html.includes("To discuss automated access to Amazon data");
 }
 
-// Parse things like "₹2,149.00", "$39.99"
 function parsePriceText(priceText) {
-  if (!priceText) return { amount: null, currency: null, raw: null };
+  if (!priceText) return { amount: null, currency: null, raw: null };
+  const raw = priceText.trim();
+  let currency = null;
+  if (raw.includes("₹")) currency = "INR";
+  else if (raw.includes("$")) currency = "USD";
+  else if (raw.includes("€")) currency = "EUR";
 
-  const raw = priceText.trim();
-  let currency = null;
-
-  if (raw.includes("₹")) currency = "INR";
-  else if (raw.includes("$")) currency = "USD";
-  else if (raw.includes("€")) currency = "EUR";
-
-  // Keep digits and dot only
-  const cleaned = raw.replace(/[^\d.]/g, "");
-  if (!cleaned) return { amount: null, currency, raw };
-
-  const num = parseFloat(cleaned);
-  if (!Number.isFinite(num)) return { amount: null, currency, raw };
-
-  // Most prices here are whole currency in INR, round for safety
-  const amount = Math.round(num);
-  return { amount, currency, raw };
+  const digits = raw.replace(/[^\d.]/g, "");
+  if (!digits) return { amount: null, currency, raw };
+  const num = parseFloat(digits);
+  if (!Number.isFinite(num)) return { amount: null, currency, raw };
+  return { amount: Math.round(num), currency, raw };
 }
 
-// Very rough category → top-level mapping for your pills
 function inferTopCategory(categoryPath = []) {
-  const joined = categoryPath.join(" ").toLowerCase();
-
-  if (joined.includes("shirt") || joined.includes("t-shirt")) return "tshirts";
-  if (joined.includes("jeans")) return "jeans";
-  if (joined.includes("shoe") || joined.includes("sneaker")) return "shoes";
-  if (joined.includes("bag") || joined.includes("backpack")) return "bags";
-  if (
-    joined.includes("laptop") ||
-    joined.includes("computer") ||
-    joined.includes("electronics")
-  )
-    return "electronics";
-  if (joined.includes("home") || joined.includes("kitchen"))
-    return "home & living";
-  if (
-    joined.includes("clothing") ||
-    joined.includes("apparel") ||
-    joined.includes("fashion")
-  )
-    return "clothing";
-
-  return "other";
+  const txt = categoryPath.join(" ").toLowerCase();
+  if (txt.includes("shirt") || txt.includes("t-shirt")) return "tshirts";
+  if (txt.includes("jeans")) return "jeans";
+  if (txt.includes("shoe")) return "shoes";
+  if (txt.includes("bag") || txt.includes("backpack")) return "bags";
+  if (txt.includes("laptop") || txt.includes("electronics")) return "electronics";
+  if (txt.includes("home") || txt.includes("kitchen")) return "home & living";
+  if (txt.includes("clothing")) return "clothing";
+  return "other";
 }
 
-/**
- * Scrape key product fields from an Amazon product page.
- * Returns a plain object; does NOT talk to Mongo.
- *
- * Throws:
- * - err.isBotProtection = true  if Amazon shows bot-protection page
- */
+// --------- main scraper ----------
 async function scrapeAmazonProduct(url) {
-  const res = await axios.get(url, {
-    headers: {
-      // Crucial: A full, up-to-date User-Agent string
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      // Critical: Request gzip, deflate, and br (Brotli) compression
-      "Accept-Encoding": "gzip, deflate, br",
-      // Accept HTML/XHTML
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-      "Accept-Language": "en-IN,en;q=0.9",
-      "DNT": "1", // Do Not Track (makes it look like a real browser)
-    },
-    maxRedirects: 5,
-    validateStatus: (s) => s >= 200 && s < 400,
-  });
+  const res = await axios.get(url, {
+    headers: {
+      "User-Agent": pickCostume(),          // 🎭 random costume every time
+      "Accept-Encoding": "gzip, deflate, br",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-IN,en;q=0.9",
+      DNT: "1"
+    },
+    maxRedirects: 5,
+    validateStatus: (s) => s >= 200 && s < 400,
+  });
 
-  const html = res.data;
+  const html = res.data;
+  if (isBotPage(html)) {
+    const err = new Error("Amazon bot protection page detected");
+    err.isBotProtection = true;
+    throw err;
+  }
 
-  if (isBotPage(html)) {
-    const err = new Error("Amazon bot protection page detected");
-    err.isBotProtection = true;
-    throw err;
-  }
+  const $ = cheerio.load(html);
 
-  const $ = cheerio.load(html);
+  // title
+  const title =
+    $("#productTitle").text().trim() ||
+    $('meta[property="og:title"]').attr("content") ||
+    $("title").text().trim() ||
+    "Product";
 
-  // Title
-  const rawTitle = $("#productTitle").text().trim();
-  const metaOgTitle = $('meta[property="og:title"]').attr("content");
-  const fallbackTitle = $("title").text().trim();
+  // brand
+  const brand =
+    $("#bylineInfo").text().trim() ||
+    $("#brand").text().trim() ||
+    null;
 
-  const title = rawTitle || metaOgTitle || fallbackTitle || "Product";
+  // images
+  let primaryImage =
+    $("#imgTagWrapperId img").attr("data-old-hires") ||
+    $("#imgTagWrapperId img").attr("src") ||
+    $("img#landingImage").attr("src") ||
+    $('meta[property="og:image"]').attr("content") ||
+    null;
+  if (primaryImage && primaryImage.startsWith("//")) primaryImage = "https:" + primaryImage;
 
-  // Brand
-  const brand =
-    $("#bylineInfo").text().trim() ||
-    $("#brand").text().trim() ||
-    null;
+  const images = [];
+  $("#altImages img").each((_, img) => {
+    let src = $(img).attr("src");
+    if (!src) return;
+    src = src.replace(/\._.*?_\./, "._SL800_.");
+    images.push(src);
+  });
+  if (!primaryImage && images.length) primaryImage = images[0];
+  else if (primaryImage) images.unshift(primaryImage);
 
-  // Main image + gallery
-  let primaryImage =
-    $("#imgTagWrapperId img").attr("data-old-hires") ||
-    $("#imgTagWrapperId img").attr("src") ||
-    $("img#landingImage").attr("src") ||
-    $('meta[property="og:image"]').attr("content") ||
-    null;
+  // price
+  const priceText =
+    $("#corePriceDisplay_feature_div .a-offscreen").first().text() ||
+    $("#desktop_buybox .a-price .a-offscreen").first().text() ||
+    $("#priceblock_ourprice").text() ||
+    $("#priceblock_dealprice").text() ||
+    $(".a-price .a-offscreen").first().text() ||
+    null;
+  const priceParsed = parsePriceText(priceText);
 
-  const images = [];
-  $("#altImages img").each((_, img) => {
-    let src = $(img).attr("src");
-    if (!src) return;
-    // Try to remove tiny thumbnail size suffix
-    src = src.replace(/\._.*?_\./, "._SL800_.");
-    images.push(src);
-  });
+  // rating
+  let rating = null;
+  const ratingText = $(".a-icon.a-icon-star span.a-icon-alt").first().text();
+  if (ratingText) {
+    const m = ratingText.match(/([\d.]+)/);
+    if (m) rating = parseFloat(m[1]);
+  }
 
-  if (!primaryImage && images.length > 0) {
-    primaryImage = images[0];
-  } else if (primaryImage) {
-    images.unshift(primaryImage);
-  }
+  // reviews count
+  let reviewsCount = null;
+  const revText = $("#acrCustomerReviewText").text();
+  if (revText) {
+    const m2 = revText.replace(/,/g, "").match(/([\d]+)/);
+    if (m2) reviewsCount = parseInt(m2[1], 10);
+  }
 
-  // Price text (we'll parse into number)
-  const priceText =
-    // Modern high-priority price containers (The Fix)
-    $("#corePriceDisplay_feature_div .a-offscreen").first().text() ||
-    $("#desktop_buybox .a-price .a-offscreen").first().text() ||
-    // Older, but sometimes still valid selectors
-    $("#priceblock_ourprice").text() ||
-    $("#priceblock_dealprice").text() ||
-    $("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen")
-      .first()
-      .text() ||
-    $(".a-price .a-offscreen").first().text() ||
-    null;
+  // bullets
+  const bullets = [];
+  $("#feature-bullets li").each((_, li) => {
+    const t = $(li).text().replace(/\s+/g, " ").trim();
+    if (t) bullets.push(t);
+  });
+  const shortDescription = bullets[0] || "This product is a simple, useful pick for daily life.";
+  const longDescription = bullets.slice(0, 5).join(" ");
 
-  const priceParsed = parsePriceText(priceText);
+  // category path
+  const categoryPath = [];
+  $("#wayfinding-breadcrumbs_container ul li a").each((_, a) => {
+    const txt = $(a).text().replace(/\s+/g, " ").trim();
+    if (txt) categoryPath.push(txt);
+  });
 
-  // Rating
-  let rating = null;
-  const ratingText = $(".a-icon.a-icon-star span.a-icon-alt").first().text();
-  if (ratingText) {
-    const match = ratingText.match(/([\d.]+)/);
-    if (match) rating = parseFloat(match[1]);
-  }
-
-  // Reviews count
-  let reviewsCount = null;
-  const reviewsText = $("#acrCustomerReviewText").text();
-  if (reviewsText) {
-    const m = reviewsText.replace(/,/g, "").match(/([\d]+)/);
-    if (m) reviewsCount = parseInt(m[1], 10);
-  }
-
-  // Bullets for descriptions
-  const bullets = [];
-  $("#feature-bullets li").each((_, li) => {
-    const t = $(li).text().replace(/\s+/g, " ").trim();
-    if (t) bullets.push(t);
-  });
-
-  const defaultShort =
-    "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.";
-
-  const shortDescription = bullets[0] || defaultShort;
-  const longDescription = bullets.slice(0, 5).join(" ");
-
-  // Category path (very rough – breadcrumb)
-  const categoryPath = [];
-  $("#wayfinding-breadcrumbs_container ul li a").each((_, a) => {
-    const t = $(a).text().replace(/\s+/g, " ").trim();
-    if (t) categoryPath.push(t);
-  });
-
-  // Short title for cards
-  const shortTitle =
-    title.length > 80 ? title.slice(0, 77).trimEnd() + "…" : title;
-
-  return {
-    title,
-    shortTitle,
-    brand,
-    primaryImage: primaryImage || null,
-    images,
-    priceText: priceParsed.raw || priceText || null,
-    price: priceParsed.amount,
-    priceCurrency: priceParsed.currency,
-    rating,
-    reviewsCount,
-    shortDescription,
-    longDescription,
-    categoryPath,
-    topCategory: inferTopCategory(categoryPath),
-    slug: slugify(title),
-  };
+  return {
+    title,
+    shortTitle: title.length > 80 ? title.slice(0, 77) + "…" : title,
+    brand,
+    primaryImage,
+    images,
+    priceText: priceParsed.raw || priceText,
+    price: priceParsed.amount,
+    priceCurrency: priceParsed.currency,
+    rating,
+    reviewsCount,
+    shortDescription,
+    longDescription,
+    categoryPath,
+    topCategory: inferTopCategory(categoryPath),
+    slug: slugify(title),
+  };
 }
 
-module.exports = {
-  scrapeAmazonProduct,
-  slugify,
-};
+module.exports = { scrapeAmazonProduct, slugify };
