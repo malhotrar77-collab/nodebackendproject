@@ -107,7 +107,6 @@
 
     <script>
       // ---------- Config & helpers ----------
-
       const API_BASE = "/api/links";
 
       const CATEGORY_CONFIG = [
@@ -207,7 +206,6 @@
       }
 
       // ---------- UI: categories, filters ----------
-
       function renderCategoryPills() {
         categoryPillsEl.innerHTML = "";
         CATEGORY_CONFIG.forEach((cfg) => {
@@ -278,13 +276,13 @@
       }
 
       // ---------- UI: cards ----------
-
       function buildCardHtml(link) {
         const categoryLabel = getCategoryLabel(link.category);
         const created = formatDate(link.createdAt);
 
-        // Description from note, with fallback
+        // ❗❗ KID-FIX: show AI description first ❗❗
         const description =
+          (link.longDescription && link.longDescription.trim()) ||
           (link.note && link.note.trim()) ||
           "This product is a simple, useful pick for daily life. Easy to add into your routine or lifestyle.";
 
@@ -447,7 +445,6 @@
       }
 
       // ---------- Data loading ----------
-
       async function fetchLinks() {
         errorEl.classList.add("hidden");
         try {
@@ -470,7 +467,6 @@
       }
 
       // ---------- Event wiring ----------
-
       document.addEventListener("DOMContentLoaded", () => {
         renderCategoryPills();
         fetchLinks();
