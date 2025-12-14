@@ -1,6 +1,6 @@
 /* =========================
-   Global
-   ========================= */
+   RESET & ROOT
+========================= */
 
 *,
 *::before,
@@ -12,43 +12,31 @@
   --bg-body: #050815;
   --bg-shell: #050815;
   --bg-card: #0b1020;
-  --bg-card-soft: #11172a;
-  --bg-hero: #0b1120;
+  --bg-card-hover: #12183a;
 
-  --border-soft: rgba(120, 130, 180, 0.4);
-  --border-strong: rgba(255, 117, 140, 0.9);
+  --border-soft: rgba(120, 130, 180, 0.25);
+  --border-focus: rgba(255, 120, 150, 0.7);
 
   --text-main: #f5f7ff;
   --text-subtle: #a3afcc;
-  --text-muted: #7781a3;
-  --text-brand-1: #ff5c5c;
-  --text-brand-2: #ffa94d;
-  --text-brand-3: #ffffff;
+  --text-muted: #7c86a8;
+
+  --brand-from: #ff6b6b;
+  --brand-to: #ff9b4d;
 
   --pill-bg: #12192e;
-  --pill-active-bg: #ff5c7a;
-  --pill-active-text: #ffffff;
+  --pill-active-bg: linear-gradient(135deg, #ff6b6b, #ff9b4d);
 
-  --badge-bg: #161d34;
-  --badge-border: rgba(255, 255, 255, 0.12);
+  --btn-primary-bg: linear-gradient(135deg, #ff6b6b, #ff9b4d);
+  --btn-secondary-bg: #1a2340;
 
-  --btn-primary-from: #ff5c5c;
-  --btn-primary-to: #ff9b4d;
-  --btn-primary-text: #ffffff;
-  --btn-secondary-bg: #171f33;
-  --btn-secondary-text: #e0e5ff;
-
-  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.6);
-  --shadow-hero: 0 30px 80px rgba(0, 0, 0, 0.9);
-  --shadow-glow: 0 0 0 1px rgba(255, 120, 160, 0.4),
-    0 18px 45px rgba(255, 85, 135, 0.55);
-
-  --radius-lg: 20px;
   --radius-card: 22px;
   --radius-pill: 999px;
 
-  --transition-fast: 0.18s ease-out;
-  --transition-med: 0.25s ease-out;
+  --shadow-card: 0 14px 32px rgba(0, 0, 0, 0.55);
+  --shadow-hover: 0 18px 45px rgba(255, 120, 120, 0.45);
+
+  --transition: 0.22s ease;
 }
 
 html,
@@ -56,133 +44,191 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, #12172b 0, #050815 55%);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(circle at top, #12172b 0%, #050815 55%);
   color: var(--text-main);
 }
 
-body {
-  display: flex;
-  justify-content: center;
-}
-
 /* =========================
-   Layout shell
-   ========================= */
+   LAYOUT
+========================= */
 
 .store-shell {
   width: 100%;
   max-width: 1200px;
-  min-height: 100vh;
-  padding: 20px 18px 32px;
-  display: flex;
-  flex-direction: column;
-}
-
-.store-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
+  padding: 18px 14px 32px;
+  margin: 0 auto;
 }
 
 /* =========================
-   Hero
-   ========================= */
+   TOP BAR
+========================= */
 
-.hero-card {
+.store-topbar {
   display: flex;
   justify-content: space-between;
-  gap: 24px;
-  padding: 22px;
-  border-radius: 26px;
-  background: radial-gradient(circle at top, #151b3b 0, #090f21 40%, #060918 85%);
-  box-shadow: var(--shadow-hero);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  align-items: center;
+  margin-bottom: 18px;
 }
 
-.hero-text h1 {
-  margin: 0 0 6px;
+.brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #ff6b6b, #10162c);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6);
+}
+
+.brand-pill span {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  color: white;
+}
+
+.store-nav {
+  display: flex;
+  gap: 10px;
+}
+
+.nav-link {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  font-size: 13px;
+  color: var(--text-subtle);
+  background: rgba(15, 20, 45, 0.6);
+  transition: var(--transition);
+}
+
+.nav-link:hover {
+  color: white;
+}
+
+.nav-link-active {
+  background: var(--btn-primary-bg);
+  color: white;
+}
+
+/* =========================
+   HERO
+========================= */
+
+.hero-card {
+  padding: 22px;
+  border-radius: 26px;
+  background: radial-gradient(circle at top, #151b3b, #060918);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9);
+  margin-bottom: 18px;
+}
+
+.hero-card h1 {
+  margin: 0 0 8px;
   font-size: 26px;
 }
 
-.hero-subtitle {
+.hero-card p {
+  margin: 0;
   font-size: 13px;
   color: var(--text-subtle);
 }
 
 /* =========================
-   Filters
-   ========================= */
+   FILTERS
+========================= */
 
 .category-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
 .pill {
-  border-radius: var(--radius-pill);
   padding: 7px 14px;
+  border-radius: var(--radius-pill);
   font-size: 13px;
   background: var(--pill-bg);
   color: var(--text-subtle);
-  border: 1px solid rgba(151, 160, 210, 0.25);
+  border: 1px solid var(--border-soft);
   cursor: pointer;
+  transition: var(--transition);
+}
+
+.pill:hover {
+  color: white;
 }
 
 .pill-active {
-  background: linear-gradient(
-    135deg,
-    var(--btn-primary-from),
-    var(--btn-primary-to)
-  );
-  color: #fff;
-  box-shadow: 0 10px 26px rgba(255, 120, 120, 0.7);
+  background: var(--pill-active-bg);
+  color: white;
+  border: none;
 }
 
 /* =========================
-   Grid
-   ========================= */
+   SEARCH & SORT
+========================= */
+
+.search-sort-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.search-wrapper input,
+#sort-select {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: var(--radius-pill);
+  background: #0a0f25;
+  border: 1px solid var(--border-soft);
+  color: white;
+  font-size: 13px;
+}
+
+/* =========================
+   GRID (IMPORTANT)
+========================= */
 
 .deals-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
 }
 
 /* =========================
-   Cards
-   ========================= */
+   DEAL CARD
+========================= */
 
 .deal-card {
+  background: radial-gradient(circle at top, #12172b, #050815);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at top, #12172b 0, #050815 70%);
-  border-radius: var(--radius-card);
-  padding: 14px;
-  border: 1px solid rgba(120, 130, 180, 0.4);
-  box-shadow: var(--shadow-soft);
-  transition: transform var(--transition-med), box-shadow var(--transition-med),
-    border-color var(--transition-med);
+  transition: var(--transition);
 }
 
 .deal-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-glow);
+  background: var(--bg-card-hover);
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-hover);
 }
 
 .deal-card-image {
-  border-radius: 18px;
-  background: #060a16;
+  border-radius: 16px;
+  background: #050815;
+  overflow: hidden;
+  height: 170px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   margin-bottom: 10px;
-  height: 180px;
 }
 
 .deal-card-image img {
@@ -191,89 +237,81 @@ body {
   object-fit: contain;
 }
 
+/* =========================
+   CARD TEXT
+========================= */
+
 .deal-title {
   font-size: 14px;
-  line-height: 1.35;
-  margin: 6px 0;
+  font-weight: 600;
+  margin: 0 0 4px;
 }
 
 .deal-description {
   font-size: 12px;
   color: var(--text-subtle);
+  line-height: 1.45;
+  margin-bottom: 8px;
 }
+
+/* =========================
+   PRICE
+========================= */
 
 .price-label {
   font-size: 11px;
-  text-transform: uppercase;
   color: #ffd4a8;
+  text-transform: uppercase;
 }
 
 .price-amount {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: #ffd369;
 }
 
+/* =========================
+   CARD FOOTER
+========================= */
+
 .deal-card-footer {
-  margin-top: 10px;
   display: flex;
   gap: 8px;
+  margin-top: auto;
 }
 
 .btn {
   flex: 1;
-  border-radius: 999px;
-  border: none;
-  padding: 9px 14px;
+  padding: 9px;
   font-size: 13px;
+  border-radius: var(--radius-pill);
+  border: none;
   cursor: pointer;
 }
 
 .btn-primary {
-  background: radial-gradient(circle at top left, #ff6b6b 0, #ff9b4d 65%);
-  color: #fff;
-  box-shadow: 0 12px 30px rgba(255, 120, 80, 0.6);
+  background: var(--btn-primary-bg);
+  color: white;
 }
 
 .btn-secondary {
-  background: #171f33;
-  color: #e0e5ff;
-  border: 1px solid rgba(154, 164, 210, 0.6);
+  background: var(--btn-secondary-bg);
+  color: white;
+  border: 1px solid var(--border-soft);
 }
 
 /* =========================
-   MOBILE (IMPORTANT PART)
-   ========================= */
+   RESPONSIVE
+========================= */
 
-@media (max-width: 720px) {
-  .store-shell {
-    padding: 16px 12px 24px;
-  }
-
-  .hero-card {
-    flex-direction: column;
-  }
-
-  /* FORCE 2 CARDS PER ROW */
+@media (min-width: 720px) {
   .deals-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
   }
+}
 
-  .deal-card-image {
-    height: 140px;
-  }
-
-  .deal-title {
-    font-size: 13px;
-  }
-
-  .deal-description {
-    font-size: 11px;
-  }
-
-  .btn {
-    font-size: 12px;
-    padding: 8px 10px;
+@media (min-width: 1024px) {
+  .deals-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
