@@ -333,3 +333,7 @@ body {
 .hidden {
   display: none;
 }
+.desc.expanded {
+  -webkit-line-clamp: unset;
+  max-height: none;
+}
