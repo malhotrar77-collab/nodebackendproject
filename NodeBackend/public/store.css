@@ -80,18 +80,103 @@ body {
   flex-direction: column;
 }
 
+.store-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+/* =========================
+   Brand pill
+   ========================= */
+
+.brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle at top left, #ff5c7a 0, #10162c 55%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ff6b6b;
+}
+
+.dot-live {
+  box-shadow: 0 0 0 5px rgba(255, 107, 107, 0.22);
+}
+
+/* =========================
+   Navigation
+   ========================= */
+
+.store-nav {
+  display: inline-flex;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.nav-link {
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--text-subtle);
+  text-decoration: none;
+  background: rgba(10, 14, 30, 0.8);
+  transition: all var(--transition-fast);
+}
+
+.nav-link-active {
+  background: linear-gradient(
+    135deg,
+    var(--btn-primary-from),
+    var(--btn-primary-to)
+  );
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(255, 120, 80, 0.5);
+}
+
+/* =========================
+   Main
+   ========================= */
+
+.store-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* =========================
+   Hero
+   ========================= */
+
+.hero-card {
+  display: flex;
+  gap: 24px;
+  padding: 22px;
+  border-radius: 26px;
+  background: radial-gradient(circle at top, #151b3b 0, #090f21 40%, #060918 85%);
+  box-shadow: var(--shadow-hero);
+}
+
 /* =========================
    Grid
    ========================= */
 
 .deals-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
 
 /* =========================
-   Cards
+   Deal card
    ========================= */
 
 .deal-card {
@@ -100,23 +185,21 @@ body {
   background: radial-gradient(circle at top, #12172b 0, #050815 70%);
   border-radius: var(--radius-card);
   padding: 14px;
-  border: 1px solid rgba(120, 130, 180, 0.4);
+  border: 1px solid var(--border-soft);
   box-shadow: var(--shadow-soft);
-  transition: transform var(--transition-med), box-shadow var(--transition-med),
-    border-color var(--transition-med);
+  transition: all var(--transition-med);
 }
 
 .deal-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-glow);
 }
 
 .deal-card-image {
   background: #060a16;
-  border-radius: 16px;
-  min-height: 190px;
-  max-height: 190px;
+  border-radius: 18px;
+  height: 190px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -124,59 +207,79 @@ body {
 }
 
 .deal-card-image img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 
 /* =========================
-   Mobile fixes (IMPORTANT)
+   Text
    ========================= */
 
-@media (max-width: 640px) {
-  .store-shell {
-    padding: 14px 10px 24px;
-  }
+.deal-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 10px 0 4px;
+}
 
-  /* FORCE 2 COLUMNS LIKE AMAZON */
+.deal-description {
+  font-size: 12px;
+  color: var(--text-subtle);
+  line-height: 1.45;
+  flex-grow: 1;
+}
+
+/* =========================
+   Footer
+   ========================= */
+
+.deal-card-footer {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: radial-gradient(circle at top left, #ff6b6b 0, #ff9b4d 65%);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+}
+
+/* =========================
+   MOBILE FIX (CRITICAL)
+   ========================= */
+
+@media (max-width: 720px) {
   .deals-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
 
-  .deal-card {
-    padding: 10px;
-    border-radius: 18px;
-  }
-
   .deal-card-image {
-    min-height: 140px;
-    max-height: 140px;
-    border-radius: 14px;
+    height: 150px;
   }
 
   .deal-title {
     font-size: 13px;
-    line-height: 1.3;
   }
 
   .deal-description {
     font-size: 11px;
-    line-height: 1.35;
   }
 
-  .btn {
-    padding: 8px 10px;
-    font-size: 12px;
-  }
-}
-
-/* =========================
-   Small phones safety
-   ========================= */
-
-@media (max-width: 360px) {
-  .deals-grid {
-    grid-template-columns: 1fr;
+  .store-shell {
+    padding: 16px 12px 24px;
   }
 }
