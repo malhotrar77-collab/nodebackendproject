@@ -7,7 +7,7 @@ const { scrapeAmazonProduct } = require("../scrapers/amazon");
 const router = express.Router();
 
 /* ===============================
-   OpenAI (DO NOT TOUCH LOGIC)
+   OpenAI (SAFE + MINIMAL)
 ================================ */
 let openai = null;
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
@@ -20,8 +20,6 @@ if (OPENAI_KEY) {
   } catch (e) {
     console.warn("⚠️ OpenAI init failed:", e.message);
   }
-} else {
-  console.warn("⚠️ OPENAI_API_KEY missing – AI disabled");
 }
 
 /* ===============================
@@ -45,14 +43,15 @@ function stripAmazonTracking(url) {
   }
 }
 
-function parsePriceValue(raw) {
-  if (!raw) return null;
-  const num = parseFloat(raw.toString().replace(/[^\d.]/g, ""));
-  return Number.isFinite(num) ? num : null;
+function isPoorText(txt) {
+  if (!txt) return true;
+  if (txt.length < 80) return true;
+  if (/simple|useful|daily life/i.test(txt)) return true;
+  return false;
 }
 
 /* ===============================
-   AI Rewrite (UNCHANGED LOGIC)
+   AI Rewrite (ONLY IF NEEDED)
 ================================ */
 async function rewriteWithAI({ title, shortDescription, longDescription }) {
   if (!openai) return null;
@@ -60,76 +59,49 @@ async function rewriteWithAI({ title, shortDescription, longDescription }) {
   try {
     const res = await openai.chat.completions.create({
       model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      max_tokens: 300,
       messages: [
         {
           role: "system",
           content:
-            "You are an ecommerce SEO copywriter. Return ONLY JSON with keys: short, description",
+            "You are an SEO ecommerce copywriter. Return ONLY valid JSON with keys: short, description. Make content unique, helpful, SEO friendly, and concise.",
         },
         {
           role: "user",
           content: `
-Original title: ${title}
-Original short description: ${shortDescription}
-Original long description: ${longDescription}
+Product title: ${title}
 
-Rewrite both descriptions to be:
-- SEO friendly
-- Human readable
-- Unique
-- Not promotional spam
-`,
+Original short description:
+${shortDescription}
+
+Original long description:
+${longDescription}
+          `,
         },
       ],
-      response_format: { type: "json_object" },
-      max_tokens: 300,
     });
 
     return JSON.parse(res.choices[0].message.content);
-  } catch (err) {
-    console.error("AI rewrite failed:", err.message);
+  } catch (e) {
+    console.error("AI rewrite failed:", e.message);
     return null;
   }
 }
 
 /* ===============================
-   Affiliate URL
+   Create Amazon Link (SMART)
 ================================ */
-const AMAZON_TAG = process.env.AMAZON_TAG || null;
-
-function buildAffiliateUrl(url) {
-  if (!url || !AMAZON_TAG) return url;
-  if (url.includes("tag=")) return url;
-  return `${url}${url.includes("?") ? "&" : "?"}tag=${AMAZON_TAG}`;
-}
-
-/* ======================================================
-   🔥 createAmazonLink() — IMPORTANT PART
-====================================================== */
 async function createAmazonLink({ originalUrl, category, note }) {
-  if (!originalUrl) throw new Error("originalUrl required");
-
   const scraped = await scrapeAmazonProduct(originalUrl);
 
   let shortDesc = scraped.shortDescription || "";
   let longDesc = scraped.longDescription || "";
 
-  /* ---------- AI USAGE DECISION ---------- */
-  let useAI = false;
-
-  if (
-    openai &&
-    (
-      shortDesc.length < 40 ||
-      longDesc.length < 120 ||
-      /useful|simple|great|perfect/i.test(shortDesc)
-    )
-  ) {
-    useAI = true;
-  }
-
   let ai = null;
-  if (useAI) {
+
+  // 🔥 AI runs ONLY if text is poor
+  if (isPoorText(shortDesc) || isPoorText(longDesc)) {
     ai = await rewriteWithAI({
       title: scraped.title,
       shortDescription: shortDesc,
@@ -141,31 +113,29 @@ async function createAmazonLink({ originalUrl, category, note }) {
     id: generateId(),
     source: "amazon",
     title: scraped.title || "Amazon Product",
-    category: category || "other",
-    note: note || "",
 
-    originalUrl: stripAmazonTracking(originalUrl),
-    affiliateUrl: buildAffiliateUrl(stripAmazonTracking(originalUrl)),
-
-    imageUrl: scraped.imageUrl,
-    images: scraped.images || [scraped.imageUrl],
-
-    price: scraped.price || parsePriceValue(scraped.priceText),
-    priceCurrency: scraped.priceCurrency || "INR",
-
-    /* ✅ UNIQUE DESCRIPTIONS */
     shortDescription:
       ai?.short ||
       shortDesc ||
-      "A practical product selected for everyday use.",
+      `Explore features, design, and everyday usability of ${scraped.title}.`,
 
     longDescription:
       ai?.description ||
       longDesc ||
-      "This product is carefully selected based on quality, usability, and value for money.",
+      `Discover why ${scraped.title} is popular among Amazon shoppers. This product offers practical value, solid build quality, and everyday usefulness.`,
 
-    rating: scraped.rating,
-    reviewsCount: scraped.reviewsCount,
+    category: category || "other",
+    note: note || "",
+
+    originalUrl: stripAmazonTracking(originalUrl),
+    affiliateUrl: stripAmazonTracking(originalUrl),
+
+    imageUrl: scraped.imageUrl,
+    images: scraped.images || [],
+
+    price: scraped.price || null,
+    rating: scraped.rating || null,
+    reviewsCount: scraped.reviewsCount || null,
 
     clicks: 0,
     isActive: true,
@@ -177,18 +147,15 @@ async function createAmazonLink({ originalUrl, category, note }) {
    ROUTES
 ================================ */
 
-// Health
-router.get("/test", (_, res) =>
-  res.json({ success: true, message: "Links API OK" })
-);
+router.get("/test", (_, res) => {
+  res.json({ success: true });
+});
 
-// All
 router.get("/all", async (_, res) => {
   const links = await Link.find().sort({ createdAt: -1 }).lean();
   res.json({ success: true, links });
 });
 
-// Create
 router.post("/create", async (req, res) => {
   try {
     const link = await createAmazonLink(req.body);
@@ -198,14 +165,6 @@ router.post("/create", async (req, res) => {
   }
 });
 
-// Delete
-router.delete("/delete/:id", async (req, res) => {
-  const deleted = await Link.findOneAndDelete({ id: req.params.id });
-  if (!deleted) return res.status(404).json({ success: false });
-  res.json({ success: true });
-});
-
-// Go + click count
 router.get("/go/:id", async (req, res) => {
   const link = await Link.findOneAndUpdate(
     { id: req.params.id },
@@ -216,9 +175,9 @@ router.get("/go/:id", async (req, res) => {
   res.redirect(link.affiliateUrl || link.originalUrl);
 });
 
-/* ======================================================
-   🔥 /refresh-all — DO NOT TOUCH AI CONTENT
-====================================================== */
+/* ===============================
+   🔥 REFRESH ALL (NO AI)
+================================ */
 router.post("/refresh-all", async (_, res) => {
   const links = await Link.find({ isActive: true });
   let updated = 0;
@@ -231,28 +190,20 @@ router.post("/refresh-all", async (_, res) => {
       await Link.updateOne(
         { _id: link._id },
         {
-          title: scraped.title || link.title,
           price: scraped.price || link.price,
           imageUrl: scraped.imageUrl || link.imageUrl,
           images: scraped.images || link.images,
-          rating: scraped.rating || link.rating,
-          reviewsCount: scraped.reviewsCount || link.reviewsCount,
           lastCheckedAt: new Date(),
         }
       );
 
       updated++;
-    } catch (err) {
+    } catch (e) {
       failed++;
     }
   }
 
-  res.json({
-    success: true,
-    total: links.length,
-    updated,
-    failed,
-  });
+  res.json({ success: true, total: links.length, updated, failed });
 });
 
 module.exports = router;
