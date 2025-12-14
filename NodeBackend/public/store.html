@@ -4,214 +4,134 @@
   <meta charset="UTF-8" />
   <title>AlwaysOnSale – Store</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="store.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
 <header class="app-shell">
 
-  <!-- TOP BAR -->
   <div class="topbar">
     <div class="brand">
       <span class="dot"></span>
       <span>ALWAYS ON SALE</span>
     </div>
-
     <nav class="nav">
       <a class="active">Store</a>
       <a href="/">Dashboard</a>
     </nav>
   </div>
 
-  <!-- HERO -->
   <section class="hero">
     <h1>Today's hand-picked deals</h1>
     <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
     <span class="live">LIVE FROM ALWAYSonsale</span>
   </section>
 
-  <!-- FILTERS -->
   <section class="filters">
     <div id="category-pills" class="pills"></div>
-
     <div class="search-sort">
-      <input id="search-input" type="search" placeholder="Search products..." />
+      <input id="search-input" placeholder="Search products..." />
       <select id="sort-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
-        <option value="clicks-desc">Most clicks</option>
+        <option value="clicks">Most clicks</option>
       </select>
     </div>
   </section>
 
-  <!-- META -->
   <section class="meta">
     <span id="stats-text">Loading deals…</span>
-    <span id="error-text" class="error hidden"></span>
+    <span id="error-text" class="hidden"></span>
   </section>
 
-  <!-- GRID -->
   <main id="deals-grid" class="grid"></main>
-
 </header>
 
+<!-- OVERLAY -->
+<div id="overlay" class="overlay hidden">
+  <div class="overlay-card">
+    <button class="close-btn">×</button>
+    <div class="overlay-images"></div>
+    <h2 id="ov-title"></h2>
+    <p id="ov-desc"></p>
+    <div class="price"><strong id="ov-price"></strong></div>
+    <div class="actions">
+      <a id="ov-buy" class="buy" target="_blank">Buy on Amazon</a>
+    </div>
+  </div>
+</div>
+
 <script>
-/* ================= CONFIG ================= */
-const API_BASE = "/api/links";
-
-const CATEGORIES = [
-  "all","clothing","tshirts","shoes","bags",
-  "electronics","jeans","laptops","home & living","other"
-];
-
-const state = {
-  all: [],
-  category: "all",
-  search: "",
-  sort: "newest"
-};
-
+const API = "/api/links";
 const grid = document.getElementById("deals-grid");
-const stats = document.getElementById("stats-text");
-const error = document.getElementById("error-text");
+const overlay = document.getElementById("overlay");
+let all = [];
 
-/* ================= HELPERS ================= */
 const esc = s => (s||"").replace(/[&<>"']/g,m=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",
   '"':"&quot;","'":"&#39;"
 }[m]));
 
-const dateFmt = d =>
-  new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
-
-/* ================= CATEGORIES ================= */
-function renderCategories() {
-  const el = document.getElementById("category-pills");
-  el.innerHTML = "";
-
-  CATEGORIES.forEach(c => {
-    const b = document.createElement("button");
-    b.textContent = c === "all" ? "All" : c.replace(/(^|\s)\S/g,l=>l.toUpperCase());
-    b.className = c === state.category ? "pill active" : "pill";
-    b.onclick = () => { state.category = c; render(); };
-    el.appendChild(b);
-  });
-}
-
-/* ================= CARD ================= */
-function card(link) {
-  const desc =
-    link.longDescription || link.note ||
-    "A useful everyday product worth checking out.";
-
+function card(l) {
   return `
   <article class="card">
     <div class="img-wrap">
-      <img src="${esc(link.imageUrl || "")}" alt="">
+      <img src="${esc(l.imageUrl||"")}" />
+      <button class="view-btn" data-id="${l.id}">View Product</button>
     </div>
-
-    <h3 class="title">${esc(link.title)}</h3>
-
-    <p class="desc">${esc(desc)}</p>
+    <h3 class="title">${esc(l.title)}</h3>
+    <p class="desc">${esc(l.shortDescription||l.longDescription||"")}</p>
     <button class="more-btn">More</button>
-
     <div class="price">
       <small>Best price on Amazon</small>
-      <strong>₹${link.price || "—"}</strong>
+      <strong>₹${l.price||"—"}</strong>
     </div>
-
-    <div class="meta-row">
-      <span>${dateFmt(link.createdAt)}</span>
-      <span>${link.clicks || 0} clicks</span>
-    </div>
-
     <div class="actions">
-      <button class="buy" data-id="${link.id}">Buy</button>
-      <button class="copy" data-id="${link.id}">Copy</button>
+      <button class="buy" data-id="${l.id}">Buy</button>
+      <button class="copy" data-id="${l.id}">Copy</button>
     </div>
   </article>`;
 }
 
-/* ================= RENDER ================= */
-function render() {
-  let list = [...state.all];
-
-  if (state.category !== "all") {
-    list = list.filter(l => (l.category||"other") === state.category);
-  }
-
-  if (state.search) {
-    const q = state.search.toLowerCase();
-    list = list.filter(l => (l.title||"").toLowerCase().includes(q));
-  }
-
-  if (state.sort === "newest") {
-    list.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  } else if (state.sort === "oldest") {
-    list.sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-  } else {
-    list.sort((a,b)=>(b.clicks||0)-(a.clicks||0));
-  }
-
-  stats.textContent = `Showing ${list.length} deal(s).`;
+function render(list) {
   grid.innerHTML = list.map(card).join("");
-
   wire();
 }
 
-/* ================= EVENTS ================= */
 function wire() {
-  grid.querySelectorAll(".more-btn").forEach(btn=>{
-    btn.onclick = ()=>{
-      const d = btn.previousElementSibling;
-      d.classList.toggle("expanded");
-      btn.textContent = d.classList.contains("expanded") ? "Less" : "More";
-    };
+  document.querySelectorAll(".view-btn").forEach(btn=>{
+    btn.onclick=()=>openOverlay(all.find(l=>l.id===btn.dataset.id));
   });
-
-  grid.querySelectorAll(".buy").forEach(b=>{
-    b.onclick = ()=> window.open(`${API_BASE}/go/${b.dataset.id}`,"_blank");
+  document.querySelector(".close-btn").onclick=closeOverlay;
+  document.querySelectorAll(".buy").forEach(b=>{
+    b.onclick=()=>window.open(`${API}/go/${b.dataset.id}`);
   });
-
-  grid.querySelectorAll(".copy").forEach(b=>{
-    b.onclick = async ()=>{
-      await navigator.clipboard.writeText(
-        location.origin + `/api/links/go/${b.dataset.id}`
-      );
-      b.textContent = "Copied";
-      setTimeout(()=>b.textContent="Copy",900);
-    };
+  document.querySelectorAll(".copy").forEach(b=>{
+    b.onclick=()=>navigator.clipboard.writeText(location.origin+`/api/links/go/${b.dataset.id}`);
   });
 }
 
-/* ================= LOAD ================= */
-async function load() {
-  try {
-    const r = await fetch(`${API_BASE}/all`);
-    const j = await r.json();
-    state.all = j.links || [];
-    render();
-  } catch {
-    error.textContent = "Could not load products.";
-    error.classList.remove("hidden");
-  }
+function openOverlay(l) {
+  document.body.style.overflow="hidden";
+  overlay.classList.remove("hidden");
+  document.getElementById("ov-title").textContent=l.title;
+  document.getElementById("ov-desc").textContent=l.longDescription||"";
+  document.getElementById("ov-price").textContent="₹"+(l.price||"—");
+  document.getElementById("ov-buy").href=`${API}/go/${l.id}`;
+  document.querySelector(".overlay-images").innerHTML =
+    (l.images||[l.imageUrl]).map(i=>`<img src="${i}">`).join("");
 }
 
-document.getElementById("search-input").oninput = e=>{
-  state.search = e.target.value;
-  render();
-};
-document.getElementById("sort-select").onchange = e=>{
-  state.sort = e.target.value;
-  render();
-};
+function closeOverlay() {
+  overlay.classList.add("hidden");
+  document.body.style.overflow="";
+}
 
-renderCategories();
-load();
+fetch(`${API}/all`).then(r=>r.json()).then(j=>{
+  all=j.links||[];
+  render(all);
+});
 </script>
 </body>
 </html>
