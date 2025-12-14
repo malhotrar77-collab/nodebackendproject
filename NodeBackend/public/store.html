@@ -8,7 +8,10 @@
   <link rel="stylesheet" href="store.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
 </head>
 
 <body>
@@ -17,21 +20,23 @@
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="brand">
-      <span class="dot"></span>
+      <span class="brand-dot"></span>
       <span>ALWAYS ON SALE</span>
     </div>
-
     <nav class="nav">
-      <a class="active">Store</a>
+      <span class="nav-active">Store</span>
       <a href="/">Dashboard</a>
     </nav>
   </div>
 
   <!-- HERO -->
   <section class="hero">
-    <h1>Today’s hand-picked deals</h1>
-    <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
-    <span class="live">LIVE FROM ALWAYSonsale</span>
+    <h1>Today's hand-picked deals</h1>
+    <p>
+      Amazon engine, Instagram skin.<br />
+      Curated products with tracked links.
+    </p>
+    <span class="live-pill">LIVE FROM ALWAYSonsale</span>
   </section>
 
   <!-- FILTERS -->
@@ -39,7 +44,11 @@
     <div id="category-pills" class="pills"></div>
 
     <div class="search-sort">
-      <input id="search-input" type="search" placeholder="Search products…" />
+      <input
+        id="search-input"
+        type="search"
+        placeholder="Search products..."
+      />
       <select id="sort-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
@@ -49,12 +58,12 @@
   </section>
 
   <!-- META -->
-  <section class="meta">
+  <div class="meta">
     <span id="stats-text">Showing 0 deal(s).</span>
     <span id="error-text" class="error hidden">
       Could not load products.
     </span>
-  </section>
+  </div>
 
   <!-- GRID -->
   <main id="deals-grid" class="grid"></main>
@@ -88,12 +97,13 @@ const esc = s => (s||"").replace(/[&<>"']/g,m=>({
 }[m]));
 
 const dateFmt = d =>
-  new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+  d ? new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
 
 /* ================= CATEGORIES ================= */
 function renderCategories() {
   const el = document.getElementById("category-pills");
   el.innerHTML = "";
+
   CATEGORIES.forEach(c => {
     const b = document.createElement("button");
     b.textContent = c === "all" ? "All" : c.replace(/(^|\s)\S/g,l=>l.toUpperCase());
@@ -112,22 +122,26 @@ function card(link) {
   return `
   <article class="card">
     <div class="img-wrap">
-      <img src="${esc(link.imageUrl || "")}" alt="">
+      ${link.imageUrl ? `<img src="${esc(link.imageUrl)}" />` : `<div class="no-img">No image</div>`}
     </div>
 
-    <h3 class="title">${esc(link.title)}</h3>
+    <div class="card-body">
+      <h3>${esc(link.title || "Product")}</h3>
 
-    <p class="desc">${esc(desc)}</p>
-    <button class="more-btn">More</button>
+      <p class="desc">
+        ${esc(desc)}
+      </p>
+      <button class="toggle">More</button>
 
-    <div class="price">
-      <small>Best price on Amazon</small>
-      <strong>₹${link.price || "—"}</strong>
-    </div>
+      <div class="price">
+        <span>Best price on Amazon</span>
+        <strong>₹${link.price || "—"}</strong>
+      </div>
 
-    <div class="meta-row">
-      <span>${dateFmt(link.createdAt)}</span>
-      <span>${link.clicks || 0} clicks</span>
+      <div class="meta-row">
+        <span>${dateFmt(link.createdAt)}</span>
+        <span>${link.clicks || 0} clicks</span>
+      </div>
     </div>
 
     <div class="actions">
@@ -165,11 +179,11 @@ function render() {
 
 /* ================= EVENTS ================= */
 function wire() {
-  grid.querySelectorAll(".more-btn").forEach(btn=>{
+  grid.querySelectorAll(".toggle").forEach(btn=>{
     btn.onclick = ()=>{
-      const d = btn.previousElementSibling;
-      d.classList.toggle("expanded");
-      btn.textContent = d.classList.contains("expanded") ? "Less" : "More";
+      const p = btn.previousElementSibling;
+      p.classList.toggle("expanded");
+      btn.textContent = p.classList.contains("expanded") ? "Less" : "More";
     };
   });
 
