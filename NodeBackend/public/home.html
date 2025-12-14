@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AlwaysOnSale — Everything is on Sale</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #070b1f;
+      --panel: #0f1738;
+      --accent: #ff9f43;
+      --text: #e8ebff;
+      --muted: #9aa1ff;
+      --glow: rgba(255,160,70,0.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: radial-gradient(circle at top, #10184a, var(--bg));
+      color: var(--text);
+    }
+
+    a { text-decoration: none; color: inherit; }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,160,70,.18), transparent 60%),
+        radial-gradient(circle at 80% 20%, rgba(100,140,255,.18), transparent 60%);
+    }
+
+    .hero-content {
+      position: relative;
+      max-width: 900px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255,160,70,.15);
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      line-height: 1.05;
+      margin: 0 0 18px;
+    }
+
+    .sub {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 34px;
+    }
+
+    .cta {
+      display: inline-block;
+      background: var(--accent);
+      color: #000;
+      padding: 16px 36px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 18px;
+      box-shadow: 0 0 40px var(--glow);
+      transition: transform .25s ease;
+    }
+
+    .cta:hover {
+      transform: scale(1.05);
+    }
+
+    section {
+      padding: 80px 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 40px;
+    }
+
+    .icons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+      gap: 24px;
+    }
+
+    .icon-card {
+      background: linear-gradient(180deg, #141d48, #0a0f24);
+      padding: 26px;
+      border-radius: 20px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(0,0,0,.6);
+    }
+
+    .icon {
+      font-size: 42px;
+      margin-bottom: 14px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">🔥 50%+ OFF • LIVE DEALS</div>
+      <h1>Everything is<br>Always On Sale</h1>
+      <p class="sub">
+        Real Amazon products. Real discounts.<br>
+        Curated daily. Zero fake offers.
+      </p>
+      <a class="cta" href="/AlwaysOnSale">Shop Today’s Deals</a>
+    </div>
+  </div>
+
+  <section>
+    <h2 class="section-title">Why AlwaysOnSale?</h2>
+    <div class="icons">
+      <div class="icon-card">
+        <div class="icon">🔥</div>
+        <h3>Verified Discounts</h3>
+      </div>
+      <div class="icon-card">
+        <div class="icon">🧠</div>
+        <h3>Smart Price Tracking</h3>
+      </div>
+      <div class="icon-card">
+        <div class="icon">⚡</div>
+        <h3>Updated Daily</h3>
+      </div>
+      <div class="icon-card">
+        <div class="icon">🛍️</div>
+        <h3>Buy Safely on Amazon</h3>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    AlwaysOnSale is an Amazon affiliate. Prices and availability may change.
+  </footer>
+
+</body>
+</html>
