@@ -8,213 +8,267 @@
   <link rel="stylesheet" href="store.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
 </head>
 
 <body>
-<header class="app-shell">
+  <!-- ================= HEADER ================= -->
+  <header class="store-shell">
+    <div class="store-topbar">
+      <div class="brand-pill">
+        <span class="dot dot-live"></span>
+        <span class="brand-text-1">ALWAYS</span>
+        <span class="brand-text-2">ON</span>
+        <span class="brand-text-3">SALE</span>
+      </div>
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div class="brand">
-      <span class="dot"></span>
-      <span>ALWAYS ON SALE</span>
+      <nav class="store-nav">
+        <a class="nav-link nav-link-active" href="/AlwaysOnSale">Store</a>
+        <a class="nav-link" href="/">Dashboard (admin)</a>
+      </nav>
     </div>
 
-    <nav class="nav">
-      <a class="active">Store</a>
-      <a href="/">Dashboard (admin)</a>
-    </nav>
-  </div>
+    <!-- ================= MAIN ================= -->
+    <main class="store-main">
 
-  <!-- HERO -->
-  <section class="hero">
-    <h1>Today's hand-picked deals</h1>
-    <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
-    <span class="live">LIVE FROM ALWAYSonsale</span>
-  </section>
+      <!-- HERO -->
+      <section class="hero-card">
+        <div class="hero-text">
+          <h1>Today’s hand-picked deals</h1>
+          <p class="hero-subtitle">
+            Amazon engine, Instagram skin. Curated products with tracked links.
+          </p>
+        </div>
 
-  <!-- FILTERS -->
-  <section class="filters">
-    <div id="category-pills" class="pills"></div>
+        <div class="hero-status">
+          <div class="status-pill status-live">
+            <span class="status-dot"></span>
+            <span>LIVE FROM ALWAYSonsale</span>
+          </div>
+          <p class="status-caption">
+            Showing curated deals. Auto-updated via your affiliate dashboard.
+          </p>
+        </div>
+      </section>
 
-    <div class="search-sort">
-      <input id="search-input" type="search" placeholder="Search products..." />
-      <select id="sort-select">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="clicks-desc">Most clicks</option>
-      </select>
-    </div>
-  </section>
+      <!-- FILTERS -->
+      <section class="filters-row">
+        <div id="category-pills" class="category-pills"></div>
 
-  <!-- META -->
-  <section class="meta">
-    <span id="stats-text">Showing 0 deal(s).</span>
-    <span id="error-text" class="error hidden">
-      Could not load products. Please try again.
-    </span>
-  </section>
+        <div class="search-sort-row">
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Search products or category"
+          />
 
-  <!-- GRID -->
-  <main id="deals-grid" class="grid"></main>
+          <select id="sort-select">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="clicks-desc">Most clicks</option>
+          </select>
+        </div>
+      </section>
 
-</header>
+      <!-- META -->
+      <section class="meta-row">
+        <p id="stats-text">Showing 0 deal(s).</p>
+        <p id="error-text" class="hidden">
+          Could not load products. Please try again in a bit.
+        </p>
+      </section>
 
-<script>
-/* ================= CONFIG ================= */
-const API_BASE = "/api/links";
+      <!-- GRID -->
+      <section class="grid-shell">
+        <div id="deals-grid" class="deals-grid"></div>
+      </section>
+    </main>
 
-const CATEGORIES = [
-  "all","clothing","tshirts","shoes","bags",
-  "electronics","jeans","laptops","home & living","other"
-];
+    <footer class="store-footer">
+      AlwaysOnSale · Amazon engine, Instagram skin.
+    </footer>
+  </header>
 
-const state = {
-  all: [],
-  filtered: [],
-  category: "all",
-  search: "",
-  sort: "newest"
-};
+  <!-- ================= SCRIPT ================= -->
+  <script>
+    const API_BASE = "/api/links";
 
-const grid = document.getElementById("deals-grid");
-const stats = document.getElementById("stats-text");
-const error = document.getElementById("error-text");
+    const categories = [
+      "all",
+      "clothing",
+      "tshirts",
+      "shoes",
+      "bags",
+      "electronics",
+      "jeans",
+      "laptops",
+      "home & living",
+      "other"
+    ];
 
-/* ================= HELPERS ================= */
-const esc = s => (s||"").replace(/[&<>"']/g,m=>({
-  "&":"&amp;","<":"&lt;",">":"&gt;",
-  '"':"&quot;","'":"&#39;"
-}[m]));
-
-const dateFmt = d =>
-  new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
-
-/* ================= CATEGORIES ================= */
-function renderCategories() {
-  const el = document.getElementById("category-pills");
-  el.innerHTML = "";
-
-  CATEGORIES.forEach(c => {
-    const b = document.createElement("button");
-    b.textContent = c === "all" ? "All" : c.replace(/(^|\s)\S/g,l=>l.toUpperCase());
-    b.className = c === state.category ? "pill active" : "pill";
-    b.onclick = () => { state.category = c; render(); };
-    el.appendChild(b);
-  });
-}
-
-/* ================= CARD ================= */
-function card(link) {
-  const desc =
-    link.longDescription || link.note ||
-    "A useful everyday product worth checking out.";
-
-  return `
-  <article class="card">
-    <div class="img-wrap">
-      <img src="${esc(link.imageUrl || "")}" alt="">
-    </div>
-
-    <h3 class="title">${esc(link.title)}</h3>
-
-    <p class="desc">${esc(desc)}</p>
-    <span class="more-btn">More</span>
-
-    <div class="price">
-      <small>Best price on Amazon</small>
-      <strong>₹${link.price || "—"}</strong>
-    </div>
-
-    <div class="meta-row">
-      <span>${dateFmt(link.createdAt)}</span>
-      <span>${link.clicks || 0} clicks</span>
-    </div>
-
-    <div class="actions">
-      <button class="buy" data-id="${link.id}">Buy</button>
-      <button class="copy" data-id="${link.id}">Copy</button>
-    </div>
-  </article>`;
-}
-
-/* ================= RENDER ================= */
-function render() {
-  let list = [...state.all];
-
-  if (state.category !== "all") {
-    list = list.filter(l => (l.category||"other") === state.category);
-  }
-
-  if (state.search) {
-    const q = state.search.toLowerCase();
-    list = list.filter(l => (l.title||"").toLowerCase().includes(q));
-  }
-
-  if (state.sort === "newest") {
-    list.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  } else if (state.sort === "oldest") {
-    list.sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-  } else {
-    list.sort((a,b)=>(b.clicks||0)-(a.clicks||0));
-  }
-
-  state.filtered = list;
-  stats.textContent = `Showing ${list.length} deal(s).`;
-  grid.innerHTML = list.map(card).join("");
-
-  wire();
-}
-
-/* ================= EVENTS ================= */
-function wire() {
-  grid.querySelectorAll(".more-btn").forEach(btn=>{
-    btn.onclick = ()=>{
-      const d = btn.previousElementSibling;
-      d.classList.toggle("expanded");
-      btn.textContent = d.classList.contains("expanded") ? "Less" : "More";
+    const state = {
+      all: [],
+      filtered: [],
+      category: "all",
+      search: "",
+      sort: "newest"
     };
-  });
 
-  grid.querySelectorAll(".buy").forEach(b=>{
-    b.onclick = ()=> window.open(`${API_BASE}/go/${b.dataset.id}`,"_blank");
-  });
+    const grid = document.getElementById("deals-grid");
+    const stats = document.getElementById("stats-text");
+    const errorText = document.getElementById("error-text");
 
-  grid.querySelectorAll(".copy").forEach(b=>{
-    b.onclick = async ()=>{
-      await navigator.clipboard.writeText(
-        location.origin + `/api/links/go/${b.dataset.id}`
-      );
-      b.textContent = "Copied";
-      setTimeout(()=>b.textContent="Copy",1000);
-    };
-  });
-}
+    /* ---------- Utilities ---------- */
+    const esc = (s) =>
+      (s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
-/* ================= LOAD ================= */
-async function load() {
-  try {
-    const r = await fetch(`${API_BASE}/all`);
-    const j = await r.json();
-    state.all = j.links || [];
-    render();
-  } catch {
-    error.classList.remove("hidden");
-  }
-}
+    const formatDate = (d) =>
+      d
+        ? new Date(d).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric"
+          })
+        : "";
 
-document.getElementById("search-input").oninput = e=>{
-  state.search = e.target.value;
-  render();
-};
-document.getElementById("sort-select").onchange = e=>{
-  state.sort = e.target.value;
-  render();
-};
+    const formatPrice = (p) =>
+      p
+        ? new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR",
+            maximumFractionDigits: 0
+          }).format(p)
+        : "—";
 
-renderCategories();
-load();
-</script>
+    /* ---------- Category Pills ---------- */
+    function renderCategories() {
+      const el = document.getElementById("category-pills");
+      el.innerHTML = "";
+
+      categories.forEach((c) => {
+        const b = document.createElement("button");
+        b.textContent = c === "all" ? "All" : c.replace(/^\w/, m => m.toUpperCase());
+        b.className = "pill" + (state.category === c ? " pill-active" : "");
+        b.onclick = () => {
+          state.category = c;
+          renderCategories();
+          render();
+        };
+        el.appendChild(b);
+      });
+    }
+
+    /* ---------- Card ---------- */
+    function card(link) {
+      const desc =
+        link.longDescription ||
+        link.note ||
+        "A useful product curated for everyday value.";
+
+      return `
+      <article class="deal-card">
+        <div class="deal-card-image">
+          ${
+            link.imageUrl
+              ? `<img src="${link.imageUrl}" loading="lazy" />`
+              : `<div class="no-image">No image</div>`
+          }
+        </div>
+
+        <div class="deal-card-body">
+          <h3 class="deal-title">${esc(link.title)}</h3>
+
+          <p class="deal-description">
+            ${esc(desc)}
+          </p>
+          <span class="read-more-btn">More</span>
+
+          <div class="price-row">
+            <div class="price-label">Best price on Amazon</div>
+            <div class="price-amount">${formatPrice(link.price)}</div>
+          </div>
+
+          <div class="meta-row-card">
+            <span>${formatDate(link.createdAt)}</span>
+            <span>${link.clicks || 0} clicks</span>
+          </div>
+        </div>
+
+        <div class="deal-card-footer">
+          <button class="btn btn-primary" data-buy="${link.id}">Buy</button>
+          <button class="btn btn-secondary" data-copy="${link.id}">Copy</button>
+        </div>
+      </article>`;
+    }
+
+    /* ---------- Render ---------- */
+    function render() {
+      let list = [...state.all];
+
+      if (state.category !== "all") {
+        list = list.filter(
+          (l) => (l.category || "").toLowerCase() === state.category
+        );
+      }
+
+      if (state.search) {
+        list = list.filter((l) =>
+          (l.title || "").toLowerCase().includes(state.search)
+        );
+      }
+
+      stats.textContent = `Showing ${list.length} deal(s).`;
+      grid.innerHTML = list.map(card).join("");
+    }
+
+    /* ---------- Fetch ---------- */
+    async function load() {
+      try {
+        const r = await fetch(API_BASE + "/all");
+        const j = await r.json();
+        state.all = j.links || [];
+        render();
+      } catch {
+        errorText.classList.remove("hidden");
+      }
+    }
+
+    /* ---------- EVENTS ---------- */
+    document.addEventListener("DOMContentLoaded", () => {
+      renderCategories();
+      load();
+
+      document.getElementById("search-input").oninput = (e) => {
+        state.search = e.target.value.toLowerCase();
+        render();
+      };
+
+      document.getElementById("sort-select").onchange = (e) => {
+        state.sort = e.target.value;
+        render();
+      };
+    });
+
+    /* ---------- READ MORE (MOBILE SAFE) ---------- */
+    document.addEventListener("click", (e) => {
+      if (!e.target.classList.contains("read-more-btn")) return;
+
+      const card = e.target.closest(".deal-card");
+      const desc = card.querySelector(".deal-description");
+
+      desc.classList.toggle("expanded");
+      e.target.textContent = desc.classList.contains("expanded")
+        ? "Less"
+        : "More";
+    });
+  </script>
 </body>
 </html>
