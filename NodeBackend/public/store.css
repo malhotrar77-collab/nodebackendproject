@@ -1,5 +1,5 @@
 /* =========================
-   Global reset
+   Global
    ========================= */
 
 *,
@@ -9,164 +9,85 @@
 }
 
 :root {
-  --bg-body: #050816;
+  --bg-body: #050815;
+  --bg-shell: #050815;
   --bg-card: #0b1020;
+  --bg-card-soft: #11172a;
   --bg-hero: #0b1120;
 
-  --border-soft: rgba(120, 130, 180, 0.25);
-  --border-strong: rgba(255, 120, 160, 0.9);
+  --border-soft: rgba(120, 130, 180, 0.4);
+  --border-strong: rgba(255, 117, 140, 0.9);
 
   --text-main: #f5f7ff;
   --text-subtle: #a3afcc;
   --text-muted: #7781a3;
+  --text-brand-1: #ff5c5c;
+  --text-brand-2: #ffa94d;
+  --text-brand-3: #ffffff;
 
-  --accent-orange: #ff8a3d;
-  --accent-pink: #ff5c7a;
-  --accent-green: #2ed573;
+  --pill-bg: #12192e;
+  --pill-active-bg: #ff5c7a;
+  --pill-active-text: #ffffff;
 
+  --badge-bg: #161d34;
+  --badge-border: rgba(255, 255, 255, 0.12);
+
+  --btn-primary-from: #ff5c5c;
+  --btn-primary-to: #ff9b4d;
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: #171f33;
+  --btn-secondary-text: #e0e5ff;
+
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.6);
+  --shadow-hero: 0 30px 80px rgba(0, 0, 0, 0.9);
+  --shadow-glow: 0 0 0 1px rgba(255, 120, 160, 0.4),
+    0 18px 45px rgba(255, 85, 135, 0.55);
+
+  --radius-lg: 20px;
   --radius-card: 22px;
   --radius-pill: 999px;
 
-  --shadow-soft: 0 18px 40px rgba(0,0,0,0.6);
-  --shadow-glow: 0 0 0 1px rgba(255,120,160,0.4),
-                 0 18px 45px rgba(255,85,135,0.55);
+  --transition-fast: 0.18s ease-out;
+  --transition-med: 0.25s ease-out;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  font-family: Inter, system-ui, sans-serif;
-  background: radial-gradient(circle at top, #12172b 0, #050816 55%);
+  min-height: 100%;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #12172b 0, #050815 55%);
   color: var(--text-main);
 }
 
+body {
+  display: flex;
+  justify-content: center;
+}
+
 /* =========================
-   Layout
+   Layout shell
    ========================= */
 
 .store-shell {
+  width: 100%;
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 18px;
-}
-
-/* =========================
-   Top bar
-   ========================= */
-
-.store-topbar {
+  min-height: 100vh;
+  padding: 20px 18px 32px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.brand-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-orange));
-  box-shadow: 0 10px 30px rgba(255,120,80,0.6);
-}
-
-.brand-pill span {
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  font-weight: 700;
-}
-
-.store-nav a {
-  margin-left: 8px;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  text-decoration: none;
-  font-size: 13px;
-  color: var(--text-subtle);
-  background: rgba(15,20,40,0.6);
-}
-
-.nav-link-active {
-  background: linear-gradient(135deg, var(--accent-orange), var(--accent-pink));
-  color: #fff;
+  flex-direction: column;
 }
 
 /* =========================
-   Hero
-   ========================= */
-
-.hero-card {
-  background: radial-gradient(circle at top, #151b3b 0, #060918 70%);
-  padding: 22px;
-  border-radius: 26px;
-  box-shadow: var(--shadow-soft);
-  margin-bottom: 20px;
-}
-
-.hero-card h1 {
-  margin: 0 0 6px;
-  font-size: 26px;
-}
-
-.hero-subtitle {
-  font-size: 13px;
-  color: var(--text-subtle);
-}
-
-/* =========================
-   Filters
-   ========================= */
-
-.category-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pill {
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  font-size: 13px;
-  background: #12192e;
-  color: var(--text-subtle);
-  border: 1px solid rgba(255,255,255,0.15);
-}
-
-.pill-active {
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-orange));
-  color: #fff;
-}
-
-/* =========================
-   GRID (IMPORTANT FIX)
+   Grid
    ========================= */
 
 .deals-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 16px;
-}
-
-/* MOBILE: ALWAYS 2 COLUMNS */
-@media (max-width: 640px) {
-  .deals-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* TABLET */
-@media (min-width: 641px) and (max-width: 1023px) {
-  .deals-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* DESKTOP */
-@media (min-width: 1024px) {
-  .deals-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 /* =========================
@@ -174,28 +95,28 @@ body {
    ========================= */
 
 .deal-card {
-  background: radial-gradient(circle at top, #12172b 0, #050816 70%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at top, #12172b 0, #050815 70%);
   border-radius: var(--radius-card);
   padding: 14px;
-  border: 1px solid var(--border-soft);
+  border: 1px solid rgba(120, 130, 180, 0.4);
   box-shadow: var(--shadow-soft);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.deal-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-glow);
+  min-height: 380px;
+  transition: transform var(--transition-med),
+    box-shadow var(--transition-med);
 }
 
 .deal-card-image {
-  height: 180px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #050816;
+  border-radius: 18px;
+  background: #060a16;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  margin-bottom: 12px;
+  min-height: 190px;
 }
 
 .deal-card-image img {
@@ -204,37 +125,68 @@ body {
   object-fit: contain;
 }
 
-.deal-title {
-  font-size: 14px;
-  margin: 10px 0 6px;
-}
-
-.deal-description {
-  font-size: 12px;
-  color: var(--text-subtle);
-}
-
-.price-amount {
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffd369;
-}
-
 /* =========================
    Buttons
    ========================= */
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-orange));
-  color: #fff;
-  border-radius: var(--radius-pill);
-  padding: 9px 14px;
+.btn {
+  border-radius: 999px;
   border: none;
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.btn-secondary {
-  background: #171f33;
-  color: #e0e5ff;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255,255,255,0.2);
+/* =========================
+   Footer
+   ========================= */
+
+.store-footer {
+  margin-top: 24px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(90, 100, 150, 0.35);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* =========================
+   MOBILE FIX (SAFE)
+   ========================= */
+
+@media (max-width: 640px) {
+  .deals-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .deal-card {
+    min-height: unset;
+    padding: 12px;
+  }
+
+  .deal-card-image {
+    min-height: 140px;
+    max-height: 140px;
+  }
+
+  .deal-card-image img {
+    object-fit: contain;
+  }
+
+  .deal-title {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  .deal-description {
+    font-size: 11px;
+    line-height: 1.4;
+    max-height: 4.2em;
+    overflow: hidden;
+  }
+
+  .btn {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
 }
