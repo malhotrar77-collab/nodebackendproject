@@ -28,23 +28,6 @@
     <span class="live">LIVE FROM ALWAYSonsale</span>
   </section>
 
-  <section class="filters">
-    <div id="category-pills" class="pills"></div>
-    <div class="search-sort">
-      <input id="search-input" placeholder="Search products..." />
-      <select id="sort-select">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="clicks">Most clicks</option>
-      </select>
-    </div>
-  </section>
-
-  <section class="meta">
-    <span id="stats-text">Loading deals…</span>
-    <span id="error-text" class="hidden"></span>
-  </section>
-
   <main id="deals-grid" class="grid"></main>
 </header>
 
@@ -80,13 +63,17 @@ function card(l) {
       <img src="${esc(l.imageUrl||"")}" />
       <button class="view-btn" data-id="${l.id}">View Product</button>
     </div>
+
     <h3 class="title">${esc(l.title)}</h3>
-    <p class="desc">${esc(l.shortDescription||l.longDescription||"")}</p>
+
+    <p class="desc">${esc(l.shortDescription || "")}</p>
     <button class="more-btn">More</button>
+
     <div class="price">
       <small>Best price on Amazon</small>
-      <strong>₹${l.price||"—"}</strong>
+      <strong>₹${l.price || "—"}</strong>
     </div>
+
     <div class="actions">
       <button class="buy" data-id="${l.id}">Buy</button>
       <button class="copy" data-id="${l.id}">Copy</button>
@@ -101,37 +88,60 @@ function render(list) {
 
 function wire() {
   document.querySelectorAll(".view-btn").forEach(btn=>{
-    btn.onclick=()=>openOverlay(all.find(l=>l.id===btn.dataset.id));
+    btn.onclick = () => {
+      const item = all.find(l => l.id === btn.dataset.id);
+      openOverlay(item);
+    };
   });
-  document.querySelector(".close-btn").onclick=closeOverlay;
+
+  document.querySelectorAll(".more-btn").forEach(btn=>{
+    btn.onclick = () => {
+      const desc = btn.previousElementSibling;
+      desc.classList.toggle("expanded");
+      btn.textContent = desc.classList.contains("expanded") ? "Less" : "More";
+    };
+  });
+
+  document.querySelector(".close-btn").onclick = closeOverlay;
+
   document.querySelectorAll(".buy").forEach(b=>{
-    b.onclick=()=>window.open(`${API}/go/${b.dataset.id}`);
+    b.onclick = ()=>window.open(`${API}/go/${b.dataset.id}`);
   });
+
   document.querySelectorAll(".copy").forEach(b=>{
-    b.onclick=()=>navigator.clipboard.writeText(location.origin+`/api/links/go/${b.dataset.id}`);
+    b.onclick = ()=>{
+      navigator.clipboard.writeText(
+        location.origin + `/api/links/go/${b.dataset.id}`
+      );
+    };
   });
 }
 
 function openOverlay(l) {
-  document.body.style.overflow="hidden";
+  document.body.style.overflow = "hidden";
   overlay.classList.remove("hidden");
-  document.getElementById("ov-title").textContent=l.title;
-  document.getElementById("ov-desc").textContent=l.longDescription||"";
-  document.getElementById("ov-price").textContent="₹"+(l.price||"—");
-  document.getElementById("ov-buy").href=`${API}/go/${l.id}`;
+
+  document.getElementById("ov-title").textContent = l.title;
+  document.getElementById("ov-desc").textContent = l.longDescription || "";
+  document.getElementById("ov-price").textContent = "₹" + (l.price || "—");
+  document.getElementById("ov-buy").href = `${API}/go/${l.id}`;
+
   document.querySelector(".overlay-images").innerHTML =
-    (l.images||[l.imageUrl]).map(i=>`<img src="${i}">`).join("");
+    (l.images?.length ? l.images : [l.imageUrl])
+      .map(i => `<img src="${i}">`).join("");
 }
 
 function closeOverlay() {
   overlay.classList.add("hidden");
-  document.body.style.overflow="";
+  document.body.style.overflow = "";
 }
 
-fetch(`${API}/all`).then(r=>r.json()).then(j=>{
-  all=j.links||[];
-  render(all);
-});
+fetch(`${API}/all`)
+  .then(r=>r.json())
+  .then(j=>{
+    all = j.links || [];
+    render(all);
+  });
 </script>
 </body>
 </html>
