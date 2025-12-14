@@ -14,335 +14,244 @@
     rel="stylesheet"
   />
 </head>
-
 <body>
-  <header class="store-shell">
-    <!-- Top bar -->
-    <div class="store-topbar">
-      <div class="brand-pill">
-        <span class="dot dot-live"></span>
-        <span class="brand-text-1">ALWAYS</span>
-        <span class="brand-text-2">ON</span>
-        <span class="brand-text-3">SALE</span>
-      </div>
+<header class="store-shell">
 
-      <nav class="store-nav">
-        <a class="nav-link nav-link-active" href="/AlwaysOnSale">Store</a>
-        <a class="nav-link" href="/">Dashboard (admin)</a>
-      </nav>
+  <!-- Top bar -->
+  <div class="store-topbar">
+    <div class="brand-pill">
+      <span class="dot dot-live"></span>
+      <span class="brand-text-1">ALWAYS</span>
+      <span class="brand-text-2">ON</span>
+      <span class="brand-text-3">SALE</span>
     </div>
 
-    <main class="store-main">
-      <!-- Hero -->
-      <section class="hero-card">
-        <div class="hero-text">
-          <h1>Today’s hand-picked deals</h1>
-          <p class="hero-subtitle">
-            Amazon engine, Instagram skin. Curated products with tracked links.
-          </p>
-        </div>
+    <nav class="store-nav">
+      <a class="nav-link nav-link-active" href="/AlwaysOnSale">Store</a>
+      <a class="nav-link" href="/">Dashboard (admin)</a>
+    </nav>
+  </div>
 
-        <div class="hero-status">
-          <div class="status-pill status-live">
-            <span class="status-dot"></span>
-            <span class="status-text">LIVE FROM ALWAYSonsale</span>
-          </div>
-          <p class="status-caption">
-            Showing curated deals. Auto-updated via your affiliate dashboard.
-          </p>
-        </div>
-      </section>
+  <main class="store-main">
 
-      <!-- Filters -->
-      <section class="filters-row">
-        <div id="category-pills" class="category-pills"></div>
-
-        <div class="search-sort-row">
-          <div class="search-wrapper">
-            <input
-              id="search-input"
-              type="search"
-              placeholder="Search products or category..."
-              autocomplete="off"
-            />
-          </div>
-
-          <div class="sort-wrapper">
-            <label class="sort-label" for="sort-select">Sort</label>
-            <select id="sort-select">
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-              <option value="clicks-desc">Most clicks</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <!-- Meta -->
-      <section class="meta-row">
-        <p id="stats-text" class="stats-text">Showing 0 deal(s).</p>
-        <p id="error-text" class="error-text hidden">
-          Could not load products. Please try again in a bit.
+    <!-- Hero -->
+    <section class="hero-card">
+      <div class="hero-text">
+        <h1>Today’s hand-picked deals</h1>
+        <p class="hero-subtitle">
+          Amazon engine, Instagram skin. Curated products with tracked links.
         </p>
-      </section>
+      </div>
 
-      <!-- Grid -->
-      <section class="grid-shell">
-        <div id="deals-grid" class="deals-grid"></div>
-      </section>
-    </main>
+      <div class="hero-status">
+        <div class="status-pill status-live">
+          <span class="status-dot"></span>
+          <span class="status-text">LIVE FROM ALWAYSonsale</span>
+        </div>
+        <p class="status-caption">
+          Showing curated deals. Auto-updated via your affiliate dashboard.
+        </p>
+      </div>
+    </section>
 
-    <footer class="store-footer">
-      <span>AlwaysOnSale · Amazon engine, Instagram skin.</span>
-    </footer>
-  </header>
+    <!-- Filters -->
+    <section class="filters-row">
+      <div id="category-pills" class="category-pills"></div>
 
-  <!-- =========================
-       SCRIPT
-       ========================= -->
-  <script>
-    const API_BASE = "/api/links";
+      <div class="search-sort-row">
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search products or category..."
+        />
 
-    const CATEGORY_CONFIG = [
-      { key: "all", label: "All" },
-      { key: "clothing", label: "Clothing" },
-      { key: "tshirts", label: "Tshirts" },
-      { key: "shoes", label: "Shoes" },
-      { key: "bags", label: "Bags" },
-      { key: "electronics", label: "Electronics" },
-      { key: "jeans", label: "Jeans" },
-      { key: "laptops", label: "Laptops" },
-      { key: "home & living", label: "Home & Living" },
-      { key: "other", label: "Other" }
-    ];
+        <select id="sort-select">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="clicks-desc">Most clicks</option>
+        </select>
+      </div>
+    </section>
 
-    const state = {
-      allLinks: [],
-      filteredLinks: [],
-      activeCategory: "all",
-      searchQuery: "",
-      sort: "newest"
+    <!-- Meta -->
+    <section class="meta-row">
+      <p id="stats-text">Showing 0 deal(s).</p>
+      <p id="error-text" class="hidden">
+        Could not load products. Please try again in a bit.
+      </p>
+    </section>
+
+    <!-- Grid -->
+    <section class="grid-shell">
+      <div id="deals-grid" class="deals-grid"></div>
+    </section>
+
+  </main>
+
+  <footer class="store-footer">
+    AlwaysOnSale · Amazon engine, Instagram skin.
+  </footer>
+</header>
+
+<script>
+/* ---------------- CONFIG ---------------- */
+const API_BASE = "/api/links";
+
+const CATEGORIES = [
+  { key: "all", label: "All" },
+  { key: "clothing", label: "Clothing" },
+  { key: "tshirts", label: "Tshirts" },
+  { key: "shoes", label: "Shoes" },
+  { key: "bags", label: "Bags" },
+  { key: "electronics", label: "Electronics" },
+  { key: "jeans", label: "Jeans" },
+  { key: "laptops", label: "Laptops" },
+  { key: "home & living", label: "Home & Living" },
+  { key: "other", label: "Other" }
+];
+
+const state = {
+  all: [],
+  filtered: [],
+  category: "all",
+  search: "",
+  sort: "newest"
+};
+
+const grid = document.getElementById("deals-grid");
+const stats = document.getElementById("stats-text");
+const error = document.getElementById("error-text");
+
+/* ---------------- HELPERS ---------------- */
+const esc = s =>
+  (s || "").replace(/[&<>"']/g, m =>
+    ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])
+  );
+
+/* ---------------- CATEGORIES ---------------- */
+function renderCategories() {
+  const wrap = document.getElementById("category-pills");
+  wrap.innerHTML = "";
+  CATEGORIES.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "pill" + (c.key === state.category ? " pill-active" : "");
+    b.textContent = c.label;
+    b.onclick = () => {
+      state.category = c.key;
+      renderCategories();
+      render();
     };
+    wrap.appendChild(b);
+  });
+}
 
-    const gridEl = document.getElementById("deals-grid");
-    const statsEl = document.getElementById("stats-text");
-    const errorEl = document.getElementById("error-text");
-    const categoryPillsEl = document.getElementById("category-pills");
-    const searchInputEl = document.getElementById("search-input");
-    const sortSelectEl = document.getElementById("sort-select");
+/* ---------------- RENDER ---------------- */
+function render() {
+  let list = [...state.all];
 
-    function escapeHtml(str) {
-      return (str || "")
-        .toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
+  if (state.category !== "all") {
+    list = list.filter(i => (i.category || "other") === state.category);
+  }
 
-    function formatDate(value) {
-      if (!value) return "";
-      const d = new Date(value);
-      return d.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
-      });
-    }
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    list = list.filter(i =>
+      (i.title || "").toLowerCase().includes(q) ||
+      (i.note || "").toLowerCase().includes(q)
+    );
+  }
 
-    function formatCurrency(amount, currency) {
-      if (amount == null) return null;
-      try {
-        return new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: currency || "INR",
-          maximumFractionDigits: 0
-        }).format(amount);
-      } catch {
-        return amount;
-      }
-    }
+  state.filtered = list;
+  stats.textContent = `Showing ${list.length} deal(s).`;
 
-    function renderCategoryPills() {
-      categoryPillsEl.innerHTML = "";
-      CATEGORY_CONFIG.forEach(cfg => {
-        const btn = document.createElement("button");
-        btn.className =
-          "pill" + (cfg.key === state.activeCategory ? " pill-active" : "");
-        btn.textContent = cfg.label;
-        btn.onclick = () => {
-          state.activeCategory = cfg.key;
-          renderCategoryPills();
-          renderAll();
-        };
-        categoryPillsEl.appendChild(btn);
-      });
-    }
+  grid.innerHTML = list.map(buildCard).join("");
+}
 
-    function applyFilters() {
-      let list = [...state.allLinks];
+/* ---------------- CARD ---------------- */
+function buildCard(l) {
+  const desc =
+    l.longDescription ||
+    l.note ||
+    "A useful everyday product worth checking out.";
 
-      if (state.activeCategory !== "all") {
-        list = list.filter(
-          l =>
-            (l.category || "").toLowerCase() ===
-            state.activeCategory.toLowerCase()
-        );
-      }
+  return `
+  <article class="deal-card">
+    <div class="deal-card-image">
+      ${l.imageUrl ? `<img src="${l.imageUrl}" loading="lazy">` : ""}
+    </div>
 
-      if (state.searchQuery) {
-        const q = state.searchQuery.toLowerCase();
-        list = list.filter(
-          l =>
-            (l.title || "").toLowerCase().includes(q) ||
-            (l.category || "").toLowerCase().includes(q)
-        );
-      }
+    <div class="deal-card-body">
+      <h2 class="deal-title">${esc(l.title)}</h2>
 
-      if (state.sort === "newest") {
-        list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      }
+      <p class="deal-description">${esc(desc)}</p>
+      <div class="read-more-btn">More</div>
 
-      state.filteredLinks = list;
-    }
+      <div class="price-row">
+        <div class="price-label">Best price on Amazon</div>
+        <div class="price-amount">₹${l.price || "—"}</div>
+      </div>
 
-    function buildCardHtml(link) {
-      const img =
-        link.imageUrl ||
-        (Array.isArray(link.images) ? link.images[0] : "");
+      <div class="meta-row-card">
+        <span>${l.createdAt ? new Date(l.createdAt).toDateString() : ""}</span>
+        <span>${l.clicks || 0} clicks</span>
+      </div>
+    </div>
 
-      const desc =
-        link.longDescription ||
-        link.note ||
-        "A useful everyday product.";
+    <footer class="deal-card-footer">
+      <button class="btn btn-primary" onclick="go('${l.id || l._id}')">
+        Buy on Amazon
+      </button>
+      <button class="btn btn-secondary" onclick="copy('${l.id || l._id}')">
+        Copy link
+      </button>
+    </footer>
+  </article>
+  `;
+}
 
-      const price = formatCurrency(link.price, link.priceCurrency);
+/* ---------------- ACTIONS ---------------- */
+function go(id) {
+  window.open(`${API_BASE}/go/${id}`, "_blank");
+}
 
-      return `
-        <article class="deal-card">
-          <header class="deal-card-header">
-            <span class="badge badge-source">AMAZON</span>
-            <span class="badge badge-category">${escapeHtml(
-              link.category || "Other"
-            )}</span>
-          </header>
+function copy(id) {
+  navigator.clipboard.writeText(location.origin + `/api/links/go/${id}`);
+}
 
-          <div class="deal-card-image">
-            ${
-              img
-                ? `<img src="${img}" loading="lazy" />`
-                : `<div class="no-image">No image</div>`
-            }
-          </div>
+/* ---------------- LOAD ---------------- */
+async function load() {
+  try {
+    const r = await fetch(`${API_BASE}/all`);
+    const j = await r.json();
+    state.all = j.links || [];
+    render();
+  } catch {
+    error.classList.remove("hidden");
+  }
+}
 
-          <div class="deal-card-body">
-            <h2 class="deal-title">${escapeHtml(link.title)}</h2>
+/* ---------------- EVENTS ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  renderCategories();
+  load();
 
-            <p class="deal-description">${escapeHtml(desc)}</p>
-            <span class="read-more-btn hidden">More</span>
+  document.getElementById("search-input").oninput =
+    e => (state.search = e.target.value, render());
 
-            <div class="price-row">
-              <div class="price-label">Best price on Amazon</div>
-              <div class="price-amount">${
-                price || "Price not available"
-              }</div>
-            </div>
+  document.getElementById("sort-select").onchange =
+    e => (state.sort = e.target.value, render());
+});
 
-            <div class="meta-row-card">
-              <span>${formatDate(link.createdAt)}</span>
-              <span>${link.clicks || 0} clicks</span>
-            </div>
-          </div>
+/* ---------------- MOBILE: READ MORE ---------------- */
+document.addEventListener("click", e => {
+  if (!e.target.classList.contains("read-more-btn")) return;
 
-          <footer class="deal-card-footer">
-            <button class="btn btn-primary" data-buy="${link.id}">
-              Buy on Amazon
-            </button>
-            <button class="btn btn-secondary" data-copy="${link.id}">
-              Copy link
-            </button>
-          </footer>
-        </article>
-      `;
-    }
-
-    function renderAll() {
-      applyFilters();
-      statsEl.textContent = `Showing ${state.filteredLinks.length} deal(s).`;
-      gridEl.innerHTML = state.filteredLinks
-        .map(buildCardHtml)
-        .join("");
-
-      wireButtons();
-      wireReadMore();
-    }
-
-    function wireButtons() {
-      gridEl.querySelectorAll("[data-buy]").forEach(btn => {
-        btn.onclick = () =>
-          window.open(`${API_BASE}/go/${btn.dataset.buy}`, "_blank");
-      });
-
-      gridEl.querySelectorAll("[data-copy]").forEach(btn => {
-        btn.onclick = async () => {
-          const url = `${location.origin}${API_BASE}/go/${btn.dataset.copy}`;
-          await navigator.clipboard.writeText(url);
-          btn.textContent = "Copied!";
-          setTimeout(() => (btn.textContent = "Copy link"), 1000);
-        };
-      });
-    }
-
-    function wireReadMore() {
-      if (window.innerWidth > 720) return;
-
-      gridEl.querySelectorAll(".deal-card").forEach(card => {
-        const desc = card.querySelector(".deal-description");
-        const btn = card.querySelector(".read-more-btn");
-
-        if (desc.scrollHeight > desc.clientHeight + 4) {
-          btn.classList.remove("hidden");
-        }
-      });
-    }
-
-    document.addEventListener("click", e => {
-      if (!e.target.classList.contains("read-more-btn")) return;
-      const desc = e.target.previousElementSibling;
-      desc.classList.toggle("expanded");
-      e.target.textContent = desc.classList.contains("expanded")
-        ? "Less"
-        : "More";
-    });
-
-    async function fetchLinks() {
-      try {
-        const res = await fetch(`${API_BASE}/all`);
-        const data = await res.json();
-        state.allLinks = data.links || [];
-        renderAll();
-      } catch {
-        errorEl.classList.remove("hidden");
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      renderCategoryPills();
-      fetchLinks();
-
-      searchInputEl.oninput = e => {
-        state.searchQuery = e.target.value;
-        renderAll();
-      };
-
-      sortSelectEl.onchange = e => {
-        state.sort = e.target.value;
-        renderAll();
-      };
-    });
-  </script>
+  const desc = e.target.previousElementSibling;
+  desc.classList.toggle("expanded");
+  e.target.textContent = desc.classList.contains("expanded") ? "Less" : "More";
+});
+</script>
 </body>
 </html>
