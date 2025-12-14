@@ -315,3 +315,43 @@ body {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* =========================
+   Mobile: Collapse long text
+   ========================= */
+
+@media (max-width: 720px) {
+
+  /* Title: max 2 lines */
+  .deal-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Description: max 3 lines by default */
+  .deal-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Expanded state */
+  .deal-description.expanded {
+    -webkit-line-clamp: unset;
+    display: block;
+  }
+
+  /* "More / Less" button */
+  .read-more-btn {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #ff9b4d;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+  }
+}
