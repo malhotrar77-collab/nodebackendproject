@@ -2,69 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>AlwaysOnSale – Deals</title>
+  <title>AlwaysOnSale – Store</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link rel="stylesheet" href="store.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-<header class="app-shell">
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div class="brand">
-      <span class="brand-dot"></span>
-      <span class="brand-text">ALWAYS ON SALE</span>
-    </div>
-
-    <nav class="nav">
-      <a class="active">Store</a>
-      <a href="/">Dashboard</a>
-    </nav>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <span>ALWAYS ON SALE</span>
   </div>
-
-  <!-- HERO -->
-  <section class="hero">
-    <h1>Today's hand-picked deals</h1>
-    <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
-    <span class="live">LIVE FROM ALWAYSonsale</span>
-  </section>
-
-  <!-- FILTERS -->
-  <section class="filters">
-    <div id="category-pills" class="pills"></div>
-
-    <div class="search-sort">
-      <input id="search-input" type="search" placeholder="Search products..." />
-      <select id="sort-select">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="clicks">Most clicks</option>
-      </select>
-    </div>
-  </section>
-
-  <!-- META -->
-  <section class="meta">
-    <span id="stats-text">Showing 0 deal(s).</span>
-    <span id="error-text" class="error hidden">
-      Could not load products.
-    </span>
-  </section>
-
-  <!-- GRID -->
-  <main id="deals-grid" class="grid"></main>
-
+  <nav>
+    <span class="active">Store</span>
+    <a href="/">Dashboard</a>
+  </nav>
 </header>
+
+<section class="hero">
+  <h1>Today's hand-picked deals</h1>
+  <p>Amazon engine. Instagram skin. Curated products with tracked links.</p>
+  <span class="live">LIVE FROM ALWAYSonsale</span>
+</section>
+
+<section class="filters">
+  <div id="category-pills" class="pills"></div>
+
+  <div class="search-sort">
+    <input id="search-input" type="search" placeholder="Search products…" />
+    <select id="sort-select">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="clicks">Most clicks</option>
+    </select>
+  </div>
+</section>
+
+<section class="meta">
+  <span id="stats-text">Loading deals…</span>
+  <span id="error-text" class="error hidden">Could not load products.</span>
+</section>
+
+<main id="deals-grid" class="grid"></main>
 
 <script>
 /* ================= CONFIG ================= */
 const API_BASE = "/api/links";
-
 const CATEGORIES = [
   "all","clothing","tshirts","shoes","bags",
   "electronics","jeans","laptops","home & living","other"
@@ -79,26 +67,26 @@ const state = {
 
 const grid = document.getElementById("deals-grid");
 const stats = document.getElementById("stats-text");
-const error = document.getElementById("error-text");
+const errorEl = document.getElementById("error-text");
 
 /* ================= HELPERS ================= */
-const esc = s => (s||"").replace(/[&<>"']/g,m=>({
+const esc = s => (s || "").replace(/[&<>"']/g, m => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",
   '"':"&quot;","'":"&#39;"
 }[m]));
 
-const dateFmt = d =>
+const formatDate = d =>
   new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
 
-/* ================= CATEGORIES ================= */
+/* ================= CATEGORY PILLS ================= */
 function renderCategories() {
   const el = document.getElementById("category-pills");
   el.innerHTML = "";
 
   CATEGORIES.forEach(c => {
     const b = document.createElement("button");
+    b.className = "pill" + (c === state.category ? " active" : "");
     b.textContent = c === "all" ? "All" : c.replace(/(^|\s)\S/g,l=>l.toUpperCase());
-    b.className = c === state.category ? "pill active" : "pill";
     b.onclick = () => { state.category = c; render(); };
     el.appendChild(b);
   });
@@ -106,29 +94,27 @@ function renderCategories() {
 
 /* ================= CARD ================= */
 function card(link) {
-  const desc =
-    link.longDescription || link.note ||
-    "A useful everyday product worth checking out.";
+  const desc = link.longDescription || link.note || "A useful everyday product.";
 
   return `
   <article class="card">
-    <div class="img-wrap">
+    <div class="image">
       <img src="${esc(link.imageUrl || "")}" alt="">
     </div>
 
-    <div class="card-body">
-      <h3 class="title">${esc(link.title)}</h3>
+    <div class="content">
+      <h3>${esc(link.title)}</h3>
 
       <p class="desc">${esc(desc)}</p>
-      <button class="more-btn">More</button>
+      <span class="toggle">More</span>
 
       <div class="price">
-        <span>Best price on Amazon</span>
+        <small>Best price on Amazon</small>
         <strong>₹${link.price || "—"}</strong>
       </div>
 
       <div class="meta-row">
-        <span>${dateFmt(link.createdAt)}</span>
+        <span>${formatDate(link.createdAt)}</span>
         <span>${link.clicks || 0} clicks</span>
       </div>
 
@@ -145,21 +131,20 @@ function render() {
   let list = [...state.all];
 
   if (state.category !== "all") {
-    list = list.filter(l => (l.category||"other") === state.category);
+    list = list.filter(l => (l.category || "other") === state.category);
   }
 
   if (state.search) {
     const q = state.search.toLowerCase();
-    list = list.filter(l => (l.title||"").toLowerCase().includes(q));
+    list = list.filter(l => (l.title || "").toLowerCase().includes(q));
   }
 
-  if (state.sort === "newest") {
+  if (state.sort === "newest")
     list.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  } else if (state.sort === "oldest") {
+  if (state.sort === "oldest")
     list.sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-  } else {
+  if (state.sort === "clicks")
     list.sort((a,b)=>(b.clicks||0)-(a.clicks||0));
-  }
 
   stats.textContent = `Showing ${list.length} deal(s).`;
   grid.innerHTML = list.map(card).join("");
@@ -168,16 +153,16 @@ function render() {
 
 /* ================= EVENTS ================= */
 function wire() {
-  grid.querySelectorAll(".more-btn").forEach(btn=>{
+  grid.querySelectorAll(".toggle").forEach(btn=>{
     btn.onclick = ()=>{
-      const d = btn.previousElementSibling;
-      d.classList.toggle("expanded");
-      btn.textContent = d.classList.contains("expanded") ? "Less" : "More";
+      const p = btn.previousElementSibling;
+      p.classList.toggle("expanded");
+      btn.textContent = p.classList.contains("expanded") ? "Less" : "More";
     };
   });
 
   grid.querySelectorAll(".buy").forEach(b=>{
-    b.onclick = ()=> window.open(`${API_BASE}/go/${b.dataset.id}`,"_blank");
+    b.onclick = ()=>window.open(`${API_BASE}/go/${b.dataset.id}`,"_blank");
   });
 
   grid.querySelectorAll(".copy").forEach(b=>{
@@ -194,12 +179,13 @@ function wire() {
 /* ================= LOAD ================= */
 async function load() {
   try {
+    errorEl.classList.add("hidden");
     const r = await fetch(`${API_BASE}/all`);
     const j = await r.json();
     state.all = j.links || [];
     render();
   } catch {
-    error.classList.remove("hidden");
+    errorEl.classList.remove("hidden");
   }
 }
 
@@ -207,6 +193,7 @@ document.getElementById("search-input").oninput = e=>{
   state.search = e.target.value;
   render();
 };
+
 document.getElementById("sort-select").onchange = e=>{
   state.sort = e.target.value;
   render();
@@ -215,5 +202,6 @@ document.getElementById("sort-select").onchange = e=>{
 renderCategories();
 load();
 </script>
+
 </body>
 </html>
