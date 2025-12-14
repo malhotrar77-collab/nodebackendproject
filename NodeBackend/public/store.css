@@ -1,6 +1,6 @@
 /* =========================
-   RESET & ROOT
-========================= */
+   Global
+   ========================= */
 
 *,
 *::before,
@@ -10,319 +10,204 @@
 
 :root {
   --bg-body: #050815;
-  --bg-shell: #050815;
   --bg-card: #0b1020;
-  --bg-card-hover: #12183a;
-
-  --border-soft: rgba(120, 130, 180, 0.25);
-  --border-focus: rgba(255, 120, 150, 0.7);
 
   --text-main: #f5f7ff;
   --text-subtle: #a3afcc;
-  --text-muted: #7c86a8;
+  --text-muted: #7781a3;
 
   --brand-from: #ff6b6b;
   --brand-to: #ff9b4d;
 
-  --pill-bg: #12192e;
-  --pill-active-bg: linear-gradient(135deg, #ff6b6b, #ff9b4d);
-
-  --btn-primary-bg: linear-gradient(135deg, #ff6b6b, #ff9b4d);
-  --btn-secondary-bg: #1a2340;
+  --btn-secondary-bg: #171f33;
+  --btn-secondary-text: #e0e5ff;
 
   --radius-card: 22px;
   --radius-pill: 999px;
 
-  --shadow-card: 0 14px 32px rgba(0, 0, 0, 0.55);
-  --shadow-hover: 0 18px 45px rgba(255, 120, 120, 0.45);
-
-  --transition: 0.22s ease;
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 0 1px rgba(255, 120, 160, 0.4),
+    0 18px 45px rgba(255, 85, 135, 0.55);
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  min-height: 100%;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  background: radial-gradient(circle at top, #12172b 0%, #050815 55%);
+  font-family: Inter, system-ui, sans-serif;
+  background: radial-gradient(circle at top, #12172b 0, #050815 55%);
   color: var(--text-main);
 }
 
 /* =========================
-   LAYOUT
-========================= */
+   Layout
+   ========================= */
 
 .store-shell {
-  width: 100%;
   max-width: 1200px;
-  padding: 18px 14px 32px;
-  margin: 0 auto;
+  margin: auto;
+  padding: 18px 14px 40px;
 }
 
 /* =========================
-   TOP BAR
-========================= */
-
-.store-topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.brand-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #ff6b6b, #10162c);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6);
-}
-
-.brand-pill span {
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  font-weight: 700;
-  color: white;
-}
-
-.store-nav {
-  display: flex;
-  gap: 10px;
-}
-
-.nav-link {
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  text-decoration: none;
-  font-size: 13px;
-  color: var(--text-subtle);
-  background: rgba(15, 20, 45, 0.6);
-  transition: var(--transition);
-}
-
-.nav-link:hover {
-  color: white;
-}
-
-.nav-link-active {
-  background: var(--btn-primary-bg);
-  color: white;
-}
-
-/* =========================
-   HERO
-========================= */
+   Hero
+   ========================= */
 
 .hero-card {
-  padding: 22px;
+  background: radial-gradient(circle at top, #151b3b, #050815 70%);
   border-radius: 26px;
-  background: radial-gradient(circle at top, #151b3b, #060918);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9);
-  margin-bottom: 18px;
+  padding: 22px;
+  box-shadow: var(--shadow-soft);
 }
 
 .hero-card h1 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 26px;
 }
 
 .hero-card p {
   margin: 0;
-  font-size: 13px;
   color: var(--text-subtle);
+  font-size: 14px;
 }
 
 /* =========================
-   FILTERS
-========================= */
+   Filters
+   ========================= */
 
 .category-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-top: 18px;
 }
 
 .pill {
   padding: 7px 14px;
   border-radius: var(--radius-pill);
-  font-size: 13px;
-  background: var(--pill-bg);
+  background: #12192e;
   color: var(--text-subtle);
-  border: 1px solid var(--border-soft);
+  border: 1px solid rgba(150, 160, 210, 0.3);
   cursor: pointer;
-  transition: var(--transition);
-}
-
-.pill:hover {
-  color: white;
+  font-size: 13px;
 }
 
 .pill-active {
-  background: var(--pill-active-bg);
-  color: white;
-  border: none;
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  color: #fff;
 }
 
 /* =========================
-   SEARCH & SORT
-========================= */
-
-.search-sort-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.search-wrapper input,
-#sort-select {
-  width: 100%;
-  padding: 9px 14px;
-  border-radius: var(--radius-pill);
-  background: #0a0f25;
-  border: 1px solid var(--border-soft);
-  color: white;
-  font-size: 13px;
-}
-
-/* =========================
-   GRID (IMPORTANT)
-========================= */
+   Grid
+   ========================= */
 
 .deals-grid {
+  margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 /* =========================
-   DEAL CARD
-========================= */
+   Cards
+   ========================= */
 
 .deal-card {
-  background: radial-gradient(circle at top, #12172b, #050815);
+  background: radial-gradient(circle at top, #12172b, #050815 70%);
   border-radius: var(--radius-card);
-  padding: 12px;
-  border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-card);
+  padding: 14px;
+  box-shadow: var(--shadow-soft);
   display: flex;
   flex-direction: column;
-  transition: var(--transition);
 }
 
 .deal-card:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-focus);
-  box-shadow: var(--shadow-hover);
+  box-shadow: var(--shadow-glow);
 }
 
 .deal-card-image {
-  border-radius: 16px;
+  height: 190px;
   background: #050815;
-  overflow: hidden;
-  height: 170px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 10px;
+  overflow: hidden;
 }
 
 .deal-card-image img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 
 /* =========================
-   CARD TEXT
-========================= */
+   Text
+   ========================= */
 
 .deal-title {
   font-size: 14px;
   font-weight: 600;
-  margin: 0 0 4px;
+  margin: 10px 0 4px;
 }
 
 .deal-description {
   font-size: 12px;
   color: var(--text-subtle);
   line-height: 1.45;
-  margin-bottom: 8px;
 }
 
 /* =========================
-   PRICE
-========================= */
+   Price & Meta
+   ========================= */
 
-.price-label {
-  font-size: 11px;
-  color: #ffd4a8;
-  text-transform: uppercase;
-}
-
-.price-amount {
-  font-size: 15px;
+.price {
+  margin-top: 8px;
   font-weight: 600;
   color: #ffd369;
 }
 
-/* =========================
-   CARD FOOTER
-========================= */
+.meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
 
-.deal-card-footer {
+/* =========================
+   Buttons
+   ========================= */
+
+.card-actions {
+  margin-top: auto;
   display: flex;
   gap: 8px;
-  margin-top: auto;
 }
 
 .btn {
   flex: 1;
+  border-radius: var(--radius-pill);
   padding: 9px;
   font-size: 13px;
-  border-radius: var(--radius-pill);
-  border: none;
   cursor: pointer;
+  border: none;
 }
 
 .btn-primary {
-  background: var(--btn-primary-bg);
-  color: white;
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  color: #fff;
 }
 
 .btn-secondary {
   background: var(--btn-secondary-bg);
-  color: white;
-  border: 1px solid var(--border-soft);
+  color: var(--btn-secondary-text);
+  border: 1px solid rgba(150, 160, 210, 0.4);
 }
 
 /* =========================
-   RESPONSIVE
-========================= */
-
-@media (min-width: 720px) {
-  .deals-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .deals-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-/* =========================
-   Mobile: Collapse long text
+   Mobile: Collapse text
    ========================= */
 
 @media (max-width: 720px) {
-
-  /* Title: max 2 lines */
   .deal-title {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -330,28 +215,21 @@ body {
     overflow: hidden;
   }
 
-  /* Description: max 3 lines by default */
   .deal-description {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    position: relative;
   }
 
-  /* Expanded state */
   .deal-description.expanded {
-    -webkit-line-clamp: unset;
     display: block;
   }
 
-  /* "More / Less" button */
   .read-more-btn {
-    margin-top: 4px;
     font-size: 12px;
     color: #ff9b4d;
+    margin-top: 4px;
     cursor: pointer;
-    user-select: none;
-    font-weight: 500;
   }
 }
