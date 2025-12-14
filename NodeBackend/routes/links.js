@@ -1,3 +1,4 @@
+// NodeBackend/routes/links.js
 const express = require("express");
 const axios = require("axios");
 const dayjs = require("dayjs");
@@ -6,24 +7,26 @@ const { scrapeAmazonProduct } = require("../scrapers/amazon");
 
 const router = express.Router();
 
-/* =========================
-   OpenAI (optional)
-========================= */
+/* ===============================
+   OpenAI (optional, safe)
+================================ */
 let openai = null;
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 if (OPENAI_KEY) {
   try {
     const { OpenAI } = require("openai");
     openai = new OpenAI({ apiKey: OPENAI_KEY });
-    console.log("OpenAI ready");
+    console.log("✅ OpenAI ready");
   } catch (e) {
-    console.warn("OpenAI failed:", e.message);
+    console.warn("⚠️ OpenAI failed:", e.message);
   }
+} else {
+  console.warn("⚠️ OPENAI_API_KEY missing – AI rewrite disabled.");
 }
 
-/* =========================
+/* ===============================
    Helpers
-========================= */
+================================ */
 function generateId(len = 5) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
@@ -46,83 +49,120 @@ async function resolveAmazonUrl(url) {
   if (!url) return null;
   try {
     const head = await axios.head(url, { maxRedirects: 5, timeout: 10000 });
-    return stripAmazonTracking(
-      head.request?.res?.responseUrl || url
-    );
+    const final =
+      head.request?.res?.responseUrl ||
+      head.headers?.location ||
+      url;
+    return stripAmazonTracking(final);
   } catch {
     return stripAmazonTracking(url);
   }
 }
 
-function parsePriceValue(priceRaw) {
-  if (!priceRaw) return { parsed: null, currency: null };
-  const cleaned = priceRaw.replace(/[^\d.,]/g, "").replace(/,/g, "");
-  const parsed = parseFloat(cleaned);
-  return Number.isFinite(parsed) ? { parsed, currency: "INR" } : { parsed: null, currency: null };
+function parsePriceValue(raw) {
+  if (!raw) return { parsed: null, currency: null };
+  const cleaned = raw.toString().replace(/[^\d.,₹$]/g, "");
+  const currency = raw.includes("₹") ? "INR" : raw.includes("$") ? "USD" : null;
+  const num = parseFloat(cleaned.replace(/,/g, ""));
+  return Number.isFinite(num) ? { parsed: num, currency } : { parsed: null, currency };
 }
 
-/* =========================
-   Affiliate
-========================= */
+/* ===============================
+   AI Rewrite (optional)
+================================ */
+async function rewriteWithAI({ title, shortDescription, longDescription }) {
+  if (!openai) return null;
+
+  try {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an ecommerce copywriter. Respond ONLY with JSON {title, short, description}",
+        },
+        {
+          role: "user",
+          content: `Title: ${title}\nShort: ${shortDescription}\nLong: ${longDescription}`,
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 300,
+    });
+
+    return JSON.parse(res.choices[0].message.content);
+  } catch (err) {
+    console.error("AI rewrite failed:", err.message);
+    return null;
+  }
+}
+
+/* ===============================
+   Affiliate URL
+================================ */
 const AMAZON_TAG = process.env.AMAZON_TAG || null;
+
 function buildAffiliateUrl(url) {
   if (!url || !AMAZON_TAG) return url;
   if (url.includes("tag=")) return url;
-  return url + (url.includes("?") ? "&" : "?") + `tag=${AMAZON_TAG}`;
+  return `${url}${url.includes("?") ? "&" : "?"}tag=${AMAZON_TAG}`;
 }
 
-/* =========================
-   CREATE (Amazon)
-========================= */
-async function createAmazonLink({ originalUrl, title, category, note, autoTitle = true }) {
-  const id = generateId();
-  let scraped = null;
+/* ===============================
+   Core Create Logic
+================================ */
+async function createAmazonLink({ originalUrl, title, category, note }) {
+  const scraped = await scrapeAmazonProduct(originalUrl);
 
-  try {
-    scraped = autoTitle ? await scrapeAmazonProduct(originalUrl) : null;
-  } catch (e) {
-    console.error("Scrape failed:", e.message);
-  }
+  const ai = openai
+    ? await rewriteWithAI({
+        title: scraped.title,
+        shortDescription: scraped.shortDescription,
+        longDescription: scraped.longDescription,
+      })
+    : null;
 
-  const finalUrl = scraped?.finalUrl || (await resolveAmazonUrl(originalUrl));
-  const priceParsed = scraped?.priceText ? parsePriceValue(scraped.priceText) : {};
+  const priceParsed = parsePriceValue(scraped.priceText);
 
-  const doc = {
-    id,
+  return Link.create({
+    id: generateId(),
     source: "amazon",
-    title: title || scraped?.title || "Amazon Product",
-    shortTitle: (scraped?.title || "").slice(0, 80),
+    title: ai?.title || scraped.title || "Amazon Product",
+    shortTitle:
+      ai?.short ||
+      (scraped.title?.length > 80
+        ? scraped.title.slice(0, 77) + "…"
+        : scraped.title),
     category: category || "other",
     note: note || "",
-    originalUrl: finalUrl,
-    rawOriginalUrl: originalUrl,
-    affiliateUrl: buildAffiliateUrl(finalUrl),
-    tag: AMAZON_TAG || undefined,
-    imageUrl: scraped?.imageUrl,
-    images: scraped?.images,
-    price: scraped?.price || priceParsed.parsed,
+    originalUrl: stripAmazonTracking(originalUrl),
+    affiliateUrl: buildAffiliateUrl(stripAmazonTracking(originalUrl)),
+    imageUrl: scraped.imageUrl,
+    images: scraped.images || [],
+    price: scraped.price || priceParsed.parsed,
     priceCurrency: priceParsed.currency,
-    rating: scraped?.rating,
-    reviewsCount: scraped?.reviewsCount,
-    shortDescription: scraped?.shortDescription,
-    longDescription: scraped?.longDescription,
-    isActive: true,
+    shortDescription: ai?.short || scraped.shortDescription,
+    longDescription: ai?.description || scraped.longDescription,
+    rating: scraped.rating,
+    reviewsCount: scraped.reviewsCount,
     clicks: 0,
+    isActive: true,
     lastCheckedAt: new Date(),
-  };
-
-  return await Link.create(doc);
+  });
 }
 
-/* =========================
+/* ===============================
    ROUTES
-========================= */
+================================ */
 
-router.get("/test", (req, res) => {
-  res.json({ success: true });
+// Health check
+router.get("/test", (_, res) => {
+  res.json({ success: true, message: "Links API OK" });
 });
 
-router.get("/all", async (req, res) => {
+// Get all links
+router.get("/all", async (_, res) => {
   try {
     const links = await Link.find().sort({ createdAt: -1 }).lean();
     res.json({ success: true, links });
@@ -131,6 +171,7 @@ router.get("/all", async (req, res) => {
   }
 });
 
+// Create one
 router.post("/create", async (req, res) => {
   try {
     const link = await createAmazonLink(req.body);
@@ -140,18 +181,14 @@ router.post("/create", async (req, res) => {
   }
 });
 
-router.post("/bulk1", async (req, res) => {
-  const lines = (req.body.urlsText || "").split("\n").map(l => l.trim()).filter(Boolean);
-  const created = [];
-  for (const url of lines) {
-    try {
-      const doc = await createAmazonLink({ originalUrl: url });
-      created.push(doc);
-    } catch {}
-  }
-  res.json({ success: true, created });
+// Delete
+router.delete("/delete/:id", async (req, res) => {
+  const deleted = await Link.findOneAndDelete({ id: req.params.id });
+  if (!deleted) return res.status(404).json({ success: false });
+  res.json({ success: true });
 });
 
+// Go + click count
 router.get("/go/:id", async (req, res) => {
   const link = await Link.findOneAndUpdate(
     { id: req.params.id },
@@ -162,41 +199,53 @@ router.get("/go/:id", async (req, res) => {
   res.redirect(link.affiliateUrl || link.originalUrl);
 });
 
-/* =========================
-   🔧 MAINTENANCE: REFRESH ALL
-========================= */
-router.post("/refresh-all", async (req, res) => {
-  console.log("🔄 CPM Maintenance: refresh-all started");
+/* ===============================
+   🔥 MAINTENANCE ROUTE
+   Refresh ALL products
+================================ */
+router.post("/refresh-all", async (_, res) => {
+  try {
+    const links = await Link.find({ isActive: true });
+    let updated = 0;
+    let failed = 0;
 
-  const links = await Link.find({});
-  let updated = 0;
-  let failed = 0;
+    for (const link of links) {
+      try {
+        const scraped = await scrapeAmazonProduct(link.originalUrl);
 
-  for (const link of links) {
-    try {
-      const scraped = await scrapeAmazonProduct(link.originalUrl);
-      if (!scraped) throw new Error("No scrape data");
+        await Link.updateOne(
+          { _id: link._id },
+          {
+            title: scraped.title || link.title,
+            price: scraped.price || link.price,
+            imageUrl: scraped.imageUrl || link.imageUrl,
+            shortDescription: scraped.shortDescription || link.shortDescription,
+            longDescription: scraped.longDescription || link.longDescription,
+            lastCheckedAt: new Date(),
+            lastError: undefined,
+          }
+        );
 
-      link.title = scraped.title || link.title;
-      link.price = scraped.price || link.price;
-      link.imageUrl = scraped.imageUrl || link.imageUrl;
-      link.images = scraped.images || link.images;
-      link.shortDescription = scraped.shortDescription || link.shortDescription;
-      link.longDescription = scraped.longDescription || link.longDescription;
-      link.lastCheckedAt = new Date();
-      link.lastError = undefined;
-
-      await link.save();
-      updated++;
-    } catch (e) {
-      link.lastError = e.message;
-      await link.save();
-      failed++;
+        updated++;
+      } catch (err) {
+        failed++;
+        await Link.updateOne(
+          { _id: link._id },
+          { lastCheckedAt: new Date(), lastError: err.message }
+        );
+      }
     }
-  }
 
-  console.log(`✅ Maintenance done: ${updated} updated, ${failed} failed`);
-  res.json({ success: true, updated, failed });
+    res.json({
+      success: true,
+      total: links.length,
+      updated,
+      failed,
+    });
+  } catch (err) {
+    console.error("Refresh-all error:", err);
+    res.status(500).json({ success: false });
+  }
 });
 
 module.exports = router;
