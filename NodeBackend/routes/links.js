@@ -1,27 +1,27 @@
 // NodeBackend/routes/links.js
 const express = require("express");
 const axios = require("axios");
-const dayjs = require("dayjs");
 const Link = require("../models/link");
 const { scrapeAmazonProduct } = require("../scrapers/amazon");
 
 const router = express.Router();
 
 /* ===============================
-   OpenAI (optional, safe)
+   OpenAI (DO NOT TOUCH LOGIC)
 ================================ */
 let openai = null;
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+
 if (OPENAI_KEY) {
   try {
     const { OpenAI } = require("openai");
     openai = new OpenAI({ apiKey: OPENAI_KEY });
     console.log("✅ OpenAI ready");
   } catch (e) {
-    console.warn("⚠️ OpenAI failed:", e.message);
+    console.warn("⚠️ OpenAI init failed:", e.message);
   }
 } else {
-  console.warn("⚠️ OPENAI_API_KEY missing – AI rewrite disabled.");
+  console.warn("⚠️ OPENAI_API_KEY missing – AI disabled");
 }
 
 /* ===============================
@@ -45,30 +45,14 @@ function stripAmazonTracking(url) {
   }
 }
 
-async function resolveAmazonUrl(url) {
-  if (!url) return null;
-  try {
-    const head = await axios.head(url, { maxRedirects: 5, timeout: 10000 });
-    const final =
-      head.request?.res?.responseUrl ||
-      head.headers?.location ||
-      url;
-    return stripAmazonTracking(final);
-  } catch {
-    return stripAmazonTracking(url);
-  }
-}
-
 function parsePriceValue(raw) {
-  if (!raw) return { parsed: null, currency: null };
-  const cleaned = raw.toString().replace(/[^\d.,₹$]/g, "");
-  const currency = raw.includes("₹") ? "INR" : raw.includes("$") ? "USD" : null;
-  const num = parseFloat(cleaned.replace(/,/g, ""));
-  return Number.isFinite(num) ? { parsed: num, currency } : { parsed: null, currency };
+  if (!raw) return null;
+  const num = parseFloat(raw.toString().replace(/[^\d.]/g, ""));
+  return Number.isFinite(num) ? num : null;
 }
 
 /* ===============================
-   AI Rewrite (optional)
+   AI Rewrite (UNCHANGED LOGIC)
 ================================ */
 async function rewriteWithAI({ title, shortDescription, longDescription }) {
   if (!openai) return null;
@@ -80,11 +64,21 @@ async function rewriteWithAI({ title, shortDescription, longDescription }) {
         {
           role: "system",
           content:
-            "You are an ecommerce copywriter. Respond ONLY with JSON {title, short, description}",
+            "You are an ecommerce SEO copywriter. Return ONLY JSON with keys: short, description",
         },
         {
           role: "user",
-          content: `Title: ${title}\nShort: ${shortDescription}\nLong: ${longDescription}`,
+          content: `
+Original title: ${title}
+Original short description: ${shortDescription}
+Original long description: ${longDescription}
+
+Rewrite both descriptions to be:
+- SEO friendly
+- Human readable
+- Unique
+- Not promotional spam
+`,
         },
       ],
       response_format: { type: "json_object" },
@@ -109,43 +103,70 @@ function buildAffiliateUrl(url) {
   return `${url}${url.includes("?") ? "&" : "?"}tag=${AMAZON_TAG}`;
 }
 
-/* ===============================
-   Core Create Logic
-================================ */
-async function createAmazonLink({ originalUrl, title, category, note }) {
+/* ======================================================
+   🔥 createAmazonLink() — IMPORTANT PART
+====================================================== */
+async function createAmazonLink({ originalUrl, category, note }) {
+  if (!originalUrl) throw new Error("originalUrl required");
+
   const scraped = await scrapeAmazonProduct(originalUrl);
 
-  const ai = openai
-    ? await rewriteWithAI({
-        title: scraped.title,
-        shortDescription: scraped.shortDescription,
-        longDescription: scraped.longDescription,
-      })
-    : null;
+  let shortDesc = scraped.shortDescription || "";
+  let longDesc = scraped.longDescription || "";
 
-  const priceParsed = parsePriceValue(scraped.priceText);
+  /* ---------- AI USAGE DECISION ---------- */
+  let useAI = false;
+
+  if (
+    openai &&
+    (
+      shortDesc.length < 40 ||
+      longDesc.length < 120 ||
+      /useful|simple|great|perfect/i.test(shortDesc)
+    )
+  ) {
+    useAI = true;
+  }
+
+  let ai = null;
+  if (useAI) {
+    ai = await rewriteWithAI({
+      title: scraped.title,
+      shortDescription: shortDesc,
+      longDescription: longDesc,
+    });
+  }
 
   return Link.create({
     id: generateId(),
     source: "amazon",
-    title: ai?.title || scraped.title || "Amazon Product",
-    shortTitle:
-      ai?.short ||
-      (scraped.title?.length > 80
-        ? scraped.title.slice(0, 77) + "…"
-        : scraped.title),
+    title: scraped.title || "Amazon Product",
     category: category || "other",
     note: note || "",
+
     originalUrl: stripAmazonTracking(originalUrl),
     affiliateUrl: buildAffiliateUrl(stripAmazonTracking(originalUrl)),
+
     imageUrl: scraped.imageUrl,
-    images: scraped.images || [],
-    price: scraped.price || priceParsed.parsed,
-    priceCurrency: priceParsed.currency,
-    shortDescription: ai?.short || scraped.shortDescription,
-    longDescription: ai?.description || scraped.longDescription,
+    images: scraped.images || [scraped.imageUrl],
+
+    price: scraped.price || parsePriceValue(scraped.priceText),
+    priceCurrency: scraped.priceCurrency || "INR",
+
+    /* ✅ UNIQUE DESCRIPTIONS */
+    shortDescription:
+      ai?.short ||
+      shortDesc ||
+      "A practical product selected for everyday use.",
+
+    longDescription:
+      ai?.description ||
+      longDesc ||
+      "This product is carefully selected based on quality, usability, and value for money.",
+
     rating: scraped.rating,
     reviewsCount: scraped.reviewsCount,
+
     clicks: 0,
     isActive: true,
     lastCheckedAt: new Date(),
@@ -156,22 +177,18 @@ async function createAmazonLink({ originalUrl, title, category, note }) {
    ROUTES
 ================================ */
 
-// Health check
-router.get("/test", (_, res) => {
-  res.json({ success: true, message: "Links API OK" });
-});
+// Health
+router.get("/test", (_, res) =>
+  res.json({ success: true, message: "Links API OK" })
+);
 
-// Get all links
+// All
 router.get("/all", async (_, res) => {
-  try {
-    const links = await Link.find().sort({ createdAt: -1 }).lean();
-    res.json({ success: true, links });
-  } catch (e) {
-    res.status(500).json({ success: false });
-  }
+  const links = await Link.find().sort({ createdAt: -1 }).lean();
+  res.json({ success: true, links });
 });
 
-// Create one
+// Create
 router.post("/create", async (req, res) => {
   try {
     const link = await createAmazonLink(req.body);
@@ -199,53 +216,43 @@ router.get("/go/:id", async (req, res) => {
   res.redirect(link.affiliateUrl || link.originalUrl);
 });
 
-/* ===============================
-   🔥 MAINTENANCE ROUTE
-   Refresh ALL products
-================================ */
+/* ======================================================
+   🔥 /refresh-all — DO NOT TOUCH AI CONTENT
+====================================================== */
 router.post("/refresh-all", async (_, res) => {
-  try {
-    const links = await Link.find({ isActive: true });
-    let updated = 0;
-    let failed = 0;
+  const links = await Link.find({ isActive: true });
+  let updated = 0;
+  let failed = 0;
 
-    for (const link of links) {
-      try {
-        const scraped = await scrapeAmazonProduct(link.originalUrl);
+  for (const link of links) {
+    try {
+      const scraped = await scrapeAmazonProduct(link.originalUrl);
 
-        await Link.updateOne(
-          { _id: link._id },
-          {
-            title: scraped.title || link.title,
-            price: scraped.price || link.price,
-            imageUrl: scraped.imageUrl || link.imageUrl,
-            shortDescription: scraped.shortDescription || link.shortDescription,
-            longDescription: scraped.longDescription || link.longDescription,
-            lastCheckedAt: new Date(),
-            lastError: undefined,
-          }
-        );
+      await Link.updateOne(
+        { _id: link._id },
+        {
+          title: scraped.title || link.title,
+          price: scraped.price || link.price,
+          imageUrl: scraped.imageUrl || link.imageUrl,
+          images: scraped.images || link.images,
+          rating: scraped.rating || link.rating,
+          reviewsCount: scraped.reviewsCount || link.reviewsCount,
+          lastCheckedAt: new Date(),
+        }
+      );
 
-        updated++;
-      } catch (err) {
-        failed++;
-        await Link.updateOne(
-          { _id: link._id },
-          { lastCheckedAt: new Date(), lastError: err.message }
-        );
-      }
+      updated++;
+    } catch (err) {
+      failed++;
     }
-
-    res.json({
-      success: true,
-      total: links.length,
-      updated,
-      failed,
-    });
-  } catch (err) {
-    console.error("Refresh-all error:", err);
-    res.status(500).json({ success: false });
   }
+
+  res.json({
+    success: true,
+    total: links.length,
+    updated,
+    failed,
+  });
 });
 
 module.exports = router;
