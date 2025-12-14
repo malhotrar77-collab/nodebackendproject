@@ -8,23 +8,21 @@
   <link rel="stylesheet" href="store.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-    rel="stylesheet"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
 
 <body>
-<header class="app">
+<header class="app-shell">
 
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="brand">
       <span class="brand-dot"></span>
-      <span>ALWAYS ON SALE</span>
+      <span class="brand-text">ALWAYS ON SALE</span>
     </div>
+
     <nav class="nav">
-      <span class="nav-active">Store</span>
+      <a class="active">Store</a>
       <a href="/">Dashboard</a>
     </nav>
   </div>
@@ -32,11 +30,8 @@
   <!-- HERO -->
   <section class="hero">
     <h1>Today's hand-picked deals</h1>
-    <p>
-      Amazon engine, Instagram skin.<br />
-      Curated products with tracked links.
-    </p>
-    <span class="live-pill">LIVE FROM ALWAYSonsale</span>
+    <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
+    <span class="live">LIVE FROM ALWAYSonsale</span>
   </section>
 
   <!-- FILTERS -->
@@ -44,26 +39,22 @@
     <div id="category-pills" class="pills"></div>
 
     <div class="search-sort">
-      <input
-        id="search-input"
-        type="search"
-        placeholder="Search products..."
-      />
+      <input id="search-input" type="search" placeholder="Search products..." />
       <select id="sort-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
-        <option value="clicks-desc">Most clicks</option>
+        <option value="clicks">Most clicks</option>
       </select>
     </div>
   </section>
 
   <!-- META -->
-  <div class="meta">
+  <section class="meta">
     <span id="stats-text">Showing 0 deal(s).</span>
     <span id="error-text" class="error hidden">
       Could not load products.
     </span>
-  </div>
+  </section>
 
   <!-- GRID -->
   <main id="deals-grid" class="grid"></main>
@@ -97,7 +88,7 @@ const esc = s => (s||"").replace(/[&<>"']/g,m=>({
 }[m]));
 
 const dateFmt = d =>
-  d ? new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
+  new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
 
 /* ================= CATEGORIES ================= */
 function renderCategories() {
@@ -122,16 +113,14 @@ function card(link) {
   return `
   <article class="card">
     <div class="img-wrap">
-      ${link.imageUrl ? `<img src="${esc(link.imageUrl)}" />` : `<div class="no-img">No image</div>`}
+      <img src="${esc(link.imageUrl || "")}" alt="">
     </div>
 
     <div class="card-body">
-      <h3>${esc(link.title || "Product")}</h3>
+      <h3 class="title">${esc(link.title)}</h3>
 
-      <p class="desc">
-        ${esc(desc)}
-      </p>
-      <button class="toggle">More</button>
+      <p class="desc">${esc(desc)}</p>
+      <button class="more-btn">More</button>
 
       <div class="price">
         <span>Best price on Amazon</span>
@@ -142,11 +131,11 @@ function card(link) {
         <span>${dateFmt(link.createdAt)}</span>
         <span>${link.clicks || 0} clicks</span>
       </div>
-    </div>
 
-    <div class="actions">
-      <button class="buy" data-id="${link.id}">Buy</button>
-      <button class="copy" data-id="${link.id}">Copy</button>
+      <div class="actions">
+        <button class="buy" data-id="${link.id}">Buy</button>
+        <button class="copy" data-id="${link.id}">Copy</button>
+      </div>
     </div>
   </article>`;
 }
@@ -179,11 +168,11 @@ function render() {
 
 /* ================= EVENTS ================= */
 function wire() {
-  grid.querySelectorAll(".toggle").forEach(btn=>{
+  grid.querySelectorAll(".more-btn").forEach(btn=>{
     btn.onclick = ()=>{
-      const p = btn.previousElementSibling;
-      p.classList.toggle("expanded");
-      btn.textContent = p.classList.contains("expanded") ? "Less" : "More";
+      const d = btn.previousElementSibling;
+      d.classList.toggle("expanded");
+      btn.textContent = d.classList.contains("expanded") ? "Less" : "More";
     };
   });
 
