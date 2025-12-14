@@ -12,7 +12,7 @@
 </head>
 
 <body>
-<header class="app-shell">
+<header class="app">
 
   <!-- TOP BAR -->
   <div class="topbar">
@@ -23,13 +23,13 @@
 
     <nav class="nav">
       <a class="active">Store</a>
-      <a href="/">Dashboard (admin)</a>
+      <a href="/">Dashboard</a>
     </nav>
   </div>
 
   <!-- HERO -->
   <section class="hero">
-    <h1>Today's hand-picked deals</h1>
+    <h1>Today’s hand-picked deals</h1>
     <p>Amazon engine, Instagram skin. Curated products with tracked links.</p>
     <span class="live">LIVE FROM ALWAYSonsale</span>
   </section>
@@ -39,7 +39,7 @@
     <div id="category-pills" class="pills"></div>
 
     <div class="search-sort">
-      <input id="search-input" type="search" placeholder="Search products..." />
+      <input id="search-input" type="search" placeholder="Search products…" />
       <select id="sort-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
@@ -52,7 +52,7 @@
   <section class="meta">
     <span id="stats-text">Showing 0 deal(s).</span>
     <span id="error-text" class="error hidden">
-      Could not load products. Please try again.
+      Could not load products.
     </span>
   </section>
 
@@ -72,7 +72,6 @@ const CATEGORIES = [
 
 const state = {
   all: [],
-  filtered: [],
   category: "all",
   search: "",
   sort: "newest"
@@ -95,7 +94,6 @@ const dateFmt = d =>
 function renderCategories() {
   const el = document.getElementById("category-pills");
   el.innerHTML = "";
-
   CATEGORIES.forEach(c => {
     const b = document.createElement("button");
     b.textContent = c === "all" ? "All" : c.replace(/(^|\s)\S/g,l=>l.toUpperCase());
@@ -120,7 +118,7 @@ function card(link) {
     <h3 class="title">${esc(link.title)}</h3>
 
     <p class="desc">${esc(desc)}</p>
-    <button class="read-more-btn">More</button>
+    <button class="more-btn">More</button>
 
     <div class="price">
       <small>Best price on Amazon</small>
@@ -160,16 +158,14 @@ function render() {
     list.sort((a,b)=>(b.clicks||0)-(a.clicks||0));
   }
 
-  state.filtered = list;
   stats.textContent = `Showing ${list.length} deal(s).`;
   grid.innerHTML = list.map(card).join("");
-
   wire();
 }
 
 /* ================= EVENTS ================= */
 function wire() {
-  grid.querySelectorAll(".read-more-btn").forEach(btn=>{
+  grid.querySelectorAll(".more-btn").forEach(btn=>{
     btn.onclick = ()=>{
       const d = btn.previousElementSibling;
       d.classList.toggle("expanded");
