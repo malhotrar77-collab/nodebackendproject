@@ -1,4 +1,3 @@
-first models/links.js
 // NodeBackend/models/link.js
 const mongoose = require("mongoose");
 
