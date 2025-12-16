@@ -3,6 +3,11 @@ const express = require("express");
 const axios = require("axios");
 const Link = require("../models/link");
 const { scrapeAmazonProduct } = require("../scrapers/amazon");
+const {
+  TAXONOMY,
+  isValidCategory,
+  isValidSubcategory,
+} = require("../taxonomy/categories");
 
 const router = express.Router();
 
@@ -51,6 +56,60 @@ function isPoorText(txt) {
 }
 
 /* ===============================
+   CATEGORY RESOLVER (CORE)
+================================ */
+
+function resolveCategory({ categoryPath = [], topCategory = "", title = "" }) {
+  const text = [...categoryPath, topCategory, title]
+    .join(" ")
+    .toLowerCase();
+
+  // ---- Electronics ----
+  if (/headphone|earbud|speaker|audio/.test(text))
+    return ["electronics", "audio"];
+
+  if (/laptop|computer|keyboard|mouse|monitor/.test(text))
+    return ["electronics", "computers"];
+
+  if (/smart watch|fitness band|wearable/.test(text))
+    return ["electronics", "wearables"];
+
+  if (/router|wifi|network/.test(text))
+    return ["electronics", "networking"];
+
+  // ---- Fashion ----
+  if (/shoe|sneaker|footwear/.test(text))
+    return ["fashion", "footwear"];
+
+  if (/shirt|t-shirt|jeans|trouser|clothing/.test(text))
+    return ["fashion", "clothing"];
+
+  if (/bag|backpack|wallet/.test(text))
+    return ["fashion", "bags_wallets"];
+
+  // ---- Home & Living ----
+  if (/kitchen|cookware|utensil/.test(text))
+    return ["home_living", "kitchen"];
+
+  if (/light|lamp|bulb/.test(text))
+    return ["home_living", "lighting"];
+
+  if (/bed|mattress|pillow|bath/.test(text))
+    return ["home_living", "bedding_bath"];
+
+  // ---- Fitness ----
+  if (/gym|fitness|dumbbell|yoga/.test(text))
+    return ["fitness_sports", "gym_equipment"];
+
+  // ---- Automotive ----
+  if (/car|bike|automotive/.test(text))
+    return ["automotive", "car_accessories"];
+
+  // ---- Default ----
+  return ["other", "other"];
+}
+
+/* ===============================
    AI Rewrite (ONLY IF NEEDED)
 ================================ */
 async function rewriteWithAI({ title, shortDescription, longDescription }) {
@@ -65,7 +124,7 @@ async function rewriteWithAI({ title, shortDescription, longDescription }) {
         {
           role: "system",
           content:
-            "You are an SEO ecommerce copywriter. Return ONLY valid JSON with keys: short, description. Make content unique, helpful, SEO friendly, and concise.",
+            "You are an SEO ecommerce copywriter. Return ONLY valid JSON with keys: short, description.",
         },
         {
           role: "user",
@@ -83,24 +142,41 @@ ${longDescription}
     });
 
     return JSON.parse(res.choices[0].message.content);
-  } catch (e) {
-    console.error("AI rewrite failed:", e.message);
+  } catch {
     return null;
   }
 }
 
 /* ===============================
-   Create Amazon Link (SMART)
+   CREATE AMAZON LINK
 ================================ */
-async function createAmazonLink({ originalUrl, category, note }) {
+async function createAmazonLink({
+  originalUrl,
+  category,
+  subcategory,
+  tags,
+  note,
+}) {
   const scraped = await scrapeAmazonProduct(originalUrl);
+
+  const [autoCat, autoSub] = resolveCategory({
+    categoryPath: scraped.categoryPath,
+    topCategory: scraped.topCategory,
+    title: scraped.title,
+  });
+
+  const finalCategory =
+    isValidCategory(category) ? category : autoCat;
+
+  const finalSubcategory =
+    isValidSubcategory(finalCategory, subcategory)
+      ? subcategory
+      : autoSub;
 
   let shortDesc = scraped.shortDescription || "";
   let longDesc = scraped.longDescription || "";
 
   let ai = null;
-
-  // 🔥 AI runs ONLY if text is poor
   if (isPoorText(shortDesc) || isPoorText(longDesc)) {
     ai = await rewriteWithAI({
       title: scraped.title,
@@ -112,28 +188,33 @@ async function createAmazonLink({ originalUrl, category, note }) {
   return Link.create({
     id: generateId(),
     source: "amazon",
+
     title: scraped.title || "Amazon Product",
+    shortTitle: scraped.shortTitle,
+    brand: scraped.brand,
+
+    category: finalCategory,
+    subcategory: finalSubcategory,
+    tags: Array.isArray(tags) ? tags : [],
+
+    categoryPath: scraped.categoryPath,
 
     shortDescription:
-      ai?.short ||
-      shortDesc ||
-      `Explore features, design, and everyday usability of ${scraped.title}.`,
+      ai?.short || shortDesc || `Explore ${scraped.title}.`,
 
     longDescription:
-      ai?.description ||
-      longDesc ||
-      `Discover why ${scraped.title} is popular among Amazon shoppers. This product offers practical value, solid build quality, and everyday usefulness.`,
-
-    category: category || "other",
-    note: note || "",
+      ai?.description || longDesc || `Discover ${scraped.title}.`,
 
     originalUrl: stripAmazonTracking(originalUrl),
     affiliateUrl: stripAmazonTracking(originalUrl),
 
-    imageUrl: scraped.imageUrl,
+    imageUrl: scraped.primaryImage,
     images: scraped.images || [],
 
     price: scraped.price || null,
+    priceRaw: scraped.priceText || null,
+    priceCurrency: scraped.priceCurrency || null,
+
     rating: scraped.rating || null,
     reviewsCount: scraped.reviewsCount || null,
 
@@ -152,7 +233,9 @@ router.get("/test", (_, res) => {
 });
 
 router.get("/all", async (_, res) => {
-  const links = await Link.find().sort({ createdAt: -1 }).lean();
+  const links = await Link.find({ isActive: true })
+    .sort({ createdAt: -1 })
+    .lean();
   res.json({ success: true, links });
 });
 
@@ -173,37 +256,6 @@ router.get("/go/:id", async (req, res) => {
   );
   if (!link) return res.status(404).send("Not found");
   res.redirect(link.affiliateUrl || link.originalUrl);
-});
-
-/* ===============================
-   🔥 REFRESH ALL (NO AI)
-================================ */
-router.post("/refresh-all", async (_, res) => {
-  const links = await Link.find({ isActive: true });
-  let updated = 0;
-  let failed = 0;
-
-  for (const link of links) {
-    try {
-      const scraped = await scrapeAmazonProduct(link.originalUrl);
-
-      await Link.updateOne(
-        { _id: link._id },
-        {
-          price: scraped.price || link.price,
-          imageUrl: scraped.imageUrl || link.imageUrl,
-          images: scraped.images || link.images,
-          lastCheckedAt: new Date(),
-        }
-      );
-
-      updated++;
-    } catch (e) {
-      failed++;
-    }
-  }
-
-  res.json({ success: true, total: links.length, updated, failed });
 });
 
 module.exports = router;
