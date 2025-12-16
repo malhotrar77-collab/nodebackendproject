@@ -1,165 +1,745 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>AlwaysOnSale – Control Panel</title>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Affiliate Links Dashboard</title>
 
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #020617;
-      color: #e5e7eb;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 40px auto;
-      padding: 24px;
-    }
-    .row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-    input, select {
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid #374151;
-      background: #020617;
-      color: #e5e7eb;
-    }
-    button {
-      padding: 10px 16px;
-      border-radius: 8px;
-      border: none;
-      background: #f97316;
-      color: #020617;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      padding: 8px;
-      border-bottom: 1px solid #111827;
-      text-align: left;
-    }
-    img {
-      width: 50px;
-      height: 50px;
-      object-fit: cover;
-      border-radius: 6px;
-    }
-  </style>
-</head>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #020617;
+        color: #e5e7eb;
+        margin: 0;
+        padding: 0;
+      }
 
-<body>
-<div class="container">
-  <h1>AlwaysOnSale – Control Panel</h1>
+      .container {
+        max-width: 1100px;
+        margin: 40px auto;
+        background: #020617;
+        border-radius: 12px;
+        padding: 24px 28px 32px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        border: 1px solid #1f2937;
+      }
 
-  <div class="row">
-    <input id="url" placeholder="Amazon product URL" style="flex:1" />
-  </div>
+      h1 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        font-size: 24px;
+      }
 
-  <div class="row">
-    <select id="category">
-      <option value="fashion">fashion</option>
-      <option value="electronics">electronics</option>
-      <option value="home_living">home_living</option>
-      <option value="other">other</option>
-    </select>
+      .small {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-bottom: 8px;
+      }
 
-    <select id="subcategory">
-      <option value="other">other</option>
-      <option value="clothing">clothing</option>
-      <option value="footwear">footwear</option>
-      <option value="audio">audio</option>
-      <option value="computers">computers</option>
-      <option value="watches">watches</option>
-    </select>
-  </div>
+      .row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
 
-  <div class="row">
-    <input id="tags" placeholder="tags (comma separated)" />
-    <input id="note" placeholder="note (optional)" />
-  </div>
+      input[type="text"],
+      textarea {
+        flex: 1;
+        min-width: 240px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #4b5563;
+        background: #020617;
+        color: #e5e7eb;
+        outline: none;
+        font-family: inherit;
+        font-size: 13px;
+      }
 
-  <div class="row">
-    <button id="create">Create Product</button>
-  </div>
+      textarea {
+        resize: vertical;
+      }
 
-  <table>
-    <thead>
-      <tr>
-        <th>Img</th>
-        <th>Title</th>
-        <th>Category</th>
-        <th>Tags</th>
-        <th>Clicks</th>
-      </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
-</div>
+      input[type="text"]:focus,
+      textarea:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 1px #f97316;
+      }
 
-<script>
-async function loadProducts() {
-  const res = await fetch("/api/links/all");
-  const data = await res.json();
+      label {
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #9ca3af;
+      }
 
-  document.getElementById("rows").innerHTML =
-    data.links.map(l => {
-      const img =
-        l.imageUrl ||
-        (Array.isArray(l.images) && l.images[0]) ||
-        "https://via.placeholder.com/50";
+      button {
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        background: #f97316;
+        color: #020617;
+        font-weight: 600;
+        white-space: nowrap;
+      }
 
-      return `
-        <tr>
-          <td><img src="${img}"></td>
-          <td>${l.title || "-"}</td>
-          <td>${l.category} → ${l.subcategory || "other"}</td>
-          <td>${(l.tags||[]).join(", ")}</td>
-          <td>${l.clicks || 0}</td>
-        </tr>
-      `;
-    }).join("");
-}
+      button.secondary {
+        background: #111827;
+        color: #e5e7eb;
+        border: 1px solid #4b5563;
+      }
 
-document.getElementById("create").onclick = async () => {
-  const body = {
-    originalUrl: document.getElementById("url").value,
-    category: document.getElementById("category").value,
-    subcategory: document.getElementById("subcategory").value,
-    tags: document.getElementById("tags").value
-      .split(",")
-      .map(t => t.trim().toLowerCase())
-      .filter(Boolean),
-    note: document.getElementById("note").value
-  };
+      button.danger {
+        background: #ef4444;
+        color: #fee2e2;
+      }
 
-  const res = await fetch("/api/links/create", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
 
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    alert(data.message || "Creation failed");
-    return;
-  }
+      #status {
+        font-size: 13px;
+        min-height: 18px;
+        margin-bottom: 8px;
+      }
 
-  document.getElementById("url").value = "";
-  loadProducts();
-};
+      #status.ok {
+        color: #4ade80;
+      }
 
-loadProducts();
-</script>
-</body>
+      #status.error {
+        color: #f97373;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      th,
+      td {
+        padding: 6px 8px;
+        border-bottom: 1px solid #111827;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #020617;
+        position: sticky;
+        top: 0;
+      }
+
+      td.actions {
+        white-space: nowrap;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        word-break: break-all;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #111827;
+        font-size: 11px;
+        gap: 4px;
+      }
+
+      .badge span {
+        font-weight: 600;
+      }
+
+      .img-thumb {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        background: #020617;
+      }
+
+      .img-placeholder {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        border: 1px dashed #374151;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #4b5563;
+      }
+
+      .section-title {
+        font-size: 18px;
+        margin-top: 24px;
+      }
+
+      .analytics-box {
+        margin-top: 12px;
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .analytics-box h3 {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+
+      .analytics-box ul {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+
+      .analytics-box p {
+        margin: 0;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>Affiliate Links Dashboard</h1>
+      <div class="small">
+        Backend: <code class="mono">/api/links/*</code> (same server) — short
+        redirects: <code class="mono">/api/links/go/:id</code>
+      </div>
+
+      <h2 class="section-title">Create affiliate link</h2>
+      <div id="status"></div>
+
+      <div class="row">
+        <input
+          type="text"
+          id="url-input"
+          placeholder="Paste Amazon product URL or amzn.to link"
+        />
+      </div>
+
+      <div class="row">
+        <input
+          type="text"
+          id="title-input"
+          placeholder="Title (optional if auto)"
+        />
+      </div>
+
+      <div class="row">
+        <input
+          type="text"
+          id="category-input"
+          placeholder="Category (optional, e.g., bags, shoes)"
+        />
+      </div>
+
+      <div class="row">
+        <input
+          type="text"
+          id="note-input"
+          placeholder="Note (optional, e.g., Instagram reel, group A)"
+        />
+      </div>
+
+      <div
+        class="row"
+        style="align-items: center; justify-content: space-between"
+      >
+        <label>
+          <input type="checkbox" id="auto-title-input" checked />
+          Auto title from Amazon (recommended)
+        </label>
+        <div class="small" style="text-align: right">
+          Example URL:
+          <code class="mono">https://amzn.to/48eIkdx</code> or
+          <code class="mono">https://www.amazon.in/...</code>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: 10px">
+        <button id="create-btn">Create affiliate link</button>
+      </div>
+
+      <h3 class="section-title">Bulk create (optional)</h3>
+      <div class="small">
+        Paste up to 10 Amazon URLs below, one per line. If you fill category or
+        note above, they will be applied to all links.
+      </div>
+
+      <div class="row">
+        <textarea
+          id="bulk-input"
+          rows="4"
+          placeholder="Paste multiple Amazon product URLs here, one per line"
+        ></textarea>
+      </div>
+
+      <div class="row">
+        <button id="bulk-btn" class="secondary">Create multiple links</button>
+      </div>
+
+      <h3 class="section-title">Analytics (overview)</h3>
+      <div class="analytics-box" id="analytics-box">
+        <div>
+          <h3>Summary</h3>
+          <p id="summary-text">Links: 0 | Total clicks: 0</p>
+        </div>
+        <div>
+          <h3>Top products by clicks</h3>
+          <ul id="top-clicks-list"></ul>
+        </div>
+      </div>
+
+      <h2 class="section-title">Saved links</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Source</th>
+            <th>Image</th>
+            <th>Title</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Note</th>
+            <th>Original URL</th>
+            <th>Affiliate URL</th>
+            <th>Clicks</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="links-tbody"></tbody>
+      </table>
+    </div>
+
+    <script>
+      // --- DOM refs ---
+      const statusEl = document.getElementById("status");
+      const urlEl = document.getElementById("url-input");
+      const titleEl = document.getElementById("title-input");
+      const categoryEl = document.getElementById("category-input");
+      const noteEl = document.getElementById("note-input");
+      const autoTitleEl = document.getElementById("auto-title-input");
+      const tbodyEl = document.getElementById("links-tbody");
+      const createBtn = document.getElementById("create-btn");
+
+      const bulkInputEl = document.getElementById("bulk-input");
+      const bulkBtn = document.getElementById("bulk-btn");
+
+      const summaryTextEl = document.getElementById("summary-text");
+      const topClicksListEl = document.getElementById("top-clicks-list");
+
+      // --- Helpers ---
+      function setStatus(msg, type = "") {
+        statusEl.textContent = msg || "";
+        statusEl.className = "";
+        if (type) statusEl.classList.add(type);
+      }
+
+      function getErrorMessage(data, fallback) {
+        if (!data) return fallback;
+        return data.error || data.message || fallback;
+      }
+
+      function updateAnalytics(links) {
+        const totalLinks = links.length;
+        const totalClicks = links.reduce(
+          (sum, l) => sum + (Number(l.clicks) || 0),
+          0
+        );
+
+        summaryTextEl.textContent = `Links: ${totalLinks} | Total clicks: ${totalClicks}`;
+
+        const sorted = [...links].sort(
+          (a, b) => (b.clicks || 0) - (a.clicks || 0)
+        );
+        const top = sorted.slice(0, 3);
+
+        topClicksListEl.innerHTML = "";
+        if (!top.length) {
+          const li = document.createElement("li");
+          li.textContent = "— No clicks yet";
+          topClicksListEl.appendChild(li);
+          return;
+        }
+
+        for (const link of top) {
+          const li = document.createElement("li");
+          const label =
+            link.title && link.title !== "-"
+              ? link.title
+              : link.originalUrl || link.rawOriginalUrl || "(no title)";
+          li.textContent = `${label} — ${link.clicks || 0} click${
+            (link.clicks || 0) === 1 ? "" : "s"
+          }`;
+          topClicksListEl.appendChild(li);
+        }
+      }
+
+      // --- Load + render links ---
+      async function loadLinks() {
+        try {
+          setStatus("Loading links...");
+          const res = await fetch("/api/links/all");
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(getErrorMessage(data, "Failed to load links."));
+          }
+          const links = data.links || [];
+          renderLinks(links);
+          updateAnalytics(links);
+          setStatus(`Loaded ${links.length} link(s).`, "ok");
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+          renderLinks([]);
+          updateAnalytics([]);
+        }
+      }
+
+      function renderLinks(links) {
+        tbodyEl.innerHTML = "";
+
+        if (!links.length) {
+          const tr = document.createElement("tr");
+          const td = document.createElement("td");
+          td.colSpan = 12;
+          td.textContent = "No links yet. Create one above.";
+          tr.appendChild(td);
+          tbodyEl.appendChild(tr);
+          return;
+        }
+
+        for (const link of links) {
+          const tr = document.createElement("tr");
+
+          const tdId = document.createElement("td");
+          tdId.textContent = link.id || "";
+          tr.appendChild(tdId);
+
+          const tdSource = document.createElement("td");
+          tdSource.textContent = link.source || "-";
+          tr.appendChild(tdSource);
+
+          const tdImg = document.createElement("td");
+          if (link.imageUrl) {
+            const img = document.createElement("img");
+            img.src = link.imageUrl;
+            img.alt = link.title || "product";
+            img.className = "img-thumb";
+            tdImg.appendChild(img);
+          } else {
+            const ph = document.createElement("div");
+            ph.className = "img-placeholder";
+            ph.textContent = "no img";
+            tdImg.appendChild(ph);
+          }
+          tr.appendChild(tdImg);
+
+          const tdTitle = document.createElement("td");
+          tdTitle.textContent = link.title || "-";
+          tr.appendChild(tdTitle);
+
+          const tdCat = document.createElement("td");
+          tdCat.textContent = link.category || "-";
+          tr.appendChild(tdCat);
+
+          const tdPrice = document.createElement("td");
+          tdPrice.textContent = link.price || "-";
+          tr.appendChild(tdPrice);
+
+          const tdNote = document.createElement("td");
+          tdNote.textContent = link.note || "-";
+          tr.appendChild(tdNote);
+
+          const tdOriginal = document.createElement("td");
+          tdOriginal.innerHTML = `<div class="mono">${
+            link.originalUrl || link.rawOriginalUrl || ""
+          }</div>`;
+          tr.appendChild(tdOriginal);
+
+          const tdAff = document.createElement("td");
+          tdAff.innerHTML = `<div class="mono">${link.affiliateUrl || ""}</div>`;
+          tr.appendChild(tdAff);
+
+          const tdClicks = document.createElement("td");
+          const clicks = link.clicks || 0;
+          tdClicks.innerHTML = `<span class="badge"><span>${clicks}</span> clicks</span>`;
+          tr.appendChild(tdClicks);
+
+          const tdCreated = document.createElement("td");
+          if (link.createdAt) {
+            tdCreated.textContent = new Date(
+              link.createdAt
+            ).toLocaleString();
+          } else {
+            tdCreated.textContent = "-";
+          }
+          tr.appendChild(tdCreated);
+
+          const tdActions = document.createElement("td");
+          tdActions.className = "actions";
+
+          const editBtn = document.createElement("button");
+          editBtn.className = "secondary";
+          editBtn.textContent = "Edit";
+          editBtn.onclick = () => editLink(link);
+
+          const copyAffBtn = document.createElement("button");
+          copyAffBtn.className = "secondary";
+          copyAffBtn.textContent = "Copy affiliate URL";
+          copyAffBtn.onclick = () =>
+            copyToClipboard(link.affiliateUrl || "");
+
+          const shortBtn = document.createElement("button");
+          shortBtn.className = "secondary";
+          shortBtn.textContent = "Copy short link";
+          shortBtn.onclick = () =>
+            copyToClipboard(`/api/links/go/${link.id}`);
+
+          const openBtn = document.createElement("button");
+          openBtn.textContent = "Open tracked link";
+          openBtn.onclick = () =>
+            window.open(`/api/links/go/${link.id}`, "_blank");
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "danger";
+          delBtn.textContent = "Delete";
+          delBtn.onclick = () => deleteLink(link.id);
+
+          tdActions.appendChild(editBtn);
+          tdActions.appendChild(copyAffBtn);
+          tdActions.appendChild(shortBtn);
+          tdActions.appendChild(openBtn);
+          tdActions.appendChild(delBtn);
+
+          tr.appendChild(tdActions);
+          tbodyEl.appendChild(tr);
+        }
+      }
+
+      // --- Single create ---
+      async function createLink() {
+        const url = (urlEl.value || "").trim();
+        const title = (titleEl.value || "").trim();
+        const category = (categoryEl.value || "").trim();
+        const note = (noteEl.value || "").trim();
+        const autoTitle = !!autoTitleEl.checked;
+
+        if (!url) {
+          setStatus("Please paste an Amazon product URL first.", "error");
+          return;
+        }
+
+        createBtn.disabled = true;
+        setStatus("Creating link...");
+
+        try {
+          const res = await fetch("/api/links/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              originalUrl: url,
+              title,
+              category,
+              note,
+              autoTitle,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(getErrorMessage(data, "Failed to create link."));
+          }
+
+          urlEl.value = "";
+          titleEl.value = "";
+          setStatus("Link created.", "ok");
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+        } finally {
+          createBtn.disabled = false;
+        }
+      }
+
+      // --- Bulk create ---
+      async function bulkCreateLinks() {
+        const raw = (bulkInputEl.value || "").trim();
+        if (!raw) {
+          setStatus("Paste some URLs into the bulk box first.", "error");
+          return;
+        }
+
+        const lines = raw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        if (!lines.length) {
+          setStatus("No valid URLs found in bulk box.", "error");
+          return;
+        }
+
+        if (lines.length > 10) {
+          setStatus("Please limit to 10 URLs at once.", "error");
+          return;
+        }
+
+        const category = (categoryEl.value || "").trim();
+        const note = (noteEl.value || "").trim();
+        const autoTitle = !!autoTitleEl.checked;
+
+        bulkBtn.disabled = true;
+        setStatus(`Creating ${lines.length} link(s)...`);
+
+        try {
+          const res = await fetch("/api/links/bulk1", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              urlsText: raw, // whole textarea, backend splits
+              category,
+              note,
+              autoTitle,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(getErrorMessage(data, "Bulk create failed."));
+          }
+
+          bulkInputEl.value = "";
+          setStatus(
+            `Created ${data.created || data.createdCount || lines.length} link(s).`,
+            "ok"
+          );
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+        } finally {
+          bulkBtn.disabled = false;
+        }
+      }
+
+      // --- Edit / delete / copy ---
+      async function editLink(link) {
+        const currentTitle = link.title || "";
+        const currentCategory = link.category || "";
+        const currentPrice = link.price || "";
+        const currentNote = link.note || "";
+
+        const newTitle = window.prompt("Title", currentTitle);
+        if (newTitle === null) return;
+
+        const newCategory = window.prompt("Category", currentCategory);
+        if (newCategory === null) return;
+
+        const newPrice = window.prompt(
+          "Price (optional, e.g. ₹1499)",
+          currentPrice
+        );
+        if (newPrice === null) return;
+
+        const newNote = window.prompt("Note", currentNote);
+        if (newNote === null) return;
+
+        setStatus("Saving changes...");
+
+        try {
+          const res = await fetch(
+            `/api/links/update/${encodeURIComponent(link.id)}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: newTitle,
+                category: newCategory,
+                price: newPrice,
+                note: newNote,
+              }),
+            }
+          );
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(getErrorMessage(data, "Failed to update link."));
+          }
+          setStatus("Link updated.", "ok");
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+        }
+      }
+
+      async function deleteLink(id) {
+        if (!id) return;
+        if (!confirm(`Delete link ${id}?`)) return;
+
+        try {
+          const res = await fetch(
+            `/api/links/delete/${encodeURIComponent(id)}`,
+            { method: "DELETE" }
+          );
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(getErrorMessage(data, "Failed to delete link."));
+          }
+          setStatus("Link deleted.", "ok");
+          await loadLinks();
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message, "error");
+        }
+      }
+
+      async function copyToClipboard(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          setStatus("Copied to clipboard.", "ok");
+        } catch (err) {
+          console.error(err);
+          setStatus("Could not copy to clipboard.", "error");
+        }
+      }
+
+      // --- Wire events ---
+      createBtn.addEventListener("click", createLink);
+      urlEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") createLink();
+      });
+
+      bulkBtn.addEventListener("click", bulkCreateLinks);
+
+      window.addEventListener("DOMContentLoaded", loadLinks);
+    </script>
+  </body>
 </html>
