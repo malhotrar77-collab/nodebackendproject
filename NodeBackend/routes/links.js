@@ -1,31 +1,13 @@
 // NodeBackend/routes/links.js
 const express = require("express");
-const axios = require("axios");
 const Link = require("../models/link");
 const { scrapeAmazonProduct } = require("../scrapers/amazon");
 const {
-  TAXONOMY,
   isValidCategory,
   isValidSubcategory,
 } = require("../taxonomy/categories");
 
 const router = express.Router();
-
-/* ===============================
-   OpenAI (SAFE + MINIMAL)
-================================ */
-let openai = null;
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
-
-if (OPENAI_KEY) {
-  try {
-    const { OpenAI } = require("openai");
-    openai = new OpenAI({ apiKey: OPENAI_KEY });
-    console.log("✅ OpenAI ready");
-  } catch (e) {
-    console.warn("⚠️ OpenAI init failed:", e.message);
-  }
-}
 
 /* ===============================
    Helpers
@@ -48,107 +30,37 @@ function stripAmazonTracking(url) {
   }
 }
 
-function isPoorText(txt) {
-  if (!txt) return true;
-  if (txt.length < 80) return true;
-  if (/simple|useful|daily life/i.test(txt)) return true;
-  return false;
-}
-
 /* ===============================
-   CATEGORY RESOLVER (CORE)
+   CATEGORY RESOLVER (SAFE)
 ================================ */
-
 function resolveCategory({ categoryPath = [], topCategory = "", title = "" }) {
   const text = [...categoryPath, topCategory, title]
     .join(" ")
     .toLowerCase();
 
-  // ---- Electronics ----
-  if (/headphone|earbud|speaker|audio/.test(text))
-    return ["electronics", "audio"];
-
-  if (/laptop|computer|keyboard|mouse|monitor/.test(text))
-    return ["electronics", "computers"];
-
-  if (/smart watch|fitness band|wearable/.test(text))
-    return ["electronics", "wearables"];
-
-  if (/router|wifi|network/.test(text))
-    return ["electronics", "networking"];
-
-  // ---- Fashion ----
   if (/shoe|sneaker|footwear/.test(text))
     return ["fashion", "footwear"];
 
-  if (/shirt|t-shirt|jeans|trouser|clothing/.test(text))
+  if (/shirt|t-shirt|jeans|clothing/.test(text))
     return ["fashion", "clothing"];
 
-  if (/bag|backpack|wallet/.test(text))
-    return ["fashion", "bags_wallets"];
+  if (/headphone|earbud|speaker/.test(text))
+    return ["electronics", "audio"];
 
-  // ---- Home & Living ----
-  if (/kitchen|cookware|utensil/.test(text))
-    return ["home_living", "kitchen"];
+  if (/laptop|computer|keyboard|mouse/.test(text))
+    return ["electronics", "computers"];
 
-  if (/light|lamp|bulb/.test(text))
-    return ["home_living", "lighting"];
+  if (/watch/.test(text))
+    return ["fashion", "watches"];
 
-  if (/bed|mattress|pillow|bath/.test(text))
-    return ["home_living", "bedding_bath"];
+  if (/tv|television/.test(text))
+    return ["electronics", "smart_devices"];
 
-  // ---- Fitness ----
-  if (/gym|fitness|dumbbell|yoga/.test(text))
-    return ["fitness_sports", "gym_equipment"];
-
-  // ---- Automotive ----
-  if (/car|bike|automotive/.test(text))
-    return ["automotive", "car_accessories"];
-
-  // ---- Default ----
   return ["other", "other"];
 }
 
 /* ===============================
-   AI Rewrite (ONLY IF NEEDED)
-================================ */
-async function rewriteWithAI({ title, shortDescription, longDescription }) {
-  if (!openai) return null;
-
-  try {
-    const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      max_tokens: 300,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an SEO ecommerce copywriter. Return ONLY valid JSON with keys: short, description.",
-        },
-        {
-          role: "user",
-          content: `
-Product title: ${title}
-
-Original short description:
-${shortDescription}
-
-Original long description:
-${longDescription}
-          `,
-        },
-      ],
-    });
-
-    return JSON.parse(res.choices[0].message.content);
-  } catch {
-    return null;
-  }
-}
-
-/* ===============================
-   CREATE AMAZON LINK
+   CREATE AMAZON LINK (STABLE)
 ================================ */
 async function createAmazonLink({
   originalUrl,
@@ -157,6 +69,10 @@ async function createAmazonLink({
   tags,
   note,
 }) {
+  if (!originalUrl) {
+    throw new Error("Amazon URL is required");
+  }
+
   const scraped = await scrapeAmazonProduct(originalUrl);
 
   const [autoCat, autoSub] = resolveCategory({
@@ -165,25 +81,18 @@ async function createAmazonLink({
     title: scraped.title,
   });
 
-  const finalCategory =
-    isValidCategory(category) ? category : autoCat;
+  const finalCategory = isValidCategory(category)
+    ? category
+    : autoCat;
 
-  const finalSubcategory =
-    isValidSubcategory(finalCategory, subcategory)
-      ? subcategory
-      : autoSub;
+  const finalSubcategory = isValidSubcategory(finalCategory, subcategory)
+    ? subcategory
+    : autoSub;
 
-  let shortDesc = scraped.shortDescription || "";
-  let longDesc = scraped.longDescription || "";
-
-  let ai = null;
-  if (isPoorText(shortDesc) || isPoorText(longDesc)) {
-    ai = await rewriteWithAI({
-      title: scraped.title,
-      shortDescription: shortDesc,
-      longDescription: longDesc,
-    });
-  }
+  const primaryImage =
+    scraped.primaryImage ||
+    (Array.isArray(scraped.images) && scraped.images[0]) ||
+    null;
 
   return Link.create({
     id: generateId(),
@@ -197,18 +106,15 @@ async function createAmazonLink({
     subcategory: finalSubcategory,
     tags: Array.isArray(tags) ? tags : [],
 
-    categoryPath: scraped.categoryPath,
+    categoryPath: scraped.categoryPath || [],
 
-    shortDescription:
-      ai?.short || shortDesc || `Explore ${scraped.title}.`,
-
-    longDescription:
-      ai?.description || longDesc || `Discover ${scraped.title}.`,
+    shortDescription: scraped.shortDescription || "",
+    longDescription: scraped.longDescription || "",
 
     originalUrl: stripAmazonTracking(originalUrl),
     affiliateUrl: stripAmazonTracking(originalUrl),
 
-    imageUrl: scraped.primaryImage,
+    imageUrl: primaryImage,
     images: scraped.images || [],
 
     price: scraped.price || null,
@@ -228,10 +134,6 @@ async function createAmazonLink({
    ROUTES
 ================================ */
 
-router.get("/test", (_, res) => {
-  res.json({ success: true });
-});
-
 router.get("/all", async (_, res) => {
   const links = await Link.find({ isActive: true })
     .sort({ createdAt: -1 })
@@ -244,7 +146,11 @@ router.post("/create", async (req, res) => {
     const link = await createAmazonLink(req.body);
     res.json({ success: true, link });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    console.error("CREATE FAILED:", e);
+    res.status(500).json({
+      success: false,
+      message: e.message || "Product creation failed",
+    });
   }
 });
 
