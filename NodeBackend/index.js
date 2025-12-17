@@ -1,7 +1,8 @@
-// index.js
+// NodeBackend/index.js
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+
 require("./db"); // connect to MongoDB
 const linksRoute = require("./routes/links");
 
