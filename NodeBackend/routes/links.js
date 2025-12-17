@@ -1,4 +1,4 @@
-// NodeBackend/routes/links.js
+// routes/links.js
 const express = require("express");
 const axios = require("axios");
 const Link = require("../models/link");
@@ -161,6 +161,10 @@ router.post("/create", async (req, res) => {
     const link = await createAmazonLink(req.body);
     res.json({ success: true, link });
   } catch (e) {
+    if (e.message.includes("Amazon bot protection page detected")) {
+      console.error("Bot protection triggered. Please try again later.");
+      return res.status(429).json({ success: false, message: "Bot protection triggered. Please try again later." });
+    }
     res.status(500).json({ success: false, message: e.message });
   }
 });
