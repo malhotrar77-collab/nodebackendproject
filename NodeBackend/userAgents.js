@@ -13,4 +13,3 @@ function pickCostume() {
 }
 
 module.exports = { pickCostume };
-Edit
